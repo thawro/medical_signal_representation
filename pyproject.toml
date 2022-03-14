@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "msr"
+version = "0.1.0"
+description = ""
+authors = ["shate"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+numpy = "^1.22.3"
+pandas = "^1.4.1"
+jupyterlab = "^3.3.2"
+seaborn = "^0.11.2"
+plotly = "^5.6.0"
+biosppy = "^0.8.0"
+mlflow = "^1.24.0"
+optuna = "^2.10.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
