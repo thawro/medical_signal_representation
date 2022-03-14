@@ -1,3 +1,22 @@
+# About
+
+
+# Directory structure
+
+```bash
+├── ...
+├── data                    # Datasets
+│   ├── mimic               # MIMIC dataset: 'V', 'PLETH' and 'ABP' signals data
+│   └── ptbxl               # PTB-XL dataset: 12-leads ECG signals data and diagnostic classes assigned to each sample
+└── src                     # Source files
+    ├── ...
+    ├── data                # data module: data loading etc.
+    ├── models              # models module: DeepLearning models
+    └── signals             # signals module: Signal classes made for signal exploration and feature extraction
+```
+
+
+
 # Datasets used
 
 1. PTB-XL
