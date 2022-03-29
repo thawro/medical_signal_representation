@@ -141,6 +141,84 @@
 
 
 
+# Signals
+
+## All signals
+
+1. Papers
+
+2. Features
+    * Statistical features
+        * quantiles
+        * mean
+        * median
+        * minimum
+        * maximum
+        * variance
+        * skewness
+        * kurtosis
+    * Other
+        * zero crossing
+        *
+
+## ECG (Electrocardiogram)
+
+1. Papers
+    * [A novel ECG signal classification method using DEA-ELM](https://www.sciencedirect.com/science/article/pii/S0306987719312381#b0085)
+    * [An Overview of Heart Rate Variability Metrics and Norms](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5624990/)
+    *
+
+2. Features
+    * Single episode:
+        * for each peak (P, Q, R, S, T):
+            * start time
+            * end time
+            * duration
+            * peak time
+            * peak val
+            * onset slope
+            * offset slope
+            * surface
+            * energy
+        * PQ segment and interval
+        * PR segment and interval
+        * ST segment and interval
+        * QT segment and interval
+        * QRS interval
+    * Many episodes:
+        * PP interval
+        * QQ interval
+        * RR interval
+        * SS interval
+        * TT interval
+        * P signal
+        * Q signal
+        * R signal
+        * S signal
+        * T signal
+        * most dominant frequency
+        * HRV features:
+            * heart rate
+            * breathing rate
+            * SDRR
+            * SDNN
+            * RMSSD
+
+
+
+## PPG (Photopletysmogram)
+
+1. Papers
+    *
+
+2. Features
+    *
+
+## GSR
+
+1. Papers:
+    * [What is GSR (galvanic skin response) and how does it work?](https://imotions.com/blog/gsr/)
+
 # Extra libs:
 
  * [BioSPPy](https://github.com/PIA-Group/BioSPPy) - nice lib, PPG and ECG preprocessing available
