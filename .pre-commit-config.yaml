@@ -17,6 +17,9 @@ repos:
         language: python
         require_serial: true
         types_or: [python, pyi]
+        args: # arguments to configure black
+          - --line-length=120
+
 
       - id: blacken-docs
         name: blacken-docs

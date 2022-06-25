@@ -1,11 +1,11 @@
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-import wfdb
-from tqdm import tqdm
+import pandas as pd
 import requests
+import seaborn as sns
+import wfdb
 from joblib import Parallel, delayed
+from tqdm import tqdm
 
 if __name__ == "__main__":
     mimic_name = "mimic3wdb-matched"
@@ -27,12 +27,17 @@ if __name__ == "__main__":
     good_measurements = []
 
     for record in tqdm(all_records, desc="Records"):
-        record_measurements = requests.get(f"https://physionet.org/files/{mimic_name}/1.0/{record}/RECORDS").text.split("\n")
+        record_measurements = requests.get(f"https://physionet.org/files/{mimic_name}/1.0/{record}/RECORDS").text.split(
+            "\n"
+        )
         record_measurements = [measurement for measurement in record_measurements if len(measurement) > 0]
-        results = Parallel(n_jobs=-1)(delayed(is_good_measurement)(record, measurement) for measurement in tqdm(record_measurements, desc="Record measurements", leave=False))
+        results = Parallel(n_jobs=-1)(
+            delayed(is_good_measurement)(record, measurement)
+            for measurement in tqdm(record_measurements, desc="Record measurements", leave=False)
+        )
         results = [result for result in results if result is not None]
         good_measurements.extend(results)
-        
+
     textfile = open("good_measurements.txt", "w")
 
     for element in good_measurements:

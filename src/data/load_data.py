@@ -37,12 +37,8 @@ def load_ptbxl_data(sampling_rate, path, target="diagnostic_class"):
     agg_df = pd.read_csv(path / "scp_statements.csv", index_col=0)
     agg_df = agg_df[agg_df.diagnostic == 1]
 
-    Y["diagnostic_class"] = Y.scp_codes.apply(
-        lambda codes: aggregate_class(codes, "diagnostic_class")
-    )
-    Y["diagnostic_subclass"] = Y.scp_codes.apply(
-        lambda codes: aggregate_class(codes, "diagnostic_subclass")
-    )
+    Y["diagnostic_class"] = Y.scp_codes.apply(lambda codes: aggregate_class(codes, "diagnostic_class"))
+    Y["diagnostic_subclass"] = Y.scp_codes.apply(lambda codes: aggregate_class(codes, "diagnostic_subclass"))
 
     # Split data into train and test
     val_fold = 9

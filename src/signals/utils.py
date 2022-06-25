@@ -1,4 +1,5 @@
 import inspect
+
 import pandas as pd
 
 
@@ -17,13 +18,13 @@ def create_new_obj(obj, **kwargs):
 
 
 def parse_nested_feats(nested_feats):
-    feats_df = pd.json_normalize(nested_feats, sep='__')
-    return feats_df.to_dict(orient='records')[0]
-    
-    
+    feats_df = pd.json_normalize(nested_feats, sep="__")
+    return feats_df.to_dict(orient="records")[0]
+
+
 def get_outliers_mask(arr, IQR_scale):
     return (arr < np.mean(arr) + IQR_scale * np.std(arr)) & (arr > np.mean(arr) - IQR_scale * np.std(arr))
-    
-    
+
+
 def z_score(arr):
     return (arr - arr.mean()) / arr.std()
