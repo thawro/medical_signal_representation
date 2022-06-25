@@ -1,5 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from biosppy.signals.ecg import ecg
+from scipy.signal import find_peaks
 
 from signals.base import BeatSignal, PeriodicSignal
 
@@ -16,7 +18,7 @@ class ECGSignal(PeriodicSignal):
 
     def get_beats(self, resample_beats=True, n_samples=100, validate=True, plot=False):
         if self.rpeaks is None:
-            self.rpeaks()
+            self.find_rpeaks()
         beats = self.ecg_info["templates"]
         beats_time = self.ecg_info["templates_ts"]
         beats_fs = len(beats_time) / beats_time[-1]
@@ -31,6 +33,8 @@ class ECGSignal(PeriodicSignal):
         if self.beats is None:
             self.get_beats(**kwargs)
         beats_to_aggregate_mask = self.valid_beats_mask if valid_only else len(self.beats) * [True]
+        if beats_to_aggregate_mask is None:
+            beats_to_aggregate_mask = len(self.beats) * [True]
         beats_to_aggregate = self.beats[beats_to_aggregate_mask]
         beats_data = np.array([beat.data for beat in beats_to_aggregate])
         beats_times = np.array([beat.time for beat in beats_to_aggregate])
@@ -54,9 +58,12 @@ class ECGSignal(PeriodicSignal):
         return self.ecg_features
 
     def extract_features(self, plot=True):
+        single_ecg = self.aggregate()
         self.features = super().extract_features()
         ecg_features = {"ecg_features": self.extract_ecg_features()}
+        agg_beat_features = {"agg_beat_features": single_ecg.extract_agg_beat_features(plot=plot)}
         self.features.update(ecg_features)
+        self.features.update(agg_beat_features)
         return self.features
 
 
@@ -64,5 +71,66 @@ class ECGBeat(BeatSignal):
     def __init__(self, name, data, fs, start_sec, beat_num=0):
         super().__init__(name, data, fs, start_sec, beat_num)
 
-    def extract_agg_beat_features(self, plot=True):
-        pass
+    def find_r_peak(self):
+        self.r_loc = self.data.argmax()
+        self.r_val = self.data[self.r_loc]
+        self.r_time = self.time[self.r_loc]
+        return self.r_loc
+
+    def find_p_peak(self):
+        zero_to_r_data = self.data[: self.r_loc]
+        peaks, _ = find_peaks(zero_to_r_data)
+        biggest_peak_idx = np.array([zero_to_r_data[peak] for peak in peaks]).argmax()
+
+        self.p_loc = peaks[biggest_peak_idx]  # zero_to_r_data.argmax()
+        self.p_val = self.data[self.p_loc]
+        self.p_time = self.time[self.p_loc]
+        return self.p_loc
+
+    def find_q_notch(self):
+        p_to_r_data = self.data[self.p_loc : self.r_loc]
+        self.q_loc = p_to_r_data.argmin() + self.p_loc
+        self.q_val = self.data[self.q_loc]
+        self.q_time = self.time[self.q_loc]
+        return self.q_loc
+
+    def find_s_notch(self):
+        r_to_end_data = self.data[self.r_loc :]
+        troughs, _ = find_peaks(-r_to_end_data)
+        self.s_loc = troughs[0] + self.r_loc
+        self.s_val = self.data[self.s_loc]
+        self.s_time = self.time[self.s_loc]
+        return self.s_loc
+
+    def find_t_peak(self):
+        s_to_end_data = self.data[self.s_loc :]
+        peaks, _ = find_peaks(s_to_end_data)
+        biggest_peak_idx = np.array([s_to_end_data[peak] for peak in peaks]).argmax()
+
+        self.t_loc = peaks[biggest_peak_idx] + self.s_loc  # zero_to_r_data.argmax()
+        self.t_val = self.data[self.t_loc]
+        self.t_time = self.time[self.t_loc]
+        return self.t_loc
+
+    def extract_agg_beat_features(self, plot=True, ax=None):
+        self.find_r_peak()
+        self.find_p_peak()
+        self.find_q_notch()
+        self.find_s_notch()
+        self.find_t_peak()
+
+        crit_points = {"p": self.p_loc, "q": self.q_loc, "r": self.r_loc, "s": self.s_loc, "t": self.t_loc}
+        if plot and ax is None:
+            fig, ax = plt.subplots(figsize=(12, 7))
+            ax.plot(self.time, self.data)
+
+        feats = {}
+        for name, loc in crit_points.items():
+            t, val = self.time[loc], self.data[loc]
+            feats[f"{name}_loc"] = loc
+            feats[f"{name}_time"] = t
+            feats[f"{name}_val"] = val
+            if plot:
+                ax.scatter(t, val, label=name, s=120)
+                ax.legend()
+        return feats

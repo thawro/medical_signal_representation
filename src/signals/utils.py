@@ -19,7 +19,8 @@ def create_new_obj(obj, **kwargs):
 
 def parse_nested_feats(nested_feats):
     feats_df = pd.json_normalize(nested_feats, sep="__")
-    return feats_df.to_dict(orient="records")[0]
+    feats = feats_df.to_dict(orient="records")[0]
+    return {name[2:]: val for name, val in feats.items()}
 
 
 def get_outliers_mask(arr, IQR_scale):
