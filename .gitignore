@@ -128,3 +128,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /data
+/mimic_db
+*.hea
+*.dat
+
+writing_tips
