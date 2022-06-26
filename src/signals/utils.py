@@ -17,6 +17,18 @@ def create_new_obj(obj, **kwargs):
     return obj.__class__(**args)
 
 
+def lazy_property(fn):
+    attr_name = "_lazy_" + fn.__name__
+
+    @property
+    def _lazy_property(self):
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, fn(self))
+        return getattr(self, attr_name)
+
+    return _lazy_property
+
+
 def parse_nested_feats(nested_feats):
     feats_df = pd.json_normalize(nested_feats, sep="__")
     feats = feats_df.to_dict(orient="records")[0]

@@ -160,7 +160,10 @@ class BaseSignal:
         if width == -1:
             width = self.time[-1] - start_time
         end_time = start_time + width
-        signal_slice = self.get_slice(start_time, end_time)
+        if end_time - start_time >= self.duration:
+            signal_slice = self
+        else:
+            signal_slice = self.get_slice(start_time, end_time)
         if scatter:
             sig_plot = ax.scatter(signal_slice.time, signal_slice.data, lw=3, label=signal_slice.name)
             plots = [sig_plot]
