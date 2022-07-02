@@ -1,17 +1,18 @@
 import inspect
-from typing import Dict, Union
+from typing import Callable, Dict, Union
 
+import numpy as np
 import pandas as pd
 
 
-def create_new_obj(obj: Object, **kwargs) -> Object:
+def create_new_obj(obj: object, **kwargs) -> object:
     """Create new instance of object passed with new arguments specified in `kwargs`.
 
     Args:
-        obj (Object): Object used as source of attributes for new object instance.
+        obj (object): Object used as source of attributes for new object instance.
 
     Returns:
-        Object: New object instance with newly specified attributed.
+        object: New object instance with newly specified attributed.
     """
     init_args = list(inspect.signature(obj.__init__).parameters.items())
     args = {}
@@ -26,14 +27,14 @@ def create_new_obj(obj: Object, **kwargs) -> Object:
     return obj.__class__(**args)
 
 
-def lazy_property(fn: function) -> function:
+def lazy_property(fn: Callable) -> Callable:
     """Lazily evaluated property.
 
     Args:
-        fn (function): Function to decorate.
+        fn (Callable): Function to decorate.
 
     Returns:
-        function: Decorated function.
+        Callable: Decorated function.
     """
     attr_name = "_lazy_" + fn.__name__
 
@@ -47,7 +48,7 @@ def lazy_property(fn: function) -> function:
 
 
 def parse_nested_feats(
-    nested_feats: Dict[str, Dict[Union[float, int, str]]], sep: str = "__"
+    nested_feats: Dict[str, Dict[str, Union[float, int, str]]], sep: str = "__"
 ) -> Dict[str, Union[float, int, str]]:
     """Flatten nested features, i.e. keys are concatenated using specified separator.
 

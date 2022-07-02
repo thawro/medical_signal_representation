@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 from scipy import integrate
 from scipy.fft import rfft, rfftfreq
-from scipy.interpolate import interp1d
+from scipy.interpolate import PchipInterpolator, interp1d
 from scipy.signal import (
     butter,
     cheby2,
@@ -49,10 +49,13 @@ class BaseSignal:
         return self.peaks
 
     def interpolate(self, fs, kind="cubic"):
-        interp_fn = interp1d(self.time, self.data, kind=kind, fill_value="extrapolate")
+        if kind == "pchip":
+            interp_fn = PchipInterpolator(self.time, self.data)
+        else:
+            interp_fn = interp1d(self.time, self.data, kind=kind, fill_value="extrapolate")
         n_samples = int(self.n_samples * fs / self.fs)
         new_time = np.arange(0, n_samples) / fs
-        new_time = new_time[(new_time >= self.time[0]) & (new_time <= self.time[-1])]
+        # new_time = new_time[(new_time >= self.time[0]) & (new_time <= self.time[-1])]
         interpolated = interp_fn(new_time)
         new_name = self.name + f"_interp({fs:.2f}Hz)"
         return create_new_obj(self, name=new_name, data=interpolated, fs=fs)
@@ -63,6 +66,11 @@ class BaseSignal:
         new_fs = self.fs * fs_scaler
         new_name = self.name + f"_resampled({n_samples})"
         return create_new_obj(self, name=new_name, data=new_data, fs=new_fs)
+
+    def resample_with_interpolation(self, n_samples, kind="cubic"):
+        fs_scaler = n_samples / self.n_samples
+        new_fs = self.fs * fs_scaler
+        return self.interpolate(new_fs, kind=kind)
 
     def z_score(self):
         new_data = z_score(self.data)

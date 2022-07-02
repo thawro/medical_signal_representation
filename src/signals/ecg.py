@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import neurokit2 as nk
 import numpy as np
 from biosppy.signals.ecg import ecg
 from scipy.signal import find_peaks
@@ -7,26 +8,79 @@ from signals.base import BeatSignal, PeriodicSignal
 from signals.utils import lazy_property
 
 
+def get_ecg_beats(ecg_sig, fs=100, return_raw=True):
+    clean_ecg = nk.ecg_clean(ecg_sig, sampling_rate=fs)
+    qrs_epochs = nk.ecg_segment(clean_ecg, rpeaks=None, sampling_rate=fs, show=False)
+    beats_times = []
+    beats_data = []
+    intervals = []
+    prev_end_idx = qrs_epochs["1"].Index.values[-1]
+    for idx, beat in qrs_epochs.items():
+        idx = int(idx)
+        if idx == 1:
+            beats_times.append(beat.index.values)
+            beats_data.append(beat.Signal.values)
+        else:
+            start_idx = np.where(beat.Index.values == prev_end_idx)[0][0]
+            beat = beat.iloc[start_idx:]
+            beats_times.append(beat.index.values)
+            beats_data.append(beat.Signal.values)
+        prev_end_idx = beat.Index.values[-1]
+        intervals.append([beat.Index.values[0], beat.Index.values[-1]])
+
+    avg_start_time = np.median([beat[0] for beat in beats_times[1:]])
+    first_beat_mask = beats_times[0] > avg_start_time
+    beats_times[0] = beats_times[0][first_beat_mask]
+    beats_data[0] = beats_data[0][first_beat_mask]
+    intervals[0][0] = intervals[0][0] + (first_beat_mask == False).sum()
+    intervals = [tuple(interval) for interval in intervals]
+    if return_raw:
+        beats_data = [ecg_sig[start_idx : end_idx + 1] for start_idx, end_idx in intervals]
+    return intervals, beats_times, beats_data
+
+
 class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
-        self.ecg_info = ecg(data, fs, show=False)
-        self.rpeaks = None
+        self.cleaned = nk.ecg_clean(self.data, sampling_rate=self.fs)
 
-    def find_rpeaks(self):
-        self.rpeaks = self.ecg_info["rpeaks"]
-        return self.rpeaks
+    @lazy_property
+    def rpeaks(self):
+        return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs)[1]["ECG_R_Peaks"]
 
-    def get_beats(self, resample_beats=True, n_samples=100, validate=True, plot=False):
-        if self.rpeaks is None:
-            self.find_rpeaks()
-        beats = self.ecg_info["templates"]
-        beats_time = self.ecg_info["templates_ts"]
-        beats_fs = len(beats_time) / beats_time[-1]
-        self.beats = []
-        for i, beat in enumerate(beats):
-            self.beats.append(ECGBeat(f"beat_{i}", beat, beats_fs, start_sec=i * beats_fs))
-        self.beats = np.array(self.beats)
+    def get_beats(self, resample_beats=True, n_samples=100, validate=True, plot=False, use_raw=True):
+        qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=None, sampling_rate=self.fs, show=False)
+        beats_times = []
+        beats_data = []
+        intervals = []
+        prev_end_idx = qrs_epochs["1"].Index.values[-1]
+        for idx, beat in qrs_epochs.items():
+            idx = int(idx)
+            if idx == 1:
+                beats_times.append(beat.index.values)
+                beats_data.append(beat.Signal.values)
+            else:
+                start_idx = np.where(beat.Index.values == prev_end_idx)[0][0]
+                beat = beat.iloc[start_idx:]
+                beats_times.append(beat.index.values)
+                beats_data.append(beat.Signal.values)
+            prev_end_idx = beat.Index.values[-1]
+            intervals.append([beat.Index.values[0], beat.Index.values[-1]])
+
+        avg_start_time = np.median([beat[0] for beat in beats_times[1:]])
+        first_beat_mask = beats_times[0] > avg_start_time
+        beats_times[0] = beats_times[0][first_beat_mask]
+        beats_data[0] = beats_data[0][first_beat_mask]
+        intervals[0][0] = intervals[0][0] + (first_beat_mask == False).sum()
+        intervals = [tuple(interval) for interval in intervals]
+        if use_raw:
+            beats_data = [self.data[start_idx : end_idx + 1] for start_idx, end_idx in intervals]
+        beats = []
+        for i, (interval, beat_time, beat_data) in enumerate(zip(intervals, beats_times, beats_data)):
+            beats.append(
+                ECGBeat(name=f"beat {i}", data=beat_data, fs=self.fs, start_sec=interval[0] * self.fs, beat_num=i)
+            )
+        self.beats = beats
         return self.beats
 
     def aggregate(self, valid_only=True, **kwargs):
