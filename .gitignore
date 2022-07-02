@@ -133,3 +133,5 @@ dmypy.json
 *.dat
 
 writing_tips
+
+*lightning_logs/
