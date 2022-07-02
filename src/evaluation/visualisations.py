@@ -5,7 +5,15 @@ import seaborn as sns
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
 
 
-def plot_confusion_matrix(y_true: list, y_pred: list, class_names: list, ax=None):
+def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, class_names: np.ndarray, ax=None):
+    """Plot confustion matric
+
+    Args:
+        y_true (np.ndarray): Ground truth labels.
+        y_pred (np.ndarray): Predicted labels.
+        class_names (np.ndarray): Class names.
+        ax (_type_): Axes to plot on. If `None`, new Axes is created. Defaults to `None`.
+    """
     if ax is None:
         fig, ax = plt.subplots(figsize=(16, 12))
     accuracy = accuracy_score(y_true, y_pred)
@@ -27,6 +35,15 @@ def plot_feature_importance(
     normalize: bool = True,
     ax=None,
 ):
+    """Plot feature importance
+
+    Args:
+        feat_names (list): Name of features passed in same order as importances.
+        feat_importances (list): Importances of features passed in same order as feature names.
+        n_best (int): Amount of best features to plot. Defaults to `10`.
+        normalize (bool): Whether to normalize the importances. Defaults to `True`.
+        ax (_type_): Axes to plot on. If `None`, new Axes is created. Defaults to `None`.
+    """
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, n_best / 1.8))
     sorted_importances = sorted(feat_importances, reverse=False)
