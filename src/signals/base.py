@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,15 +26,16 @@ from scipy.signal import (
 from scipy.stats import kurtosis, skew
 from statsmodels.tsa.seasonal import STL
 
-from signals.utils import create_new_obj, z_score
+from signals.utils import create_new_obj, lazy_property, z_score
 
 
 class BaseSignal:
-    def __init__(self, name, data, fs, start_sec=0):
+    def __init__(self, name, data, fs, start_sec=0, end_sec=None):
         self.name = name
         self.data = data
         self.fs = fs
         self.start_sec = start_sec
+        self.end_sec = end_sec
         self.n_samples = len(data)
         self.duration = self.n_samples / fs
         self.time = np.arange(0, self.n_samples) / fs
@@ -55,7 +57,7 @@ class BaseSignal:
             interp_fn = interp1d(self.time, self.data, kind=kind, fill_value="extrapolate")
         n_samples = int(self.n_samples * fs / self.fs)
         new_time = np.arange(0, n_samples) / fs
-        # new_time = new_time[(new_time >= self.time[0]) & (new_time <= self.time[-1])]
+        new_time = new_time[(new_time >= self.time[0]) & (new_time <= self.time[-1])]
         interpolated = interp_fn(new_time)
         new_name = self.name + f"_interp({fs:.2f}Hz)"
         return create_new_obj(self, name=new_name, data=interpolated, fs=fs)
@@ -67,10 +69,17 @@ class BaseSignal:
         new_name = self.name + f"_resampled({n_samples})"
         return create_new_obj(self, name=new_name, data=new_data, fs=new_fs)
 
-    def resample_with_interpolation(self, n_samples, kind="cubic"):
+    def resample_with_interpolation(self, n_samples, kind="pchip"):
         fs_scaler = n_samples / self.n_samples
         new_fs = self.fs * fs_scaler
-        return self.interpolate(new_fs, kind=kind)
+        if kind == "pchip":
+            interp_fn = PchipInterpolator(self.time, self.data)
+        else:
+            interp_fn = interp1d(self.time, self.data, kind=kind, fill_value="extrapolate")
+        new_time = np.arange(0, n_samples) / new_fs
+        interpolated = interp_fn(new_time)
+        new_name = self.name + f"_resampleWithInterp({n_samples})"
+        return create_new_obj(self, name=new_name, data=interpolated, fs=new_fs)
 
     def z_score(self):
         new_data = z_score(self.data)
@@ -162,49 +171,42 @@ class BaseSignal:
         self.features = {"basic_features": self.extract_basic_features()}
         return self.features
 
-    def plot(self, start_time=0, width=10, scatter=False, line=True, first_der=False, ax=None):
+    def plot(
+        self, start_time=0, width=10, scatter=False, line=True, first_der=False, label=None, use_samples=False, ax=None
+    ):
         if ax is None:
-            fig, ax = plt.subplots(figsize=(18, 6))
+            fig, ax = plt.subplots(figsize=(24, 6))
         if width == -1:
             width = self.time[-1] - start_time
         end_time = start_time + width
+
         if end_time - start_time >= self.duration:
             signal_slice = self
         else:
             signal_slice = self.get_slice(start_time, end_time)
-        if scatter:
-            sig_plot = ax.scatter(signal_slice.time, signal_slice.data, lw=3, label=signal_slice.name)
-            plots = [sig_plot]
-        if line:
-            sig_plot = ax.plot(signal_slice.time, signal_slice.data, lw=3, label=signal_slice.name)
-            plots = [sig_plot[0]]
+        label = label if label is not None else signal_slice.name
+        x = np.arange(signal_slice.n_samples) if use_samples else signal_slice.time
+        y = signal_slice.data
+        plot_kwgs = dict(lw=3, label=label)
+        sig_plot = ax.scatter(x, y, **plot_kwgs) if scatter else ax.plot(x, y, **plot_kwgs)
+        plots = [sig_plot]
         if first_der:
             ax2 = ax.twinx()
             signal_slice_der = signal_slice.get_derivative()
-            if scatter:
-                first_der_plot = ax2.scatter(
-                    signal_slice_der.time,
-                    signal_slice_der.data,
-                    c=sns.color_palette()[1],
-                    lw=1,
-                    label=signal_slice_der.name,
-                )
-            if line:
-                first_der_plot = ax2.plot(
-                    signal_slice_der.time,
-                    signal_slice_der.data,
-                    c=sns.color_palette()[1],
-                    lw=1,
-                    label=signal_slice_der.name,
-                )
-            plots.append(first_der_plot[0])
+            x = np.arange(signal_slice_der.n_samples) if use_samples else signal_slice_der.time
+            y = signal_slice_der.data
+            plot_kwgs = dict(c=sns.color_palette()[1], lw=1, label=label + "_der")
+            first_der_plot = ax2.scatter(x, y, **plot_kwgs) if scatter else ax2.plot(x, y, **plot_kwgs)
+            plots.append(first_der_plot)
             ax2.set_ylabel("First derivative values", fontsize=18)
             ax2.axhline(y=0, c="black", ls="--", lw=0.5)
+        plots = [plot[0] for plot in plots] if line else plots
         labels = [plot.get_label() for plot in plots]
         ax.legend(plots, labels, loc=0, fontsize=18)
-        ax.set_ylabel("values", fontsize=18)
-        ax.set_xlabel("Time [s]", fontsize=18)
+        ax.set_ylabel("Values", fontsize=18)
+        ax.set_xlabel("Samples" if use_samples else "Time [s]", fontsize=18)
         ax.set_title(self.name, fontsize=22)
+        return ax
 
     def explore(self, start_time, width=None, window_size=4, min_hz=0, max_hz=20):
         if width is None:
@@ -246,28 +248,48 @@ class PeriodicSignal(ABC, BaseSignal):
         self.agg_beat_features = None
 
     @abstractmethod
-    def get_beats(self, resample_beats=True, n_samples=100, validate=True, plot=False):
+    def get_beats(self, resample=True, n_samples=100, validate=True, plot=False, use_raw=True, return_arr=False):
         pass
+
+    def plot_beats_segmentation(self, ax=None):
+        if self.beats is None:
+            self.get_beats()
+        ax = self.plot(ax=ax)
+        beats_bounds = []
+        for beat in self.beats:
+            bounds = [beat.start_sec, beat.end_sec]
+            color = "green" if beat.is_valid else "red"
+            ax.fill_between(bounds, self.data.min(), self.data.max(), alpha=0.15, color=color)
+            beats_bounds.extend(bounds)
+        ax.vlines(beats_bounds, self.data.min(), self.data.max(), lw=1.5, ec="black", ls="--")
+        ax.grid(False)
+        ax.set_ylim([self.data.min(), self.data.max()])
 
     def plot_beats(self, same_ax=True, ax=None, plot_valid=True, plot_invalid=True):
         if self.beats is None:
             self.get_beats()
+        if self.agg_beat is None:
+            self.aggregate()
         beats_to_plot = [
             beat for beat in self.beats if (beat.is_valid and plot_valid) or (not beat.is_valid and plot_invalid)
         ]
+
         n_beats = len(beats_to_plot)
         n_valid = np.sum([beat.is_valid for beat in beats_to_plot])
         n_invalid = n_beats - n_valid
         valid_palette = sns.color_palette("Greens", n_colors=n_beats)
         invalid_palette = sns.color_palette("Reds", n_colors=n_beats)
+
         if same_ax:
             if ax is None:
-                fig, ax = plt.subplots(figsize=FIGSIZE_2)
+                fig, ax = plt.subplots(figsize=(10, 5))
             for i, beat in enumerate(beats_to_plot):
                 palette = valid_palette if beat.is_valid else invalid_palette
                 ax.plot(beat.time, beat.data, color=palette[i])
             ax.plot(self.agg_beat.time, self.agg_beat.data, lw=8, alpha=0.5, c="black", label="Aggregated beat")
             ax.set_title(f"{n_beats} beats ({n_valid} valid, {n_invalid} invalid)", fontsize=22)
+            ax.set_ylabel("Values", fontsize=18)
+            ax.set_xlabel("Time [s]", fontsize=18)
             ax.legend()
         else:
             ncols = 5
@@ -285,25 +307,29 @@ class PeriodicSignal(ABC, BaseSignal):
         if self.beats is None:
             self.get_beats(**kwargs)
         beats_to_aggregate_mask = self.valid_beats_mask if valid_only else len(self.beats) * [True]
+        if beats_to_aggregate_mask is None:
+            beats_to_aggregate_mask = len(self.beats) * [True]
         beats_to_aggregate = self.beats[beats_to_aggregate_mask]
         beats_data = np.array([beat.data for beat in beats_to_aggregate])
         beats_times = np.array([beat.time for beat in beats_to_aggregate])
         agg_beat_data, agg_beat_time = beats_data.mean(axis=0), beats_times.mean(axis=0)
         agg_fs = len(agg_beat_data) / (agg_beat_time[-1] - agg_beat_time[0])
         BeatClass = beats_to_aggregate[0].__class__
-        agg_beat = BeatClass("agg_beat", agg_beat_data, agg_fs, start_sec=0)
+        agg_beat = BeatClass("agg_beat", agg_beat_data, agg_fs, start_sec=0, end_sec=agg_beat_time[-1])
         self.agg_beat = agg_beat
         return self.agg_beat
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)
-        self.get_beats(plot=True)
-        self.agg_beat.explore(start_time=0)
+        self.plot_beats_segmentation()
+        fig, axes = plt.subplots(1, 2, figsize=(24, 5))
+        self.plot_beats(ax=axes[0])
+        self.agg_beat.plot(with_crit_points=True, ax=axes[1])
 
 
 class BeatSignal(ABC, BaseSignal):
-    def __init__(self, name, data, fs, start_sec, beat_num=0, is_valid=True):
-        super().__init__(name, data, fs, start_sec)
+    def __init__(self, name, data, fs, start_sec, end_sec=None, beat_num=0, is_valid=True):
+        super().__init__(name, data, fs, start_sec, end_sec)
         self.is_valid = is_valid
         self.beat_num = beat_num
 
@@ -311,5 +337,73 @@ class BeatSignal(ABC, BaseSignal):
     def extract_agg_beat_features(self, plot=True):
         pass
 
-    def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
-        self.extract_agg_beat_features(plot=True)
+    @lazy_property
+    def crit_points(self):
+        return {}
+
+    def plot_crit_points(self, use_samples=False, ax=None, **kwargs):
+        xaxes_data = np.arange(self.n_samples) if use_samples else self.time
+        xrange = xaxes_data[-1] - xaxes_data[0]
+        yrange = self.data.max() - self.data.min()
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(12, 7))
+
+        for name, loc in self.crit_points.items():
+            t = xaxes_data[loc]
+            val = self.data[loc]
+            ax.scatter(t, val, label=name, s=160)
+            ax.annotate(name.capitalize(), (t + 0.012 * xrange, val + 0.012 * yrange), fontweight="bold", fontsize=18)
+        plt.legend()
+
+    def plot(
+        self,
+        start_time=0,
+        width=10,
+        scatter=False,
+        line=True,
+        first_der=False,
+        label=None,
+        use_samples=False,
+        with_crit_points=True,
+        ax=None,
+    ):
+        ax = super().plot(
+            start_time=start_time,
+            width=width,
+            scatter=scatter,
+            line=line,
+            first_der=first_der,
+            label=label,
+            use_samples=use_samples,
+            ax=ax,
+        )
+        if with_crit_points:
+            self.plot_crit_points(use_samples=use_samples, ax=ax)
+
+    def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20, ax=None):
+        pass
+
+
+class MultiChannelSignal:
+    def __init__(self, signals: Dict[str, PeriodicSignal]):
+        self.signals = signals
+        self.n_signals = len(signals)
+
+    def plot(self, **kwargs):
+        fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 3 * self.n_signals))
+        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
+            sig.plot(ax=ax, **kwargs)
+            ax.set_xlabel("")
+            ax.set_ylabel("")
+            ax.set_title("")
+
+
+class MultiChannelPeriodicSignal(MultiChannelSignal):
+    def get_beats(self, **kwargs):
+        self.beats = {name: signal.get_beats(**kwargs) for name, signal in self.signals.items()}
+        return self.beats
+
+    def aggregate(self, **kwargs):
+        self.agg_beat = {name: signal.aggregate(**kwargs) for name, signal in self.signals.items()}
+        return self.agg_beat
