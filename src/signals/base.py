@@ -334,7 +334,7 @@ class BeatSignal(ABC, BaseSignal):
         self.beat_num = beat_num
 
     @abstractmethod
-    def extract_agg_beat_features(self, plot=True):
+    def extract_crit_points_features(self, plot=True):
         pass
 
     @lazy_property
@@ -400,6 +400,11 @@ class MultiChannelSignal:
 
 
 class MultiChannelPeriodicSignal(MultiChannelSignal):
+    def __init__(self, signals: Dict[str, PeriodicSignal]):
+        super().__init__(signals)
+        self.beats = None
+        self.agg_beats = None
+
     def get_beats(self, **kwargs):
         self.beats = {name: signal.get_beats(**kwargs) for name, signal in self.signals.items()}
         return self.beats

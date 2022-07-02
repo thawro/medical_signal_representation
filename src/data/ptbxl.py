@@ -14,7 +14,7 @@ from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
 
-from signals.ecg import ECGSignal
+from signals.ecg import ECGSignal, create_multichannel_ecg
 from signals.utils import parse_nested_feats
 
 DATASET_PATH = Path("./../../data/ptbxl")
@@ -120,19 +120,24 @@ def get_feats_from_all_channels(channels: np.ndarray, label: Union[str, int], pl
         _type_: _description_
     """
     try:
-        all_channels_feats = {}
-        for i, data in enumerate(channels.T):
-            multiplier = CHANNELS_POLARITY[i]
-            sig = ECGSignal("ecg", multiplier * data, 100)
-            secg = sig.aggregate()
-            feats = sig.extract_features(plot=plot)
-            feats = parse_nested_feats(feats)
-            all_channels_feats[i] = feats
-        all_channels_feats = parse_nested_feats(all_channels_feats)
-        all_channels_feats["label"] = label
-        return all_channels_feats
-    except Exception:
-        pass
+        # all_channels_feats = {}
+        # for i, data in enumerate(channels.T):
+        #     multiplier = CHANNELS_POLARITY[i]
+        #     sig = ECGSignal("ecg", multiplier * data, 100)
+        #     secg = sig.aggregate()
+        #     feats = sig.extract_features(plot=plot)
+        #     feats = parse_nested_feats(feats)
+        #     all_channels_feats[i] = feats
+        # all_channels_feats = parse_nested_feats(all_channels_feats)
+        # all_channels_feats["label"] = label
+        # return all_channels_feats
+        multi_ecg = create_multichannel_ecg(channels, 100)
+        features = parse_nested_feats(multi_ecg.extract_features())
+        features["label"] = label
+        return features
+    except Exception as e:
+        # TODO
+        return None
 
 
 def create_split_features_df(ptbxl_data: Dict[str, Dict[str, np.ndarray]], split_type: str):
@@ -147,7 +152,7 @@ def create_split_features_df(ptbxl_data: Dict[str, Dict[str, np.ndarray]], split
     """
     X, y = ptbxl_data[split_type]["X"], ptbxl_data[split_type]["y"]
     feats_list = Parallel(n_jobs=-1)(
-        delayed(get_feats_from_all_channels)(channels, label)
+        delayed(get_feats_from_all_channels)(channels.T, label)
         for channels, label in tqdm(zip(X, y), total=len(X), desc=f"{split_type} split")
     )
     feats_list = [f for f in feats_list if f is not None]
