@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from typing import Dict
 
 import matplotlib.pyplot as plt
@@ -26,7 +27,7 @@ from scipy.signal import (
 from scipy.stats import kurtosis, skew
 from statsmodels.tsa.seasonal import STL
 
-from signals.utils import create_new_obj, lazy_property, z_score
+from signals.utils import create_new_obj, lazy_property, parse_nested_feats, z_score
 
 
 class BaseSignal:
@@ -157,19 +158,25 @@ class BaseSignal:
         ax.set_xlabel("Time [s]", fontsize=18)
         return spectrum, freqs, t
 
-    def extract_basic_features(self):
-        self.basic_features = {
-            "mean": np.mean(self.data),
-            "std": np.std(self.data),
-            "median": np.median(self.data),
-            "skewness": skew(self.data),
-            "kurtosis": kurtosis(self.data),
-        }
-        return self.basic_features
+    def extract_basic_features(self, return_arr=True):
+        features = OrderedDict(
+            {
+                "mean": np.mean(self.data),
+                "std": np.std(self.data),
+                "median": np.median(self.data),
+                "skewness": skew(self.data),
+                "kurtosis": kurtosis(self.data),
+            }
+        )
+        if return_arr:
+            return np.array(list(features.values()))
+        return features
 
-    def extract_features(self):
-        self.features = {"basic_features": self.extract_basic_features()}
-        return self.features
+    def extract_features(self, return_arr=True):
+        features = OrderedDict({"basic_features": self.extract_basic_features(return_arr=return_arr)})
+        if return_arr:
+            return np.array(list(parse_nested_feats(features).values()))
+        return features
 
     def plot(
         self, start_time=0, width=10, scatter=False, line=True, first_der=False, label=None, use_samples=False, ax=None
@@ -206,7 +213,6 @@ class BaseSignal:
         ax.set_ylabel("Values", fontsize=18)
         ax.set_xlabel("Samples" if use_samples else "Time [s]", fontsize=18)
         ax.set_title(self.name, fontsize=22)
-        return ax
 
     def explore(self, start_time, width=None, window_size=4, min_hz=0, max_hz=20):
         if width is None:
@@ -246,15 +252,21 @@ class PeriodicSignal(ABC, BaseSignal):
         self.valid_beats_mask = None
         self.agg_beat = None  # PPGBeat object
         self.agg_beat_features = None
+        self.cleaned = np.copy(self.data)
 
     @abstractmethod
     def get_beats(self, resample=True, n_samples=100, validate=True, plot=False, use_raw=True, return_arr=False):
         pass
 
-    def plot_beats_segmentation(self, ax=None):
+    def plot_beats_segmentation(self, use_raw=False, ax=None):
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(24, 3))
         if self.beats is None:
             self.get_beats()
-        ax = self.plot(ax=ax)
+        if use_raw:
+            self.plot(ax=ax)
+        else:
+            ax.plot(self.time, self.cleaned, lw=3, label=self.name)
         beats_bounds = []
         for beat in self.beats:
             bounds = [beat.start_sec, beat.end_sec]
@@ -264,6 +276,7 @@ class PeriodicSignal(ABC, BaseSignal):
         ax.vlines(beats_bounds, self.data.min(), self.data.max(), lw=1.5, ec="black", ls="--")
         ax.grid(False)
         ax.set_ylim([self.data.min(), self.data.max()])
+        ax.legend()
 
     def plot_beats(self, same_ax=True, ax=None, plot_valid=True, plot_invalid=True):
         if self.beats is None:
@@ -368,7 +381,7 @@ class BeatSignal(ABC, BaseSignal):
         with_crit_points=True,
         ax=None,
     ):
-        ax = super().plot(
+        super().plot(
             start_time=start_time,
             width=width,
             scatter=scatter,

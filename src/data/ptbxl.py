@@ -120,19 +120,8 @@ def get_feats_from_all_channels(channels: np.ndarray, label: Union[str, int], pl
         _type_: _description_
     """
     try:
-        # all_channels_feats = {}
-        # for i, data in enumerate(channels.T):
-        #     multiplier = CHANNELS_POLARITY[i]
-        #     sig = ECGSignal("ecg", multiplier * data, 100)
-        #     secg = sig.aggregate()
-        #     feats = sig.extract_features(plot=plot)
-        #     feats = parse_nested_feats(feats)
-        #     all_channels_feats[i] = feats
-        # all_channels_feats = parse_nested_feats(all_channels_feats)
-        # all_channels_feats["label"] = label
-        # return all_channels_feats
         multi_ecg = create_multichannel_ecg(channels, 100)
-        features = parse_nested_feats(multi_ecg.extract_features())
+        features = parse_nested_feats(multi_ecg.get_whole_signal_features_representation(return_arr=False))
         features["label"] = label
         return features
     except Exception as e:
@@ -160,17 +149,16 @@ def create_split_features_df(ptbxl_data: Dict[str, Dict[str, np.ndarray]], split
     return df
 
 
-def create_features_dataset(sampling_rate: float = 100, target: str = "diagnostic_class"):
+def create_features_dataset(ptbxl_data: Dict[str, Dict[str, np.ndarray]]):
     """Create dataset (train, val and test splits) with features.
 
     Args:
-        sampling_rate (float): Sampling rate of PTB-XL dataset. `100` or `500`.
-        target (str): Target of PTB-XL data. `"diagnostic_class"` or `"diagnostic_subclass"`. Defaults to `"diagnostic_class"`.
+        ptbxl_data (Dict[str, Dict[str, np.ndarray]]): Dict with PTB-XL raw data.
 
     Returns:
         Dict[str, Dict[str, Union[pd.DataFrame, np.ndarray]]]: Dict with train, val and test data splits.
     """
-    ptbxl_data = load_ptbxl_data(sampling_rate=sampling_rate, path=DATASET_PATH, target=target)
+    # ptbxl_data = load_ptbxl_data(sampling_rate=sampling_rate, path=DATASET_PATH, target=target)
     train_df = create_split_features_df(ptbxl_data, split_type="train")
     val_df = create_split_features_df(ptbxl_data, split_type="val")
     test_df = create_split_features_df(ptbxl_data, split_type="test")

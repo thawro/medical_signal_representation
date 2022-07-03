@@ -1,13 +1,23 @@
+from collections import OrderedDict
 from typing import Dict
 
 import matplotlib.pyplot as plt
 import neurokit2 as nk
 import numpy as np
+import seaborn as sns
 from biosppy.signals.ecg import ecg
 from scipy.signal import find_peaks
 
 from signals.base import BeatSignal, MultiChannelPeriodicSignal, PeriodicSignal
-from signals.utils import create_new_obj, lazy_property
+from signals.utils import (
+    calculate_area,
+    calculate_energy,
+    calculate_slope,
+    create_new_obj,
+    lazy_property,
+    parse_feats_to_array,
+    parse_nested_feats,
+)
 
 CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
 
@@ -27,7 +37,7 @@ def check_ecg_polarity(data):
 
 
 def create_multichannel_ecg(data, fs):
-    signals = {i + 1: ECGSignal(f"ECG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)}
+    signals = OrderedDict({i + 1: ECGSignal(f"ECG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)})
     return MultiChannelECGSignal(signals)
 
 
@@ -93,7 +103,7 @@ class ECGSignal(PeriodicSignal):
             return beats_times, beats_data
         return self.beats
 
-    def extract_hrv_features(self):
+    def extract_hrv_features(self, return_arr=True):
         if self.rpeaks is None:
             self.find_rpeaks()
         r_peaks = self.rpeaks
@@ -101,29 +111,38 @@ class ECGSignal(PeriodicSignal):
         r_times = self.time[r_peaks]
         ibi = np.diff(r_times)
 
-        self.ecg_features = {"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi), "R_val": np.mean(r_vals)}
+        features = OrderedDict({"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi), "R_val": np.mean(r_vals)})
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
 
-        return self.ecg_features
-
-    def extract_per_beat_features(self, plot=True):
+    def extract_per_beat_features(self, plot=False, return_arr=True, n_beats=-1, **kwargs):
         if self.beats is None:
-            self.get_beats()
-        return {f"beat_{beat.beat_num}": beat.extract_features(plot=plot) for beat in self.beats}
+            self.get_beats(**kwargs)
+        n_beats = len(self.beats) if n_beats <= 0 else n_beats
+        beats = self.beats[:n_beats]
 
-    def extract_features(self, feats_to_extract=["basic", "hrv", "agg_beat"], plot=True):
+        if return_arr:
+            return np.array([beat.extract_features(plot=plot, return_arr=True) for beat in beats])
+        return OrderedDict(
+            {f"beat_{beat.beat_num}": beat.extract_features(plot=plot, return_arr=False) for beat in beats}
+        )
+
+    def extract_features(self, return_arr=True, feats_to_extract=["basic", "hrv", "agg_beat"], plot=False):
         if self.agg_beat is None:
             self.aggregate()
-        features = {"whole_signal_features": {}}
+        features = OrderedDict({"whole_signal_features": {}})
         if "basic" in feats_to_extract:
-            features["whole_signal_features"] = super().extract_features()
+            features["whole_signal_features"] = super().extract_features(return_arr=False)
         if "hrv" in feats_to_extract:
-            features["whole_signal_features"]["hrv_features"] = self.extract_hrv_features()
+            features["whole_signal_features"]["hrv_features"] = self.extract_hrv_features(return_arr=False)
         if "agg_beat" in feats_to_extract:
-            features["agg_beat_features"] = self.agg_beat.extract_features(plot=plot)
+            features["agg_beat_features"] = self.agg_beat.extract_features(plot=plot, return_arr=False)
         if "per_beat" in feats_to_extract:
-            features["per_beat_features"] = self.extract_per_beat_features(plot=plot)
-        self.features = features
-        return self.features
+            features["per_beat_features"] = self.extract_per_beat_features(plot=plot, return_arr=False)
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
 
 
 class ECGBeat(BeatSignal):
@@ -178,21 +197,85 @@ class ECGBeat(BeatSignal):
     def crit_points(self):
         return {"p": self.p_loc, "q": self.q_loc, "r": self.r_loc, "s": self.s_loc, "t": self.t_loc}
 
-    def extract_features(self, plot=True):
-        self.features = super().extract_features()
-        crit_points_features = {"crit_points_features": self.extract_crit_points_features(plot=plot)}
-        self.features.update(crit_points_features)
-        return self.features
-
-    def extract_crit_points_features(self, plot=True, ax=None):
-        feats = {}
+    def extract_crit_points_features(self, return_arr=True, plot=False, ax=None):
+        features = OrderedDict()
         for name, loc in self.crit_points.items():
-            feats[f"{name}_loc"] = loc
-            feats[f"{name}_time"] = self.time[loc]
-            feats[f"{name}_val"] = self.data[loc]
+            features[f"{name}_loc"] = loc
+            features[f"{name}_time"] = self.time[loc]
+            features[f"{name}_val"] = self.data[loc]
         if plot:
             self.plot(ax=ax, with_crit_points=True)
-        return feats
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_area_features(self, return_arr=True, plot=False, ax=None):
+        dx = 1 / self.fs
+        params = [
+            {"name": "ZeroPQ_A", "start": 0, "end": self.q_loc},
+            {"name": "QRS_A", "start": self.q_loc, "end": self.s_loc},
+            {"name": "STEnd_A", "start": self.s_loc, "end": self.n_samples - 1},
+        ]
+        features = OrderedDict({p["name"]: calculate_area(self.data, dx, p["start"], p["end"]) for p in params})
+        if plot:
+            if ax is None:
+                fig, ax = plt.subplots(figsize=(14, 6))
+            palette = sns.color_palette("pastel", len(params))
+            self.plot(ax=ax)
+            ax.get_legend().remove()
+            areas = []
+            for i, p in enumerate(params):
+                mask = (np.arange(self.n_samples) >= p["start"]) & (np.arange(self.n_samples) <= p["end"])
+                a = ax.fill_between(
+                    self.time[mask],
+                    self.data[mask],
+                    alpha=0.4,
+                    color=palette[i],
+                    edgecolor="black",
+                    lw=1,
+                    label=p["name"],
+                )
+                areas.append(a)
+            leg = ax.legend(handles=areas, fontsize=14)
+            ax.add_artist(leg)
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_energy_features(self, return_arr=True):
+        params = [
+            {"name": "ZeroPQ_E", "start": 0, "end": self.q_loc},
+            {"name": "QRS_E", "start": self.q_loc, "end": self.s_loc},
+            {"name": "STEnd_E", "start": self.s_loc, "end": self.n_samples - 1},
+        ]
+
+        features = OrderedDict({p["name"]: calculate_energy(self.data, p["start"], p["end"]) for p in params})
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_slope_features(self, return_arr=True):
+        params = [
+            {"name": "PQ_slope", "start": self.p_loc, "end": self.q_loc},
+            {"name": "QR_slope", "start": self.q_loc, "end": self.r_loc},
+            {"name": "RS_slope", "start": self.r_loc, "end": self.s_loc},
+            {"name": "ST_slope", "start": self.s_loc, "end": self.t_loc},
+        ]
+
+        features = OrderedDict({p["name"]: calculate_slope(self.time, self.data, p["start"], p["end"]) for p in params})
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_features(self, return_arr=True, plot=False):
+        features = super().extract_features(return_arr=False)
+        features["crit_points_features"] = self.extract_crit_points_features(return_arr=False)
+        features["area_features"] = self.extract_area_features(return_arr=False)
+        features["energy_features"] = self.extract_energy_features(return_arr=False)
+        features["slope_features"] = self.extract_slope_features(return_arr=False)
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
 
 
 class MultiChannelECGSignal(MultiChannelPeriodicSignal):
@@ -206,10 +289,11 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
             ax.grid(False)
             ax.get_legend().remove()
 
-    def plot_beats_segmentation(self, **kwargs):
+    def plot_beats_segmentation(self, use_raw=False, **kwargs):
+        self.get_beats(**kwargs)
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)
         for ax, (sig_name, sig) in zip(axes, self.signals.items()):
-            sig.plot_beats_segmentation(ax=ax, **kwargs)
+            sig.plot_beats_segmentation(use_raw=use_raw, ax=ax)
             ax.set_xlabel("")
             ax.set_ylabel("")
             ax.set_title("")
@@ -217,27 +301,14 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
             ax.get_legend().remove()
 
     def get_beats(self, source_channel=2, resample=True, return_arr=True, **kwargs):
-        source_channel = self.signals[source_channel]
-        source_channel.get_beats(**kwargs)
-        source_channel_intervals = source_channel.beats_intervals
-        all_channels_beats = []
-        for name, signal in self.signals.items():
-            channel_beats = []
-            for i, (start_idx, end_idx) in enumerate(source_channel_intervals):
-                beat_data = signal.data[start_idx:end_idx]
-                start_sec, end_sec = signal.time[start_idx], signal.time[end_idx]
-                beat = ECGBeat(
-                    name=f"ECG_{name}_beat_{i}",
-                    data=beat_data,
-                    fs=signal.fs,
-                    start_sec=start_sec,
-                    end_sec=end_sec,
-                    beat_num=i,
-                )
-                if resample:
-                    beat = beat.resample_with_interpolation(n_samples=100, kind="pchip")
-                channel_beats.append(beat)
-            all_channels_beats.append(channel_beats)
+        if source_channel is not None:
+            self.signals[source_channel].get_beats(**kwargs)
+            source_channel_intervals = self.signals[source_channel].beats_intervals
+        else:
+            source_channel_intervals = None
+        all_channels_beats = [
+            signal.get_beats(source_channel_intervals, n_samples=100) for _, signal in self.signals.items()
+        ]
         beats_times = [beat.time for beat in all_channels_beats[0]]
         if return_arr:
             all_channels_beats = [[beat.data for beat in channel_beats] for channel_beats in all_channels_beats]
@@ -245,23 +316,29 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
         self.beats_times = np.array(beats_times)
         return self.beats
 
-    def aggregate(self, **kwargs):
-        if self.beats is None:
-            self.get_beats(return_arr=True)
-        agg_beats = self.beats.mean(axis=1)
-        self.agg_beats = {name: signal.aggregate(**kwargs) for name, signal in self.signals.items()}
-        return self.agg_beats
+    def get_waveform_representation(self, return_arr=True):
+        if return_arr:
+            return np.array([sig.data for name, sig in self.signals.items()])
+        else:
+            return OrderedDict({name: sig.data for name, sig in self.signals.items()})
 
-    def extract_agg_beats_features(self, **kwargs):
-        if self.agg_beats is None:
-            self.aggregate(**kwargs)
-        self.agg_beats_features = {
-            name: agg_beat.extract_features(plot=False) for name, agg_beat in self.agg_beats.items()
-        }
-        return self.agg_beats_features
+    def get_per_beat_features_representation(self, return_arr=True, **kwargs):
+        self.get_beats(**kwargs)
+        if return_arr:
+            return np.array([sig.extract_per_beat_features(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict(
+            {name: sig.extract_per_beat_features(return_arr=False) for name, sig in self.signals.items()}
+        )
 
-    def extract_features(self, **kwargs):
-        if self.agg_beats is None:
-            self.aggregate(**kwargs)
-        self.features = {name: signal.extract_features(plot=False) for name, signal in self.signals.items()}
-        return self.features
+    def get_agg_beat_features_representation(self, return_arr=True, **kwargs):
+        self.get_beats(**kwargs)
+        agg_beats = OrderedDict({name: signal.aggregate() for name, signal in self.signals.items()})
+        if return_arr:
+            return np.array([agg_beat.extract_features(return_arr=True) for _, agg_beat in agg_beats.items()])
+        return OrderedDict({name: agg_beat.extract_features(return_arr=False) for name, agg_beat in agg_beats.items()})
+
+    def get_whole_signal_features_representation(self, return_arr=True, **kwargs):
+        self.get_beats(**kwargs)
+        if return_arr:
+            return np.array([sig.extract_features(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.extract_features(return_arr=False) for name, sig in self.signals.items()})
