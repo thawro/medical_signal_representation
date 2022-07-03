@@ -87,13 +87,15 @@ def z_score(arr: np.ndarray) -> np.ndarray:
     return (arr - np.mean(arr)) / np.std(arr)
 
 
-def calculate_area(sig, fs, start, end, use_abs=True, method="simps"):
-    abs_sig = abs(sig) if use_abs else np.copy(sig)
-    abs_sig = abs_sig[start : end + 1]
+def calculate_area(sig, fs, start, end, method="simps"):
+    _sig = np.copy(sig)
+    _sig = _sig[start : end + 1]
+    _sig = _sig - min([_sig[0], _sig[-1]])
+
     if method == "trapz":
-        return np.trapz(abs_sig, dx=fs)
+        return np.trapz(_sig, dx=1 / fs)
     elif method == "simps":
-        return simps(abs_sig, dx=fs)
+        return simps(_sig, dx=1 / fs)
 
 
 def calculate_energy(sig, start, end):

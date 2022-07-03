@@ -191,7 +191,7 @@ class PTBXLWaveformDataset(Dataset):
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        return self.data[idx][:, 0].float(), self.labels[idx]
+        return self.data[idx].float(), self.labels[idx]
 
 
 class PTBXLWaveformDataModule(LightningDataModule):

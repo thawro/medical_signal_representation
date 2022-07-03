@@ -40,16 +40,16 @@ class BaseSignal:
         self.n_samples = len(data)
         self.duration = self.n_samples / fs
         self.time = np.arange(0, self.n_samples) / fs
-        self.peaks = None
-        self.troughs = None
 
-    def find_troughs(self):
-        self.troughs, _ = find_peaks(-self.data)
-        return self.troughs
+    @lazy_property
+    def troughs(self):
+        troughs, _ = find_peaks(-self.data)
+        return troughs
 
-    def find_peaks(self):
-        self.peaks, _ = find_peaks(self.data)
-        return self.peaks
+    @lazy_property
+    def peaks(self):
+        peaks, _ = find_peaks(self.data)
+        return peaks
 
     def interpolate(self, fs, kind="cubic"):
         if kind == "pchip":
@@ -93,10 +93,14 @@ class BaseSignal:
         new_data = self.data[mask]
         return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
 
-    def get_derivative(self, deriv=1, window_length=21, polyorder=5):
+    def get_derivative(self, deriv=1, smoothing=1, polyorder=5):
+        noise_factor = (4 + 4 * deriv + 2 * polyorder) * self.fs / 100
+        window_length = int(noise_factor * smoothing) + 2
+        if window_length % 2 == 0:
+            window_length = window_length + 1
         new_name = self.name + f"_derivative({deriv})"
         new_data = savgol_filter(self.data, window_length, polyorder, deriv, delta=1 / self.fs)
-        return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
+        return BaseSignal(name=new_name, data=new_data, fs=self.fs, start_sec=self.start_sec, end_sec=self.end_sec)
 
     def detrend(self):
         detrended = detrend(self.data)
@@ -258,11 +262,9 @@ class PeriodicSignal(ABC, BaseSignal):
     def get_beats(self, resample=True, n_samples=100, validate=True, plot=False, use_raw=True, return_arr=False):
         pass
 
-    def plot_beats_segmentation(self, use_raw=False, ax=None):
+    def plot_beats_segmentation(self, use_raw=False, ax=None, **kwargs):
         if ax is None:
             fig, ax = plt.subplots(figsize=(24, 3))
-        if self.beats is None:
-            self.get_beats()
         if use_raw:
             self.plot(ax=ax)
         else:
@@ -279,10 +281,6 @@ class PeriodicSignal(ABC, BaseSignal):
         ax.legend()
 
     def plot_beats(self, same_ax=True, ax=None, plot_valid=True, plot_invalid=True):
-        if self.beats is None:
-            self.get_beats()
-        if self.agg_beat is None:
-            self.aggregate()
         beats_to_plot = [
             beat for beat in self.beats if (beat.is_valid and plot_valid) or (not beat.is_valid and plot_invalid)
         ]
@@ -332,6 +330,22 @@ class PeriodicSignal(ABC, BaseSignal):
         self.agg_beat = agg_beat
         return self.agg_beat
 
+    def extract_per_beat_features(self, plot=False, return_arr=True, n_beats=-1):
+        n_beats = len(self.beats) if n_beats <= 0 else n_beats
+        beats = self.beats[:n_beats]
+        if return_arr:
+            return np.array([beat.extract_features(plot=plot, return_arr=True) for beat in beats])
+        return OrderedDict(
+            {f"beat_{beat.beat_num}": beat.extract_features(plot=plot, return_arr=False) for beat in beats}
+        )
+
+    def extract_per_beat_waveforms(self, return_arr=True, n_beats=-1):
+        n_beats = len(self.beats) if n_beats <= 0 else n_beats
+        beats = self.beats[:n_beats]
+        if return_arr:
+            return np.array([beat.data for beat in beats])
+        return OrderedDict({f"beat_{beat.beat_num}": beat.data for beat in beats})
+
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)
         self.plot_beats_segmentation()
@@ -354,7 +368,7 @@ class BeatSignal(ABC, BaseSignal):
     def crit_points(self):
         return {}
 
-    def plot_crit_points(self, use_samples=False, ax=None, **kwargs):
+    def plot_crit_points(self, use_samples=False, offset=0, ax=None, **kwargs):
         xaxes_data = np.arange(self.n_samples) if use_samples else self.time
         xrange = xaxes_data[-1] - xaxes_data[0]
         yrange = self.data.max() - self.data.min()
@@ -364,9 +378,9 @@ class BeatSignal(ABC, BaseSignal):
 
         for name, loc in self.crit_points.items():
             t = xaxes_data[loc]
-            val = self.data[loc]
+            val = self.data[loc] + offset
             ax.scatter(t, val, label=name, s=160)
-            ax.annotate(name.capitalize(), (t + 0.012 * xrange, val + 0.012 * yrange), fontweight="bold", fontsize=18)
+            ax.annotate(name.upper(), (t + 0.012 * xrange, val + 0.012 * yrange), fontweight="bold", fontsize=18)
         plt.legend()
 
     def plot(
@@ -391,6 +405,7 @@ class BeatSignal(ABC, BaseSignal):
             use_samples=use_samples,
             ax=ax,
         )
+        ax = plt.gca()
         if with_crit_points:
             self.plot_crit_points(use_samples=use_samples, ax=ax)
 
