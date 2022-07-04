@@ -36,6 +36,20 @@ def check_ecg_polarity(data):
     return -1
 
 
+def find_intervals_using_hr(sig):
+    freqs, pxx = sig.psd(window_size=10, plot=False)
+    most_dominant_freq = freqs[pxx.argmax()]  # HR
+    T_in_samples = int(1 / most_dominant_freq * sig.fs)
+    x = sig.cleaned
+    x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1
+    troughs, _ = find_peaks(x_minmax, height=0.9)
+    intervals = [(troughs[0], troughs[0] + T_in_samples)]
+    while intervals[-1][1] + T_in_samples < sig.n_samples:
+        prev_end = intervals[-1][1]
+        intervals.append((prev_end, prev_end + T_in_samples))
+    return intervals
+
+
 def create_multichannel_ecg(data, fs):
     signals = OrderedDict({i + 1: ECGSignal(f"ECG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)})
     return MultiChannelECGSignal(signals)
@@ -61,35 +75,42 @@ class ECGSignal(PeriodicSignal):
         plot=False,
         use_raw=False,
         return_arr=False,
+        use_hr=False,
     ):
         if intervals is None:
-            qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=None, sampling_rate=self.fs, show=False)
-            beats_times = []
-            intervals = []
-            prev_end_idx = qrs_epochs["1"].Index.values[-1]
-            for idx, beat in qrs_epochs.items():
-                if int(idx) == 1:
-                    beats_times.append(beat.index.values)
-                else:
-                    if not align_to_r:
-                        start_idx = np.where(beat.Index.values == prev_end_idx)[0]
-                        start_idx = start_idx[0] if len(start_idx) == 1 else 0
-                        beat = beat.iloc[start_idx:]
-                    beats_times.append(beat.index.values)
-                if beat.Index.values[1] >= self.n_samples or beat.Index.values[0] >= self.n_samples:
-                    break
-                prev_end_idx = beat.Index.values[-1]
-                intervals.append([beat.Index.values[0], beat.Index.values[-1]])
+            try:
+                qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=None, sampling_rate=self.fs, show=False)
+                beats_times = []
+                intervals = []
+                prev_end_idx = qrs_epochs["1"].Index.values[-1]
+                for idx, beat in qrs_epochs.items():
+                    if int(idx) == 1:
+                        beats_times.append(beat.index.values)
+                    else:
+                        if not align_to_r:
+                            start_idx = np.where(beat.Index.values == prev_end_idx)[0]
+                            start_idx = start_idx[0] if len(start_idx) == 1 else 0
+                            beat = beat.iloc[start_idx:]
+                        beats_times.append(beat.index.values)
+                    if beat.Index.values[1] >= self.n_samples or beat.Index.values[0] >= self.n_samples:
+                        break
+                    prev_end_idx = beat.Index.values[-1]
+                    intervals.append([beat.Index.values[0], beat.Index.values[-1]])
 
-            avg_start_time = np.median([beat[0] for beat in beats_times[1:]])
-            first_beat_mask = beats_times[0] > avg_start_time
-            beats_times[0] = beats_times[0][first_beat_mask]
-            intervals[0][0] = intervals[0][0] + (first_beat_mask == False).sum()
-            if intervals[-1][1] >= self.n_samples:
-                intervals[-1][1] = self.n_samples - 1
-            if intervals[0][0] < 0:
-                intervals[0][0] = 0
-            intervals = [tuple(interval) for interval in intervals]
+                avg_start_time = np.median([beat[0] for beat in beats_times[1:]])
+                first_beat_mask = beats_times[0] > avg_start_time
+                beats_times[0] = beats_times[0][first_beat_mask]
+                intervals[0][0] = intervals[0][0] + (first_beat_mask == False).sum()
+                if intervals[-1][1] >= self.n_samples:
+                    intervals[-1][1] = self.n_samples - 1
+                if intervals[0][0] < 0:
+                    intervals[0][0] = 0
+                intervals = [tuple(interval) for interval in intervals]
+            except ZeroDivisionError:
+                if use_hr:
+                    intervals = find_intervals_using_hr(self)
+                else:
+                    raise ZeroDivisionError
         self.beats_intervals = intervals
         self.valid_beats_mask = len(intervals) * [True]
         data_source = self.data if use_raw else self.cleaned
@@ -159,9 +180,10 @@ class ECGBeat(BeatSignal):
             r_onset_loc = self.sder.peaks[self.sder.peaks < self.r_loc][-1]
             if r_onset_loc < self.q_loc:
                 r_onset_loc = self.q_loc
+            return r_onset_loc
         except Exception:
-            r_onset_loc = self.q_loc
-        return r_onset_loc
+            # TODO
+            return self.q_loc
 
     @lazy_property
     def r_loc(self):
@@ -175,8 +197,8 @@ class ECGBeat(BeatSignal):
                 r_loc = peaks[next_largest_peak]
             return r_loc
         except StopIteration:
-            r_loc = self.data.argmax()
-            return r_loc
+            # TODO
+            return self.data.argmax()
 
     @lazy_property
     def r_offset_loc(self):
@@ -186,6 +208,7 @@ class ECGBeat(BeatSignal):
                 r_offset_loc = self.s_loc
             return r_offset_loc
         except IndexError:
+            # TODO
             return self.s_loc
 
     @lazy_property
@@ -210,15 +233,23 @@ class ECGBeat(BeatSignal):
 
     @lazy_property
     def p_offset_loc(self):
-        p_offset_loc = self.sder.peaks[self.sder.peaks > self.p_loc][0]
-        if p_offset_loc > self.q_loc:
-            p_offset_loc = self.q_loc
-        return p_offset_loc
+        try:
+            p_offset_loc = self.sder.peaks[self.sder.peaks > self.p_loc][0]
+            if p_offset_loc > self.q_loc:
+                p_offset_loc = self.q_loc
+            return p_offset_loc
+        except IndexError:
+            # TODO
+            return self.q_loc
 
     @lazy_property
     def q_loc(self):
-        p_to_r_data = self.data[self.p_loc : self.r_loc]
-        return p_to_r_data.argmin() + self.p_loc
+        try:
+            p_to_r_data = self.data[self.p_loc : self.r_loc]
+            return p_to_r_data.argmin() + self.p_loc
+        except ValueError:
+            # TODO
+            return self.r_loc - (self.r_loc - self.p_loc) // 3
 
     @lazy_property
     def s_loc(self):
@@ -227,6 +258,7 @@ class ECGBeat(BeatSignal):
             troughs, _ = find_peaks(-r_to_end_data)
             return troughs[0] + self.r_loc
         except IndexError:
+            # TODO
             return self.r_loc + (self.n_samples - self.r_loc) // 4
 
     @lazy_property
@@ -255,10 +287,10 @@ class ECGBeat(BeatSignal):
     def t_offset_loc(self):
         try:
             t_offset_loc = self.sder.peaks[self.sder.peaks > self.t_loc][0]
+            return t_offset_loc
         except Exception:
             # TODO
-            t_offset_loc = self.n_samples - 1
-        return t_offset_loc
+            return self.n_samples - 1
 
     @lazy_property
     def crit_points(self):
@@ -304,8 +336,6 @@ class ECGBeat(BeatSignal):
 
             ax.plot(self.time, self.data, lw=3)
             self.plot_crit_points(ax=ax)
-            # self.plot(ax=ax)
-            # ax.get_legend().remove()
             areas = []
             for i, p in enumerate(params):
                 offset = min([self.data[p["start"]], self.data[p["end"]]])
@@ -377,19 +407,52 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
             ax.get_legend().remove()
 
     def plot_beats_segmentation(self, use_raw=False, **kwargs):
-        fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)
+        fig, axes = plt.subplots(
+            self.n_signals, 2, figsize=(24, 1.3 * self.n_signals), sharex="col", gridspec_kw={"width_ratios": [9, 2]}
+        )
         for ax, (sig_name, sig) in zip(axes, self.signals.items()):
-            sig.plot_beats_segmentation(use_raw=use_raw, ax=ax)
-            ax.set_xlabel("")
-            ax.set_ylabel("")
-            ax.set_title("")
-            ax.grid(False)
-            ax.get_legend().remove()
+            sig.plot_beats_segmentation(use_raw=use_raw, axes=ax)
+            sig.agg_beat.plot_crit_points(points=["p", "q", "r", "s", "t"], ax=ax[1])
+            ax[1].set_title("")
+        plt.tight_layout()
 
     def get_beats(self, source_channel=2, return_arr=True, **kwargs):
+        """Return beats from all channels.
+
+        If `source_channel` is specified, it will be used as source of beat intervals
+        for other channels. If `ZeroDivisionError` occurs (from `neurokit2`) for specified source_channel,
+        other channels are tested.
+        If `source_channel` is `None`, beats are extracter for every channel separately. In that case, there
+        is no guarantee, that number of beats and their alignment is preserved across all channels.
+
+        Args:
+            source_channel (int, optional): Channel used as source of beat intervals. Defaults to `2`.
+            return_arr (bool, optional): Whether to return beats data as `np.ndarray` or :class:`ECGBeat` objects.
+                Defaults to `True`.
+
+        Returns:
+            _type_: Beats as `np.ndarray` or as :class:`ECGBeat` objects.
+        """
         if source_channel is not None:
-            self.signals[source_channel].get_beats(**kwargs)
-            source_channel_intervals = self.signals[source_channel].beats_intervals
+            source_channels = list(self.signals.keys())
+            source_channels.remove(source_channel)
+            source_channels.reverse()
+            found_good_channel = False
+            new_source_channel = source_channel
+            while not found_good_channel or len(source_channels) == 0:
+                try:
+                    self.signals[new_source_channel].get_beats(**kwargs)
+                    found_good_channel = True
+                    if new_source_channel != source_channel:
+                        print(f"Original source channel was corrupted. Found new source channel: {new_source_channel}")
+                except ZeroDivisionError:
+                    new_source_channel = source_channels.pop()
+            if not found_good_channel:
+                new_source_channel = source_channel
+                self.signals[new_source_channel].get_beats(
+                    **kwargs, use_hr=True
+                )  # use Heart Rate (most dominant frequency)
+            source_channel_intervals = self.signals[new_source_channel].beats_intervals
         else:
             source_channel_intervals = None
         all_channels_beats = [
@@ -442,3 +505,8 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
         if return_arr:
             return np.array([sig.extract_features(return_arr=True) for _, sig in self.signals.items()])
         return OrderedDict({name: sig.extract_features(return_arr=False) for name, sig in self.signals.items()})
+
+    def get_whole_signal_embeddings_representation(self, embedding_model, return_arr=True):
+        if return_arr:
+            return np.array([sig.extract_embedding(embedding_model) for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.extract_embedding(embedding_model) for name, sig in self.signals.items()})

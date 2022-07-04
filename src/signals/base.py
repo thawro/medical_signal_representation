@@ -87,6 +87,12 @@ class BaseSignal:
         new_name = self.name + "_z_scored"
         return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
 
+    def min_max(self):
+        arr = self.data
+        new_data = (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
+        new_name = self.name + "_min_max"
+        return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
+
     def get_slice(self, start_time, end_time):
         mask = (self.time >= start_time) & (self.time <= end_time)
         new_name = self.name + f"_slice({start_time}-{end_time})"
@@ -182,6 +188,10 @@ class BaseSignal:
             return np.array(list(parse_nested_feats(features).values()))
         return features
 
+    def extract_embedding(self, embedding_model):
+        embedding = embedding_model(self.data)
+        return embedding
+
     def plot(
         self, start_time=0, width=10, scatter=False, line=True, first_der=False, label=None, use_samples=False, ax=None
     ):
@@ -262,23 +272,28 @@ class PeriodicSignal(ABC, BaseSignal):
     def get_beats(self, resample=True, n_samples=100, validate=True, plot=False, use_raw=True, return_arr=False):
         pass
 
-    def plot_beats_segmentation(self, use_raw=False, ax=None, **kwargs):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(24, 3))
+    def plot_beats_segmentation(self, use_raw=False, axes=None):
+        if axes is None:
+            fig, axes = plt.subplots(1, 2, figsize=(24, 4), gridspec_kw={"width_ratios": [8, 2]})
         if use_raw:
-            self.plot(ax=ax)
+            self.plot(ax=axes[0])
         else:
-            ax.plot(self.time, self.cleaned, lw=3, label=self.name)
+            axes[0].plot(self.time, self.cleaned, lw=3, label=self.name)
         beats_bounds = []
         for beat in self.beats:
             bounds = [beat.start_sec, beat.end_sec]
             color = "green" if beat.is_valid else "red"
-            ax.fill_between(bounds, self.data.min(), self.data.max(), alpha=0.15, color=color)
+            axes[0].fill_between(bounds, self.data.min(), self.data.max(), alpha=0.15, color=color)
             beats_bounds.extend(bounds)
-        ax.vlines(beats_bounds, self.data.min(), self.data.max(), lw=1.5, ec="black", ls="--")
-        ax.grid(False)
-        ax.set_ylim([self.data.min(), self.data.max()])
-        ax.legend()
+        axes[0].vlines(beats_bounds, self.data.min(), self.data.max(), lw=1.5, ec="black", ls="--")
+        self.plot_beats(ax=axes[1])
+        axes[0].set_xlim([self.time.min(), self.time.max()])
+        axes[0].set_ylim([self.data.min(), self.data.max()])
+        for ax in axes:
+            ax.grid(False)
+            ax.set_xlabel("")
+            ax.set_ylabel("")
+        plt.tight_layout()
 
     def plot_beats(self, same_ax=True, ax=None, plot_valid=True, plot_invalid=True):
         beats_to_plot = [
@@ -301,11 +316,9 @@ class PeriodicSignal(ABC, BaseSignal):
             ax.set_title(f"{n_beats} beats ({n_valid} valid, {n_invalid} invalid)", fontsize=22)
             ax.set_ylabel("Values", fontsize=18)
             ax.set_xlabel("Time [s]", fontsize=18)
-            ax.legend()
         else:
             ncols = 5
             nrows = int(np.ceil(n_beats / ncols))
-
             fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 4 * nrows))
             for beat, ax in zip(beats_to_plot, axes.flatten()):
                 palette = valid_palette if beat.is_valid else invalid_palette
@@ -368,7 +381,9 @@ class BeatSignal(ABC, BaseSignal):
     def crit_points(self):
         return {}
 
-    def plot_crit_points(self, use_samples=False, offset=0, ax=None, **kwargs):
+    def plot_crit_points(self, points=None, plot_sig=False, use_samples=False, offset=0, ax=None, **kwargs):
+        if points is None:
+            points = list(self.crit_points.keys())
         xaxes_data = np.arange(self.n_samples) if use_samples else self.time
         xrange = xaxes_data[-1] - xaxes_data[0]
         yrange = self.data.max() - self.data.min()
@@ -376,12 +391,16 @@ class BeatSignal(ABC, BaseSignal):
         if ax is None:
             fig, ax = plt.subplots(figsize=(12, 7))
 
+        if plot_sig:
+            self.plot(ax=ax)
         for name, loc in self.crit_points.items():
+            if name not in points:
+                continue
             t = xaxes_data[loc]
             val = self.data[loc] + offset
             ax.scatter(t, val, label=name, s=160)
             ax.annotate(name.upper(), (t + 0.012 * xrange, val + 0.012 * yrange), fontweight="bold", fontsize=18)
-        plt.legend()
+        # plt.legend()
 
     def plot(
         self,
