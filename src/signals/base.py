@@ -99,9 +99,9 @@ class BaseSignal:
         new_data = self.data[mask]
         return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
 
-    def get_derivative(self, deriv=1, smoothing=1, polyorder=5):
-        noise_factor = (4 + 4 * deriv + 2 * polyorder) * self.fs / 100
-        window_length = int(noise_factor * smoothing) + 2
+    def get_derivative(self, deriv=1, window_length=None, polyorder=5):
+        if window_length is None:
+            window_length = int(np.ceil(5 / 100 * self.fs))
         if window_length % 2 == 0:
             window_length = window_length + 1
         new_name = self.name + f"_derivative({deriv})"

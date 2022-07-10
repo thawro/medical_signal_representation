@@ -2,7 +2,7 @@
 
 import ast
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -17,23 +17,22 @@ from tqdm.auto import tqdm
 from signals.ecg import ECGSignal, create_multichannel_ecg
 from signals.utils import parse_nested_feats
 
-DATASET_PATH = Path("./../../data/ptbxl")
-TENSORS_DATA_PATH = DATASET_PATH / "tensors"
+PTBXL_PATH = Path("./../../data/ptbxl")
+RAW_DATASET_PATH = PTBXL_PATH / "raw"
+RAW_TENSORS_DATA_PATH = PTBXL_PATH / "raw_tensors"
 CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
 
 
-def load_ptbxl_data(sampling_rate: float, path: Path, target: str = "diagnostic_class", encode_labels: bool = True):
-    """_summary_
+def load_raw_ptbxl_data(fs: float, target: str = "diagnostic_class"):
+    """Load raw PTB-XL data.
 
     Args:
-        sampling_rate (float): Sampling rate of PTB-XL dataset. `100` or `500`.
-        path (Path): Path to PTB-XL wfdb data.
+        fs (float): Sampling rate of PTB-XL dataset. `100` or `500`.
         target (str): Target of PTB-XL data. `"diagnostic_class"` or `"diagnostic_subclass"`. Defaults to `"diagnostic_class"`.
-        encode_labels (bool): Whether to use `LabelEncoder` to encode labels. Defaults to `True`.
     """
 
-    def load_raw_ptbxl_data(df, sampling_rate, path):
-        if sampling_rate == 100:
+    def load_raw_data(df, fs, path):
+        if fs == 100:
             data = [wfdb.rdsamp(str(path / f)) for f in df.filename_lr]
         else:
             data = [wfdb.rdsamp(str(path / f)) for f in df.filename_hr]
@@ -53,14 +52,14 @@ def load_ptbxl_data(sampling_rate: float, path: Path, target: str = "diagnostic_
         return diagnostic_class
 
     # load and convert annotation data
-    Y = pd.read_csv(path / "ptbxl_database.csv", index_col="ecg_id")
+    Y = pd.read_csv(RAW_DATASET_PATH / "ptbxl_database.csv", index_col="ecg_id")
     Y.scp_codes = Y.scp_codes.apply(lambda x: ast.literal_eval(x))
 
     # Load raw signal data
-    X = load_raw_ptbxl_data(Y, sampling_rate, path)
+    X = load_raw_data(Y, fs, RAW_DATASET_PATH)
 
     # Load scp_statements.csv for diagnostic aggregation
-    agg_df = pd.read_csv(path / "scp_statements.csv", index_col=0)
+    agg_df = pd.read_csv(RAW_DATASET_PATH / "scp_statements.csv", index_col=0)
     agg_df = agg_df[agg_df.diagnostic == 1]
 
     Y["diagnostic_class"] = Y.scp_codes.apply(lambda codes: aggregate_class(codes, "diagnostic_class"))
@@ -82,108 +81,138 @@ def load_ptbxl_data(sampling_rate: float, path: Path, target: str = "diagnostic_
         "test": {"X": X[test_mask], "y": Y[test_mask][target].values},
     }
 
-    if encode_labels:
-        label_encoder = LabelEncoder().fit(dataset["train"]["y"])
-        dataset["train"]["y"] = label_encoder.transform(dataset["train"]["y"])
-        dataset["val"]["y"] = label_encoder.transform(dataset["val"]["y"])
-        dataset["test"]["y"] = label_encoder.transform(dataset["test"]["y"])
-
     return dataset
 
 
-def save_as_torch_and_npy_files(sampling_rate=100, target="diagnostic_class"):
-    """Load PTB-XL data and save it as torch (input) and npy (target) files.
+def load_data_and_save(fs: float = 100, target: str = "diagnostic_class", encode_labels=True):
+    """Load PTB-XL data and save it
+
+    Waveforms are saved as torch `.pt` files.
+    Labels and classes mappings are saved as numpy  `.npy` files.
 
     Args:
-        sampling_rate (float): Sampling rate of PTB-XL dataset. `100` or `500`.
+        fs (float): Sampling rate of PTB-XL dataset. `100` or `500`.
         target (str): Target of PTB-XL data. `"diagnostic_class"` or `"diagnostic_subclass"`. Defaults to `"diagnostic_class"`.
+        encode_labels (bool): Whether to use `LabelEncoder` to encode labels. Defaults to `True`.
     """
-    ptbxl_data = load_ptbxl_data(sampling_rate=sampling_rate, path=DATASET_PATH, target=target)
+    LABELS_PATH = RAW_TENSORS_DATA_PATH / f"labels/{target}"
+    LABELS_PATH.mkdir(parents=True, exist_ok=True)
+
+    DATA_PATH = RAW_TENSORS_DATA_PATH / f"records{fs}"
+    DATA_PATH.mkdir(parents=True, exist_ok=True)
+
+    ptbxl_data = load_raw_ptbxl_data(fs, target)
+    if encode_labels:
+        label_encoder = LabelEncoder().fit(ptbxl_data["train"]["y"])
+        ptbxl_data["train"]["y"] = label_encoder.transform(ptbxl_data["train"]["y"])
+        ptbxl_data["val"]["y"] = label_encoder.transform(ptbxl_data["val"]["y"])
+        ptbxl_data["test"]["y"] = label_encoder.transform(ptbxl_data["test"]["y"])
+        np.save(LABELS_PATH / "classes.npy", label_encoder.classes_)
 
     for split in ["train", "val", "test"]:
         data_tensor = torch.tensor(ptbxl_data[split]["X"])
         labels_npy = ptbxl_data[split]["y"]
-        torch.save(data_tensor, f"../../data/ptbxl/tensors/records{sampling_rate}/{split}_data.pt")
-        with open(f"../../data/ptbxl/tensors/records{sampling_rate}/{split}_labels.npy", "wb") as f:
-            np.save(f, labels_npy)
+        torch.save(data_tensor, DATA_PATH / f"{split}_data.pt")
+        # with open(, "wb") as f:
+        np.save(LABELS_PATH / f"{split}_labels.npy", labels_npy)
 
 
-def get_feats_from_all_channels(channels: np.ndarray, label: Union[str, int], plot: bool = False):
-    """Extract features from all channels
-
-    Args:
-        channels (np.ndarray): Numpy array with channels data. Shape `[C, S]`, where `C` is number of channels and `S` is number of samples.
-        label (Union[str, int]): Label of data sample.
-        plot (bool): Whether to plot feature extraction. Defaults to `False`.
-
-    Returns:
-        _type_: _description_
-    """
-    try:
-        multi_ecg = create_multichannel_ecg(channels, 100)
-        features = parse_nested_feats(multi_ecg.get_whole_signal_features_representation(return_arr=False))
-        features["label"] = label
-        return features
-    except Exception as e:
-        # TODO
-        return None
-
-
-def create_split_features_df(ptbxl_data: Dict[str, Dict[str, np.ndarray]], split_type: str):
-    """Create `DataFrame` with features for specific split.
+def get_representations(channels_data: torch.Tensor, fs: float = 100) -> Dict[str, torch.Tensor]:
+    """Get all types of representations (returned by ECGSignal objects).
 
     Args:
-        ptbxl_data (Dict[str, Dict[str, np.ndarray]]): Dict with PTB-XL data.
-        split_type (str): Type of split. One of `["train", "val", "test"]`.
+        channels_data (torch.Tensor): ECG channels data of shape `[TODO]`, where TODO.
+        fs (float): Sampling rate. Defaults to 100.
 
     Returns:
-        pd.DataFrame: DataFrame with features (and label as last column).
+        Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    X, y = ptbxl_data[split_type]["X"], ptbxl_data[split_type]["y"]
-    feats_list = Parallel(n_jobs=-1)(
-        delayed(get_feats_from_all_channels)(channels.T, label)
-        for channels, label in tqdm(zip(X, y), total=len(X), desc=f"{split_type} split")
-    )
-    feats_list = [f for f in feats_list if f is not None]
-    df = pd.DataFrame(feats_list)
-    return df
+    multi_ecg = create_multichannel_ecg(channels_data.T.numpy(), fs)
 
+    n_beats = 10
+    multi_ecg.get_beats(source_channel=2)
+    whole_signal_waveforms = multi_ecg.get_waveform_representation()
+    whole_signal_features = multi_ecg.get_whole_signal_features_representation()
+    per_beat_waveforms = multi_ecg.get_per_beat_waveform_representation(n_beats=n_beats)
+    per_beat_features = multi_ecg.get_per_beat_features_representation(n_beats=n_beats)
+    # whole_signal_embeddings = multi_ecg.get_whole_signal_embeddings_representation()
 
-def create_features_dataset(ptbxl_data: Dict[str, Dict[str, np.ndarray]]):
-    """Create dataset (train, val and test splits) with features.
-
-    Args:
-        ptbxl_data (Dict[str, Dict[str, np.ndarray]]): Dict with PTB-XL raw data.
-
-    Returns:
-        Dict[str, Dict[str, Union[pd.DataFrame, np.ndarray]]]: Dict with train, val and test data splits.
-    """
-    # ptbxl_data = load_ptbxl_data(sampling_rate=sampling_rate, path=DATASET_PATH, target=target)
-    train_df = create_split_features_df(ptbxl_data, split_type="train")
-    val_df = create_split_features_df(ptbxl_data, split_type="val")
-    test_df = create_split_features_df(ptbxl_data, split_type="test")
-
-    label_encoder = LabelEncoder().fit(train_df["label"].values)
-    train_df["label"] = label_encoder.transform(train_df["label"].values)
-    val_df["label"] = label_encoder.transform(val_df["label"].values)
-    test_df["label"] = label_encoder.transform(test_df["label"].values)
+    actual_beats = per_beat_waveforms.shape[1]
+    n_more_beats = n_beats - actual_beats
+    # print(f"{actual_beats} beats in signal. Padding {n_more_beats} beats")
+    per_beat_waveforms = np.pad(per_beat_waveforms, ((0, 0), (0, n_more_beats), (0, 0)))  # padding beats with zeros
+    per_beat_features = np.pad(per_beat_features, ((0, 0), (0, n_more_beats), (0, 0)))  # padding beats with zeros
 
     return {
-        "train": {"X": train_df.drop("label", axis=1), "y": train_df["label"].values},
-        "val": {"X": val_df.drop("label", axis=1), "y": val_df["label"].values},
-        "test": {"X": test_df.drop("label", axis=1), "y": test_df["label"].values},
+        "whole_signal_waveforms": whole_signal_waveforms,
+        "whole_signal_features": whole_signal_features,
+        "per_beat_waveforms": per_beat_waveforms,
+        "per_beat_features": per_beat_features,
+        # 'whole_signal_embeddings': whole_signal_embeddings,
     }
 
 
-class PTBXLWaveformDataset(Dataset):
+def create_representations_dataset(
+    splits: List[str] = ["train", "val", "test"], fs: float = 100, use_multiprocessing: bool = True
+):
+    """Create and save data files (`.pt`) for all representations.
+
+    Args:
+        splits (list): Split types to create representations data for. Defaults to ['train', 'val', 'test'].
+        fs (float): Sampling frequency of signals. Defaults to 100.
+        use_multiprocessing (bool): Whether to use `joblib` library for multiprocessing
+            or run everything in simple `for` loop. Defaults to `True`.
+    """
+
+    REPRESENTATIONS_DATA_PATH = PTBXL_PATH / f"representations_{fs}"
+    REPRESENTATIONS_DATA_PATH.mkdir(parents=True, exist_ok=True)
+
+    for split in tqdm(splits):
+        data = torch.load(RAW_TENSORS_DATA_PATH / f"records{fs}/{split}_data.pt")
+        if use_multiprocessing:
+            representations = Parallel(n_jobs=-1)(delayed(get_representations)(channels, fs) for channels in tqdm(data))
+        else:
+            representations = [get_representations(channels) for channels in tqdm(data)]
+        representation_names = representations[0].keys()
+        representations = {
+            name: torch.tensor(np.array([rep[name] for rep in representations])) for name in representation_names
+        }
+        for name, representation_data in representations.items():
+            path = REPRESENTATIONS_DATA_PATH / name / f"{split}_data.pt"
+            torch.save(representation_data, path)
+
+
+def load_ptbxl_split(representation_type: str, fs: float, target: str, split: str) -> Dict[str, np.ndarray]:
+    """Load PTB-XL train, val or test split for specified representation type, target and sampling rate (fs).
+
+    Args:
+        representation_type (str): Type of representation to load data for.
+            One of `["whole_signal_waveforms", "whole_signal_features", "per_beat_waveforms",
+            "per_beat_features", "whole_signal_embeddings"]
+        target (str): Type of target for PTB-XL benchmark. One of `["diagnostic_class", "diagnostic_subclass"]`.
+        split (str): Type of data split. One of `["train", "val", "test"]`.
+        fs (float): Sampling rate of PTB-XL waveform data. One of `[100, 500]`. Defaults to 100.
+
+    Returns:
+        Dict[str, np.ndarray]: Dict with data, labels and classes mapper.
+    """
+    REPRESENTATIONS_DATA_PATH = PTBXL_PATH / f"representations_{fs}"
+    data = torch.load(REPRESENTATIONS_DATA_PATH / f"{representation_type}/{split}_data.pt")
+    labels = np.load(RAW_TENSORS_DATA_PATH / f"labels/{target}/{split}_labels.npy")
+    classes = np.load(RAW_TENSORS_DATA_PATH / f"labels/{target}/classes.npy", allow_pickle=True)
+    classes = {i: classes[i] for i in range(len(classes))}
+    return {"data": data, "labels": labels, "classes": classes}
+
+
+class PTBXLDataset(Dataset):
     """PTB-XL Dataset class used in DeepLearning models."""
 
-    def __init__(self, split, sampling_rate=100, target="diagnostic_class", transform=None):
-        # TODO: target is still not used -> only diagnostic_class labels are saved as tensors
-        # TODO: sampling_rate works only for 100 -> 100 fs samples are saves as tensors
-
-        self.data = torch.load(TENSORS_DATA_PATH / f"records{sampling_rate}/{split}_data.pt")
-        self.labels = np.load(TENSORS_DATA_PATH / f"records{sampling_rate}/{split}_labels.npy", allow_pickle=True)
+    def __init__(self, representation_type, fs, target, split, transform=None):
+        dataset = load_ptbxl_split(representation_type, fs, target, split)
+        self.data = dataset["data"]
+        self.labels = dataset["labels"]
+        self.classes = dataset["classes"]
+        self.transform = transform
 
     def __len__(self):
         return len(self.data)
@@ -194,12 +223,20 @@ class PTBXLWaveformDataset(Dataset):
         return self.data[idx].float(), self.labels[idx]
 
 
-class PTBXLWaveformDataModule(LightningDataModule):
+class PTBXLDataModule(LightningDataModule):
     """PTB-XL DataModule class used as DeepLearning models DataLoaders provider."""
 
-    def __init__(self, sampling_rate=100, target="diagnostic_class", batch_size: int = 64, num_workers=8):
+    def __init__(
+        self,
+        representation_type: str,
+        fs: float = 100,
+        target: str = "diagnostic_class",
+        batch_size: int = 64,
+        num_workers=8,
+    ):
         super().__init__()
-        self.sampling_rate = sampling_rate
+        self.representation_type = representation_type
+        self.fs = fs
         self.target = target
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -210,10 +247,15 @@ class PTBXLWaveformDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train = PTBXLWaveformDataset(split="train", sampling_rate=self.sampling_rate, target=self.target)
-            self.val = PTBXLWaveformDataset(split="val", sampling_rate=self.sampling_rate, target=self.target)
+            self.train = PTBXLDataset(
+                self.representation_type,
+                self.fs,
+                self.target,
+                split="train",
+            )
+            self.val = PTBXLDataset(self.representation_type, self.fs, self.target, split="val")
         if stage == "test" or stage is None:
-            self.test = PTBXLWaveformDataset(split="test", sampling_rate=self.sampling_rate, target=self.target)
+            self.test = PTBXLDataset(self.representation_type, self.fs, self.target, split="test")
 
     def train_dataloader(self):
         return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)

@@ -369,7 +369,7 @@ class ECGBeat(BeatSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_slope_features(self, return_arr=True):
+    def extract_slope_features(self, return_arr=True, plot=False, ax=None):
         params = [
             {"name": "P_onset_slope", "start": self.p_onset_loc, "end": self.p_loc},
             {"name": "P_offset_slope", "start": self.p_loc, "end": self.p_offset_loc},
@@ -386,10 +386,10 @@ class ECGBeat(BeatSignal):
 
     def extract_features(self, return_arr=True, plot=False):
         features = super().extract_features(return_arr=False)
-        features["crit_points_features"] = self.extract_crit_points_features(return_arr=False)
-        features["area_features"] = self.extract_area_features(return_arr=False)
+        features["crit_points_features"] = self.extract_crit_points_features(return_arr=False, plot=plot)
+        features["area_features"] = self.extract_area_features(return_arr=False, plot=plot)
         features["energy_features"] = self.extract_energy_features(return_arr=False)
-        features["slope_features"] = self.extract_slope_features(return_arr=False)
+        features["slope_features"] = self.extract_slope_features(return_arr=False, plot=plot)
         if return_arr:
             return parse_feats_to_array(features)
         return features
