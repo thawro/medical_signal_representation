@@ -14,6 +14,7 @@ from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
 
+from data.utils import StratifiedBatchSampler
 from signals.ecg import ECGSignal, create_multichannel_ecg
 from signals.utils import parse_nested_feats
 
@@ -220,7 +221,9 @@ class PTBXLDataset(Dataset):
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        return self.data[idx].float(), self.labels[idx]
+        data = self.data[idx].float()
+        data = torch.nan_to_num(data, nan=0.0)  # TODO !!!
+        return data, self.labels[idx]
 
 
 class PTBXLDataModule(LightningDataModule):
@@ -258,10 +261,22 @@ class PTBXLDataModule(LightningDataModule):
             self.test = PTBXLDataset(self.representation_type, self.fs, self.target, split="test")
 
     def train_dataloader(self):
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        return DataLoader(
+            self.train,
+            batch_sampler=StratifiedBatchSampler(self.train[:][1], batch_size=self.batch_size, shuffle=True),
+            num_workers=self.num_workers,
+        )
 
     def val_dataloader(self):
-        return DataLoader(self.val, batch_size=10 * self.batch_size, num_workers=self.num_workers)
+        return DataLoader(
+            self.val,
+            batch_sampler=StratifiedBatchSampler(self.val[:][1], batch_size=10 * self.batch_size, shuffle=False),
+            num_workers=self.num_workers,
+        )
 
     def test_dataloader(self):
-        return DataLoader(self.test, batch_size=10 * self.batch_size, num_workers=self.num_workers)
+        return DataLoader(
+            self.test,
+            batch_sampler=StratifiedBatchSampler(self.test[:][1], batch_size=10 * self.batch_size, shuffle=False),
+            num_workers=self.num_workers,
+        )
