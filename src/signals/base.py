@@ -27,7 +27,13 @@ from scipy.signal import (
 from scipy.stats import kurtosis, skew
 from statsmodels.tsa.seasonal import STL
 
-from signals.utils import create_new_obj, lazy_property, parse_nested_feats, z_score
+from signals.utils import (
+    create_new_obj,
+    get_windows,
+    lazy_property,
+    parse_nested_feats,
+    z_score,
+)
 
 
 class BaseSignal:
@@ -259,7 +265,22 @@ class BaseSignal:
             ax.margins(0.01)
 
 
-class PeriodicSignal(ABC, BaseSignal):
+class Signal(BaseSignal):
+    def __init__(self, name, data, fs, start_sec=0):
+        super().__init__(name, data, fs, start_sec)
+        self.windows = None  # List of Signal objects
+
+    def get_windows(self, intervals):
+        # windows_intervals = get_windows(self.time[0], self.time[-1], win_len, step)
+        self.windows = [create_new_obj(self, data=self.data[start:end]) for start, end in intervals]
+        return self.windows
+
+    def plot_windows(self, **kwargs):
+        for window in self.windows:
+            window.plot(**kwargs)
+
+
+class PeriodicSignal(ABC, Signal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
         self.beats = None  # List of PPGBeat objects
@@ -436,6 +457,12 @@ class MultiChannelSignal:
     def __init__(self, signals: Dict[str, PeriodicSignal]):
         self.signals = signals
         self.n_signals = len(signals)
+        self.windows = None
+
+    def get_windows(self, intervals):
+        # windows_intervals = get_windows(self.time[0], self.time[-1], win_len, step)
+        self.windows = {name: sig.get_windows(intervals) for name, sig in self.signals.items()}
+        return self.windows
 
     def plot(self, **kwargs):
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 3 * self.n_signals))

@@ -468,8 +468,7 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
     def get_waveform_representation(self, return_arr=True):
         if return_arr:
             return np.array([sig.data for name, sig in self.signals.items()])
-        else:
-            return OrderedDict({name: sig.data for name, sig in self.signals.items()})
+        return OrderedDict({name: sig.data for name, sig in self.signals.items()})
 
     def get_per_beat_features_representation(self, return_arr=True, n_beats=-1):
         if return_arr:

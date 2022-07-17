@@ -104,3 +104,14 @@ def calculate_energy(sig, start, end):
 
 def calculate_slope(t, sig, start, end):
     return (sig[end] - sig[start]) / (t[end] - t[start])
+
+
+def get_windows(start, max_len, win_len, step):
+    end = start + win_len
+    windows = []
+    while end < max_len:
+        windows.append((start, end))
+        start += step
+        end += step
+    windows.append((start, max_len))
+    return windows
