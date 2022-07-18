@@ -27,10 +27,15 @@ class EEGSignal(Signal):
         pxx /= pxx.sum()
         return {band: pxx[(freqs >= fmin) & (freqs < fmax)].mean() for band, (fmin, fmax) in FREQ_BANDS.items()}
 
-    def extract_features(self, return_arr=True, flatten=True, plot=False):
+    # TODO: Add another features
+
+    def extract_features(self, return_arr=True, flatten=False, plot=False):
         features = OrderedDict({"whole_signal_features": {}})
         features["whole_signal_features"] = super().extract_features(return_arr=False)
         features["whole_signal_features"]["rel_power_features"] = self.extract_relative_power_frequency_features()
+
+        # TODO: Add another features
+
         if return_arr:
             return parse_feats_to_array(features)
         if flatten:

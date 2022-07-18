@@ -116,11 +116,9 @@ class ECGSignal(PeriodicSignal):
         data_source = self.data if use_raw else self.cleaned
         beats = []
         for i, interval in enumerate(intervals):
-            start_sec, end_sec = interval[0] / self.fs, interval[1] / self.fs
+            start_sec = interval[0] / self.fs
             beat_data = data_source[interval[0] : interval[1] + 1]
-            beat = ECGBeat(
-                name=f"beat {i}", data=beat_data, fs=self.fs, start_sec=start_sec, end_sec=end_sec, beat_num=i
-            )
+            beat = ECGBeat(name=f"beat {i}", data=beat_data, fs=self.fs, start_sec=start_sec, beat_num=i)
             if resample:
                 beat = beat.resample_with_interpolation(n_samples=100, kind="pchip")
             beats.append(beat)
@@ -163,8 +161,8 @@ class ECGSignal(PeriodicSignal):
 
 
 class ECGBeat(BeatSignal):
-    def __init__(self, name, data, fs, start_sec, end_sec, beat_num=0):
-        super().__init__(name, data, fs, start_sec, end_sec, beat_num)
+    def __init__(self, name, data, fs, start_sec, beat_num=0):
+        super().__init__(name, data, fs, start_sec, beat_num)
 
     @lazy_property
     def fder(self):
@@ -396,16 +394,6 @@ class ECGBeat(BeatSignal):
 
 
 class MultiChannelECGSignal(MultiChannelPeriodicSignal):
-    def plot(self, **kwargs):
-        fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)
-        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
-            sig.plot(ax=ax, **kwargs)
-            ax.set_xlabel("")
-            ax.set_ylabel("")
-            ax.set_title("")
-            ax.grid(False)
-            ax.get_legend().remove()
-
     def plot_beats_segmentation(self, use_raw=False, **kwargs):
         fig, axes = plt.subplots(
             self.n_signals, 2, figsize=(24, 1.3 * self.n_signals), sharex="col", gridspec_kw={"width_ratios": [9, 2]}
@@ -464,48 +452,3 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
         self.beats = np.array(all_channels_beats)
         self.beats_times = np.array(beats_times)
         return self.beats
-
-    def get_waveform_representation(self, return_arr=True):
-        if return_arr:
-            return np.array([sig.data for name, sig in self.signals.items()])
-        return OrderedDict({name: sig.data for name, sig in self.signals.items()})
-
-    def get_per_beat_features_representation(self, return_arr=True, n_beats=-1):
-        if return_arr:
-            return np.array(
-                [sig.extract_per_beat_features(return_arr=True, n_beats=n_beats) for _, sig in self.signals.items()]
-            )
-        return OrderedDict(
-            {
-                name: sig.extract_per_beat_features(return_arr=False, n_beats=n_beats)
-                for name, sig in self.signals.items()
-            }
-        )
-
-    def get_per_beat_waveform_representation(self, return_arr=True, n_beats=-1):
-        if return_arr:
-            return np.array(
-                [sig.extract_per_beat_waveforms(return_arr=True, n_beats=n_beats) for _, sig in self.signals.items()]
-            )
-        return OrderedDict(
-            {
-                name: sig.extract_per_beat_waveforms(return_arr=False, n_beats=n_beats)
-                for name, sig in self.signals.items()
-            }
-        )
-
-    def get_agg_beat_features_representation(self, return_arr=True):
-        agg_beats = OrderedDict({name: signal.agg_beat for name, signal in self.signals.items()})
-        if return_arr:
-            return np.array([agg_beat.extract_features(return_arr=True) for _, agg_beat in agg_beats.items()])
-        return OrderedDict({name: agg_beat.extract_features(return_arr=False) for name, agg_beat in agg_beats.items()})
-
-    def get_whole_signal_features_representation(self, return_arr=True):
-        if return_arr:
-            return np.array([sig.extract_features(return_arr=True) for _, sig in self.signals.items()])
-        return OrderedDict({name: sig.extract_features(return_arr=False) for name, sig in self.signals.items()})
-
-    def get_whole_signal_embeddings_representation(self, embedding_model, return_arr=True):
-        if return_arr:
-            return np.array([sig.extract_embedding(embedding_model) for _, sig in self.signals.items()])
-        return OrderedDict({name: sig.extract_embedding(embedding_model) for name, sig in self.signals.items()})

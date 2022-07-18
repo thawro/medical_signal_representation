@@ -37,15 +37,15 @@ from signals.utils import (
 
 
 class BaseSignal:
-    def __init__(self, name, data, fs, start_sec=0, end_sec=None):
+    def __init__(self, name, data, fs, start_sec=0):
         self.name = name
         self.data = data
         self.fs = fs
         self.start_sec = start_sec
-        self.end_sec = end_sec
         self.n_samples = len(data)
         self.duration = self.n_samples / fs
         self.time = np.arange(0, self.n_samples) / fs
+        self.end_sec = self.start_sec + self.time[-1]
 
     @lazy_property
     def troughs(self):
@@ -100,10 +100,13 @@ class BaseSignal:
         return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
 
     def get_slice(self, start_time, end_time):
-        mask = (self.time >= start_time) & (self.time <= end_time)
+        mask = (self.time >= start_time) & (self.time < end_time)
         new_name = self.name + f"_slice({start_time}-{end_time})"
         new_data = self.data[mask]
         return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
+
+    def is_in_time_bounds(self, start_s, end_s):
+        return self.start_sec >= start_s and self.end_sec < end_s
 
     def get_derivative(self, deriv=1, window_length=None, polyorder=5):
         if window_length is None:
@@ -112,7 +115,7 @@ class BaseSignal:
             window_length = window_length + 1
         new_name = self.name + f"_derivative({deriv})"
         new_data = savgol_filter(self.data, window_length, polyorder, deriv, delta=1 / self.fs)
-        return BaseSignal(name=new_name, data=new_data, fs=self.fs, start_sec=self.start_sec, end_sec=self.end_sec)
+        return BaseSignal(name=new_name, data=new_data, fs=self.fs, start_sec=self.start_sec)
 
     def detrend(self):
         detrended = detrend(self.data)
@@ -270,14 +273,34 @@ class Signal(BaseSignal):
         super().__init__(name, data, fs, start_sec)
         self.windows = None  # List of Signal objects
 
-    def get_windows(self, intervals):
-        # windows_intervals = get_windows(self.time[0], self.time[-1], win_len, step)
-        self.windows = [create_new_obj(self, data=self.data[start:end]) for start, end in intervals]
+    def get_windows(self, win_len_s, step_s):
+        win_len_samples = win_len_s * self.fs
+        step_samples = step_s * self.fs
+        intervals = get_windows(0, self.n_samples, win_len_samples, step_samples)
+        intervals = np.array(intervals).astype(int)
+        self.windows = [
+            create_new_obj(self, data=self.data[start:end], start_sec=self.time[start]) for start, end in intervals
+        ]
         return self.windows
 
     def plot_windows(self, **kwargs):
         for window in self.windows:
             window.plot(**kwargs)
+
+    def extract_per_window_waveforms(self, return_arr=True):
+        if return_arr:
+            return np.array([window.data for window in self.windows])
+        return OrderedDict({f"window_{i}": window.data for i, window in enumerate(self.windows)})
+
+    def extract_per_window_features(self, return_arr=True, plot=False):
+        if return_arr:
+            return np.array([window.extract_features(return_arr=True, plot=plot) for window in self.windows])
+        return OrderedDict(
+            {
+                f"window_{i}": window.extract_features(return_arr=False, plot=plot)
+                for i, window in enumerate(self.windows)
+            }
+        )
 
 
 class PeriodicSignal(ABC, Signal):
@@ -292,6 +315,15 @@ class PeriodicSignal(ABC, Signal):
     @abstractmethod
     def get_beats(self, resample=True, n_samples=100, validate=True, plot=False, use_raw=True, return_arr=False):
         pass
+
+    def get_windows(self, win_len_s, step_s):
+        # aggregate beats for each window
+        super().get_windows(win_len_s, step_s)
+        for window in self.windows:
+            window.beats = np.array(
+                [beat for beat in self.beats if beat.is_in_time_bounds(window.start_sec, window.end_sec)]
+            )
+            window.aggregate()
 
     def plot_beats_segmentation(self, use_raw=False, axes=None):
         if axes is None:
@@ -360,11 +392,11 @@ class PeriodicSignal(ABC, Signal):
         agg_beat_data, agg_beat_time = beats_data.mean(axis=0), beats_times.mean(axis=0)
         agg_fs = len(agg_beat_data) / (agg_beat_time[-1] - agg_beat_time[0])
         BeatClass = beats_to_aggregate[0].__class__
-        agg_beat = BeatClass("agg_beat", agg_beat_data, agg_fs, start_sec=0, end_sec=agg_beat_time[-1])
+        agg_beat = BeatClass("agg_beat", agg_beat_data, agg_fs, start_sec=0)
         self.agg_beat = agg_beat
         return self.agg_beat
 
-    def extract_per_beat_features(self, plot=False, return_arr=True, n_beats=-1):
+    def extract_per_beat_features(self, return_arr=True, n_beats=-1, plot=False):
         n_beats = len(self.beats) if n_beats <= 0 else n_beats
         beats = self.beats[:n_beats]
         if return_arr:
@@ -389,8 +421,8 @@ class PeriodicSignal(ABC, Signal):
 
 
 class BeatSignal(ABC, BaseSignal):
-    def __init__(self, name, data, fs, start_sec, end_sec=None, beat_num=0, is_valid=True):
-        super().__init__(name, data, fs, start_sec, end_sec)
+    def __init__(self, name, data, fs, start_sec, beat_num=0, is_valid=True):
+        super().__init__(name, data, fs, start_sec)
         self.is_valid = is_valid
         self.beat_num = beat_num
 
@@ -459,9 +491,9 @@ class MultiChannelSignal:
         self.n_signals = len(signals)
         self.windows = None
 
-    def get_windows(self, intervals):
+    def get_windows(self, win_len_s, step_s):
         # windows_intervals = get_windows(self.time[0], self.time[-1], win_len, step)
-        self.windows = {name: sig.get_windows(intervals) for name, sig in self.signals.items()}
+        self.windows = {name: sig.get_windows(win_len_s, step_s) for name, sig in self.signals.items()}
         return self.windows
 
     def plot(self, **kwargs):
@@ -471,6 +503,37 @@ class MultiChannelSignal:
             ax.set_xlabel("")
             ax.set_ylabel("")
             ax.set_title("")
+
+    # TODO: Add windows plotting func
+
+    def get_whole_signal_waveform_representation(self, return_arr=True):
+        if return_arr:
+            return np.array([sig.data for name, sig in self.signals.items()])
+        return OrderedDict({name: sig.data for name, sig in self.signals.items()})
+
+    def get_per_window_waveform_representation(self, return_arr=True):
+        if return_arr:
+            return np.array([sig.extract_per_window_waveforms(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict(
+            {name: sig.extract_per_window_waveforms(return_arr=False) for name, sig in self.signals.items()}
+        )
+
+    def get_per_window_features_representation(self, return_arr=True):
+        if return_arr:
+            return np.array([sig.extract_per_window_features(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict(
+            {name: sig.extract_per_window_features(return_arr=False) for name, sig in self.signals.items()}
+        )
+
+    def get_whole_signal_features_representation(self, return_arr=True):
+        if return_arr:
+            return np.array([sig.extract_features(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.extract_features(return_arr=False) for name, sig in self.signals.items()})
+
+    def get_whole_signal_embeddings_representation(self, embedding_model, return_arr=True):
+        if return_arr:
+            return np.array([sig.extract_embedding(embedding_model) for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.extract_embedding(embedding_model) for name, sig in self.signals.items()})
 
 
 class MultiChannelPeriodicSignal(MultiChannelSignal):
@@ -486,3 +549,43 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
     def aggregate(self, **kwargs):
         self.agg_beat = {name: signal.aggregate(**kwargs) for name, signal in self.signals.items()}
         return self.agg_beat
+
+    def plot(self, **kwargs):
+        fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)
+        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
+            sig.plot(ax=ax, **kwargs)
+            ax.set_xlabel("")
+            ax.set_ylabel("")
+            ax.set_title("")
+            ax.grid(False)
+            ax.get_legend().remove()
+
+    def get_per_beat_features_representation(self, return_arr=True, n_beats=-1):
+        if return_arr:
+            return np.array(
+                [sig.extract_per_beat_features(return_arr=True, n_beats=n_beats) for _, sig in self.signals.items()]
+            )
+        return OrderedDict(
+            {
+                name: sig.extract_per_beat_features(return_arr=False, n_beats=n_beats)
+                for name, sig in self.signals.items()
+            }
+        )
+
+    def get_per_beat_waveform_representation(self, return_arr=True, n_beats=-1):
+        if return_arr:
+            return np.array(
+                [sig.extract_per_beat_waveforms(return_arr=True, n_beats=n_beats) for _, sig in self.signals.items()]
+            )
+        return OrderedDict(
+            {
+                name: sig.extract_per_beat_waveforms(return_arr=False, n_beats=n_beats)
+                for name, sig in self.signals.items()
+            }
+        )
+
+    def get_agg_beat_features_representation(self, return_arr=True):
+        agg_beats = OrderedDict({name: signal.agg_beat for name, signal in self.signals.items()})
+        if return_arr:
+            return np.array([agg_beat.extract_features(return_arr=True) for _, agg_beat in agg_beats.items()])
+        return OrderedDict({name: agg_beat.extract_features(return_arr=False) for name, agg_beat in agg_beats.items()})
