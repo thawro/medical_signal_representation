@@ -63,7 +63,7 @@ class ECGSignal(PeriodicSignal):
     def rpeaks(self):
         return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs)[1]["ECG_R_Peaks"]
 
-    def get_beats(
+    def set_beats(
         self,
         intervals=None,
         align_to_r=True,
@@ -124,11 +124,6 @@ class ECGSignal(PeriodicSignal):
         self.aggregate()
         if plot:
             self.plot_beats()
-        if return_arr:
-            beats_times = np.array([beat.time for beat in self.beats])
-            beats_data = np.array([beat.data for beat in self.beats])
-            return beats_times, beats_data
-        return self.beats
 
     def extract_hrv_features(self, return_arr=True):
         if self.rpeaks is None:
@@ -177,8 +172,7 @@ class ECGBeat(BeatSignal):
             if r_onset_loc < self.q_loc:
                 r_onset_loc = self.q_loc
             return r_onset_loc
-        except Exception:
-            # TODO
+        except Exception:  # TODO
             return self.q_loc
 
     @lazy_property
@@ -203,16 +197,14 @@ class ECGBeat(BeatSignal):
             if r_offset_loc > self.s_loc:
                 r_offset_loc = self.s_loc
             return r_offset_loc
-        except IndexError:
-            # TODO
+        except IndexError:  # TODO
             return self.s_loc
 
     @lazy_property
     def p_onset_loc(self):
         try:
             p_onset_loc = self.sder.peaks[self.sder.peaks < self.p_loc][-1]
-        except Exception:
-            # TODO
+        except Exception:  # TODO
             p_onset_loc = 0
         return p_onset_loc
 
@@ -223,8 +215,7 @@ class ECGBeat(BeatSignal):
             peaks, _ = find_peaks(zero_to_r_data)
             biggest_peak_idx = np.array([zero_to_r_data[peak] for peak in peaks]).argmax()
             return peaks[biggest_peak_idx]  # zero_to_r_data.argmax()
-        except Exception:
-            # TODO
+        except Exception:  # TODO
             return int(self.r_loc / 4)
 
     @lazy_property
@@ -234,8 +225,7 @@ class ECGBeat(BeatSignal):
             if p_offset_loc > self.q_loc:
                 p_offset_loc = self.q_loc
             return p_offset_loc
-        except IndexError:
-            # TODO
+        except IndexError:  # TODO
             return self.q_loc
 
     @lazy_property
@@ -243,8 +233,7 @@ class ECGBeat(BeatSignal):
         try:
             p_to_r_data = self.data[self.p_loc : self.r_loc]
             return p_to_r_data.argmin() + self.p_loc
-        except ValueError:
-            # TODO
+        except ValueError:  # TODO
             return self.r_loc - (self.r_loc - self.p_loc) // 3
 
     @lazy_property
@@ -253,8 +242,7 @@ class ECGBeat(BeatSignal):
             r_to_end_data = self.data[self.r_loc :]
             troughs, _ = find_peaks(-r_to_end_data)
             return troughs[0] + self.r_loc
-        except IndexError:
-            # TODO
+        except IndexError:  # TODO
             return self.r_loc + (self.n_samples - self.r_loc) // 4
 
     @lazy_property
@@ -263,8 +251,7 @@ class ECGBeat(BeatSignal):
             t_onset_loc = self.sder.peaks[self.sder.peaks < self.t_loc][-1]
             if t_onset_loc < self.s_loc:
                 t_onset_loc = self.s_loc
-        except Exception:
-            # TODO
+        except Exception:  # TODO
             t_onset_loc = self.s_loc
         return t_onset_loc
 
@@ -275,8 +262,7 @@ class ECGBeat(BeatSignal):
             peaks, _ = find_peaks(s_to_end_data)
             biggest_peak_idx = np.array([s_to_end_data[peak] for peak in peaks]).argmax()
             return peaks[biggest_peak_idx] + self.s_loc  # zero_to_r_data.argmax()
-        except Exception:
-            # TODO
+        except Exception:  # TODO
             return self.s_loc + (self.n_samples - self.s_loc) // 2
 
     @lazy_property
@@ -284,8 +270,7 @@ class ECGBeat(BeatSignal):
         try:
             t_offset_loc = self.sder.peaks[self.sder.peaks > self.t_loc][0]
             return t_offset_loc
-        except Exception:
-            # TODO
+        except Exception:  # TODO
             return self.n_samples - 1
 
     @lazy_property

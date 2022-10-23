@@ -88,7 +88,7 @@ class PPGSignal(PeriodicSignal):
         self.peaks = peaks_idxs
         return self.peaks
 
-    def get_beats(self, resample_beats=True, n_samples=100, validate=True, plot=False):
+    def set_beats(self, resample_beats=True, n_samples=100, validate=True, plot=False):
         if self.peaks is None:
             self.find_peaks()
         if self.troughs is None:
@@ -125,8 +125,6 @@ class PPGSignal(PeriodicSignal):
             self.plot_beats(plot_valid=True, plot_invalid=False, ax=axes[1])
         else:
             self.aggregate(valid_only=True)
-
-        return self.beats
 
     def extract_hrv_features(self):
         if self.hrv_features is None:

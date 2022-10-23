@@ -9,19 +9,15 @@ import pandas as pd
 import torch
 import wfdb
 from joblib import Parallel, delayed
-from pytorch_lightning import LightningDataModule
 from sklearn.preprocessing import LabelEncoder
-from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
 
-from data.utils import StratifiedBatchSampler
-from signals.ecg import ECGSignal, create_multichannel_ecg
-from signals.utils import parse_nested_feats
+from signals.ecg import create_multichannel_ecg
+from signals.representation_extractor import PeriodicRepresentationExtractor
 
 PTBXL_PATH = Path("./../../data/ptbxl")
 RAW_DATASET_PATH = PTBXL_PATH / "raw"
 RAW_TENSORS_DATA_PATH = PTBXL_PATH / "raw_tensors"
-CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
 
 
 def load_raw_ptbxl_data(fs: float, target: str = "diagnostic_class"):
@@ -85,8 +81,8 @@ def load_raw_ptbxl_data(fs: float, target: str = "diagnostic_class"):
     return dataset
 
 
-def load_data_and_save(fs: float = 100, target: str = "diagnostic_class", encode_labels=True):
-    """Load PTB-XL data and save it
+def load_raw_ptbxl_data_and_save_to_tensors(fs: float = 100, target: str = "diagnostic_class", encode_labels=True):
+    """Load raw PTB-XL data (as downloaded from physionet) and save it to tensors.
 
     Waveforms are saved as torch `.pt` files.
     Labels and classes mappings are saved as numpy  `.npy` files.
@@ -118,7 +114,15 @@ def load_data_and_save(fs: float = 100, target: str = "diagnostic_class", encode
         np.save(LABELS_PATH / f"{split}_labels.npy", labels_npy)
 
 
-def get_representations(channels_data: torch.Tensor, fs: float = 100) -> Dict[str, torch.Tensor]:
+# TODO: Move get_representations and create_representations_dataset to different file (it must work the same for all datasets)
+
+
+def get_representations(
+    channels_data: torch.Tensor,
+    fs: float = 100,
+    set_beats_params=dict(source_channel=2),
+    set_windows_params=dict(win_len=3, step=2),
+) -> Dict[str, torch.Tensor]:
     """Get all types of representations (returned by ECGSignal objects).
 
     Args:
@@ -128,29 +132,11 @@ def get_representations(channels_data: torch.Tensor, fs: float = 100) -> Dict[st
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    multi_ecg = create_multichannel_ecg(channels_data.T.numpy(), fs)
-
-    n_beats = 10
-    multi_ecg.get_beats(source_channel=2)
-    whole_signal_waveforms = multi_ecg.get_waveform_representation()
-    whole_signal_features = multi_ecg.get_whole_signal_features_representation()
-    per_beat_waveforms = multi_ecg.get_per_beat_waveform_representation(n_beats=n_beats)
-    per_beat_features = multi_ecg.get_per_beat_features_representation(n_beats=n_beats)
-    # whole_signal_embeddings = multi_ecg.get_whole_signal_embeddings_representation()
-
-    actual_beats = per_beat_waveforms.shape[1]
-    n_more_beats = n_beats - actual_beats
-    # print(f"{actual_beats} beats in signal. Padding {n_more_beats} beats")
-    per_beat_waveforms = np.pad(per_beat_waveforms, ((0, 0), (0, n_more_beats), (0, 0)))  # padding beats with zeros
-    per_beat_features = np.pad(per_beat_features, ((0, 0), (0, n_more_beats), (0, 0)))  # padding beats with zeros
-
-    return {
-        "whole_signal_waveforms": whole_signal_waveforms,
-        "whole_signal_features": whole_signal_features,
-        "per_beat_waveforms": per_beat_waveforms,
-        "per_beat_features": per_beat_features,
-        # 'whole_signal_embeddings': whole_signal_embeddings,
-    }
+    multichannel_signal = create_multichannel_ecg(channels_data.T.numpy(), fs)
+    rep_extractor = PeriodicRepresentationExtractor(multichannel_signal)
+    rep_extractor.set_beats(**set_beats_params)
+    rep_extractor.set_windows(**set_windows_params)
+    return rep_extractor.get_representations()
 
 
 def create_representations_dataset(
@@ -203,80 +189,3 @@ def load_ptbxl_split(representation_type: str, fs: float, target: str, split: st
     classes = np.load(RAW_TENSORS_DATA_PATH / f"labels/{target}/classes.npy", allow_pickle=True)
     classes = {i: classes[i] for i in range(len(classes))}
     return {"data": data, "labels": labels, "classes": classes}
-
-
-class PTBXLDataset(Dataset):
-    """PTB-XL Dataset class used in DeepLearning models."""
-
-    def __init__(self, representation_type, fs, target, split, transform=None):
-        dataset = load_ptbxl_split(representation_type, fs, target, split)
-        self.data = dataset["data"]
-        self.labels = dataset["labels"]
-        self.classes = dataset["classes"]
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-        data = self.data[idx].float()
-        data = torch.nan_to_num(data, nan=0.0)  # TODO !!!
-        return data, self.labels[idx]
-
-
-class PTBXLDataModule(LightningDataModule):
-    """PTB-XL DataModule class used as DeepLearning models DataLoaders provider."""
-
-    def __init__(
-        self,
-        representation_type: str,
-        fs: float = 100,
-        target: str = "diagnostic_class",
-        batch_size: int = 64,
-        num_workers=8,
-    ):
-        super().__init__()
-        self.representation_type = representation_type
-        self.fs = fs
-        self.target = target
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-
-        self.train = None
-        self.val = None
-        self.test = None
-
-    def setup(self, stage=None):
-        if stage == "fit" or stage is None:
-            self.train = PTBXLDataset(
-                self.representation_type,
-                self.fs,
-                self.target,
-                split="train",
-            )
-            self.val = PTBXLDataset(self.representation_type, self.fs, self.target, split="val")
-        if stage == "test" or stage is None:
-            self.test = PTBXLDataset(self.representation_type, self.fs, self.target, split="test")
-
-    def train_dataloader(self):
-        return DataLoader(
-            self.train,
-            batch_sampler=StratifiedBatchSampler(self.train[:][1], batch_size=self.batch_size, shuffle=True),
-            num_workers=self.num_workers,
-        )
-
-    def val_dataloader(self):
-        return DataLoader(
-            self.val,
-            batch_sampler=StratifiedBatchSampler(self.val[:][1], batch_size=10 * self.batch_size, shuffle=False),
-            num_workers=self.num_workers,
-        )
-
-    def test_dataloader(self):
-        return DataLoader(
-            self.test,
-            batch_sampler=StratifiedBatchSampler(self.test[:][1], batch_size=10 * self.batch_size, shuffle=False),
-            num_workers=self.num_workers,
-        )

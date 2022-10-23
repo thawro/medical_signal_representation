@@ -248,6 +248,26 @@
     *
 
 
-# Extra libs:
+# Extra libs
 
  * [BioSPPy](https://github.com/PIA-Group/BioSPPy) - nice lib, PPG and ECG preprocessing available
+
+
+# Representations
+
+* Features - tabular features extracted from signals
+* Whole signal waveforms - samples taken from whole signals (may be preprocessed)
+* Per beat/window waveforms - samples taken from beats/windows extracted from signals
+* Per beat/window features - features extracted from beats/windows
+* Single beat/window waveforms - samples taken from aggregated beats/windows
+
+
+# Models
+
+* Support Vector Machine
+* LGBM
+* RNN (+ attn)
+* CNN + RNN (+ attn)
+* CNN
+* Transformer
+* CNN + Transformer
