@@ -99,7 +99,7 @@
 
 
 
-3. MIMIR-III Waveform
+3. MIMIC-III Waveform
 
     * [source URL](https://physionet.org/content/mimic3wdb/1.0/)
     * preprocessing:
@@ -110,6 +110,10 @@
         *
     * interesting urls:
         * [The MIMIC-III Waveform Database](https://archive.physionet.org/physiobank/database/mimic3wdb/)
+
+4. Sleep-EDF
+
+
 
 
 # Signal representations
@@ -243,10 +247,6 @@
 2. Features
     *
 
-## GSR
-
-1. Papers:
-    * [What is GSR (galvanic skin response) and how does it work?](https://imotions.com/blog/gsr/)
 
 # Extra libs:
 

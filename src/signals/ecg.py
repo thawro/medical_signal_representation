@@ -13,10 +13,8 @@ from signals.utils import (
     calculate_area,
     calculate_energy,
     calculate_slope,
-    create_new_obj,
     lazy_property,
     parse_feats_to_array,
-    parse_nested_feats,
 )
 
 CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
@@ -37,8 +35,8 @@ def check_ecg_polarity(data):
 
 
 def find_intervals_using_hr(sig):
-    freqs, pxx = sig.psd(window_size=10, plot=False)
-    most_dominant_freq = freqs[pxx.argmax()]  # HR
+    freqs, amps = sig.psd(window_size=10, plot=False)
+    most_dominant_freq = freqs[amps.argmax()]  # HR
     T_in_samples = int(1 / most_dominant_freq * sig.fs)
     x = sig.cleaned
     x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1

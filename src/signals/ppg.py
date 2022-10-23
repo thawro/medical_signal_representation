@@ -1,7 +1,11 @@
+import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import butter, filtfilt
+import seaborn as sns
+from scipy import integrate
+from scipy.signal import butter, filtfilt, find_peaks
 
-from signals.base import BaseSignal, BeatSignal, PeriodicSignal
+from signals.base import BeatSignal, PeriodicSignal
+from signals.utils import FIGSIZE_2, get_outliers_mask, parse_nested_feats, z_score
 
 
 def get_no_outlier_beats_mask(beats, IQR_scale=1.5):
@@ -204,10 +208,6 @@ class PPGBeat(BeatSignal):
                 color="r",
                 alpha=0.2,
             )
-            #             area_1_txt_loc = self.systolic_peak_time - self.systolic_peak_time / 2, 0.33
-            #             area_2_txt_loc = self.systolic_peak_time + self.systolic_peak_time / 2, 0.33
-
-            #             ax.text(area_1_txt_loc[0], area_1_txt_loc[1], 'pole powierz przed sys_peak', props, rotation=45)
             ax.set_title(f"Pojedyncze uderzenie PPG", fontsize=24)
             ax.set_xlabel("Czas [s]", fontsize=20)
             ax.set_ylabel("j.u.", fontsize=20)

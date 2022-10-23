@@ -3,15 +3,7 @@ from collections import OrderedDict
 from scipy.signal import welch
 
 from signals.base import MultiChannelSignal, Signal
-from signals.utils import (
-    calculate_area,
-    calculate_energy,
-    calculate_slope,
-    create_new_obj,
-    lazy_property,
-    parse_feats_to_array,
-    parse_nested_feats,
-)
+from signals.utils import parse_feats_to_array, parse_nested_feats
 
 FREQ_BANDS = {"delta": [0.5, 4.5], "theta": [4.5, 8.5], "alpha": [8.5, 11.5], "sigma": [11.5, 15.5], "beta": [15.5, 30]}
 

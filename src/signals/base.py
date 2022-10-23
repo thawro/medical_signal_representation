@@ -4,24 +4,19 @@ from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
-from scipy import integrate
 from scipy.fft import rfft, rfftfreq
 from scipy.interpolate import PchipInterpolator, interp1d
 from scipy.signal import (
-    butter,
     cheby2,
     detrend,
     filtfilt,
     find_peaks,
     firwin,
-    freqz,
     iirnotch,
     resample,
     savgol_filter,
     sosfiltfilt,
-    spectrogram,
     welch,
 )
 from scipy.stats import kurtosis, skew

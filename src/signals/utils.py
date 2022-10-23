@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 from scipy.integrate import simps
 
+FIGSIZE = (24, 4)
+FIGSIZE_2 = (10, 4)
+
 
 def create_new_obj(obj: object, **kwargs) -> object:
     """Create new instance of object passed with new arguments specified in `kwargs`.
