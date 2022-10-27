@@ -435,3 +435,8 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
         self.beats = np.array(all_channels_beats)
         self.beats_times = np.array(beats_times)
         return self.beats
+
+
+def create_multichannel_ecg(data, fs):
+    signals = OrderedDict({i + 1: ECGSignal(f"ECG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)})
+    return MultiChannelECGSignal(signals)

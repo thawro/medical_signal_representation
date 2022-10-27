@@ -9,8 +9,8 @@ class PTBXLDataset(Dataset):
     def __init__(self, representation_type, fs, target, split, transform=None):
         dataset = load_ptbxl_split(representation_type, fs, target, split)
         self.data = dataset["data"]
-        self.labels = dataset["labels"]
-        self.classes = dataset["classes"]
+        self.targets = dataset["targets"]
+        self.info = dataset["info"]
         self.transform = transform
 
     def __len__(self):
@@ -21,4 +21,4 @@ class PTBXLDataset(Dataset):
             idx = idx.tolist()
         data = self.data[idx].float()
         data = torch.nan_to_num(data, nan=0.0)  # TODO !!!
-        return data, self.labels[idx]
+        return data, self.targets[idx]

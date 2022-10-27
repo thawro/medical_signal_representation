@@ -1,8 +1,9 @@
 """Module used to provide data for PTB-XL dataset"""
 
 import ast
+from collections import OrderedDict
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -12,10 +13,15 @@ from joblib import Parallel, delayed
 from sklearn.preprocessing import LabelEncoder
 from tqdm.auto import tqdm
 
+from data.representations import (
+    create_dataset,
+    get_periodic_representations,
+    load_split,
+)
 from signals.ecg import create_multichannel_ecg
-from signals.representation_extractor import PeriodicRepresentationExtractor
+from utils import DATA_PATH
 
-PTBXL_PATH = Path("./../../data/ptbxl")
+PTBXL_PATH = DATA_PATH / "ptbxl"
 RAW_DATASET_PATH = PTBXL_PATH / "raw"
 RAW_TENSORS_DATA_PATH = PTBXL_PATH / "raw_tensors"
 
@@ -92,7 +98,7 @@ def load_raw_ptbxl_data_and_save_to_tensors(fs: float = 100, target: str = "diag
         target (str): Target of PTB-XL data. `"diagnostic_class"` or `"diagnostic_subclass"`. Defaults to `"diagnostic_class"`.
         encode_labels (bool): Whether to use `LabelEncoder` to encode labels. Defaults to `True`.
     """
-    LABELS_PATH = RAW_TENSORS_DATA_PATH / f"labels/{target}"
+    LABELS_PATH = RAW_TENSORS_DATA_PATH / f"targets/{target}"
     LABELS_PATH.mkdir(parents=True, exist_ok=True)
 
     DATA_PATH = RAW_TENSORS_DATA_PATH / f"records{fs}"
@@ -108,70 +114,57 @@ def load_raw_ptbxl_data_and_save_to_tensors(fs: float = 100, target: str = "diag
 
     for split in ["train", "val", "test"]:
         data_tensor = torch.tensor(ptbxl_data[split]["X"])
-        labels_npy = ptbxl_data[split]["y"]
+        targets_npy = ptbxl_data[split]["y"]
         torch.save(data_tensor, DATA_PATH / f"{split}_data.pt")
-        # with open(, "wb") as f:
-        np.save(LABELS_PATH / f"{split}_labels.npy", labels_npy)
+        np.save(LABELS_PATH / f"{split}_targets.npy", targets_npy)
 
 
-# TODO: Move get_representations and create_representations_dataset to different file (it must work the same for all datasets)
-
-
-def get_representations(
+def get_ptbxl_representation(
     channels_data: torch.Tensor,
     fs: float = 100,
-    set_beats_params=dict(source_channel=2),
-    set_windows_params=dict(win_len=3, step=2),
-) -> Dict[str, torch.Tensor]:
+    beats_params=dict(source_channel=2),
+    agg_beat_params=dict(valid_only=False),
+    windows_params=dict(win_len=3, step=2),
+):
     """Get all types of representations (returned by ECGSignal objects).
-
     Args:
         channels_data (torch.Tensor): ECG channels data of shape `[TODO]`, where TODO.
         fs (float): Sampling rate. Defaults to 100.
-
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    multichannel_signal = create_multichannel_ecg(channels_data.T.numpy(), fs)
-    rep_extractor = PeriodicRepresentationExtractor(multichannel_signal)
-    rep_extractor.set_beats(**set_beats_params)
-    rep_extractor.set_windows(**set_windows_params)
-    return rep_extractor.get_representations()
+    ecg = create_multichannel_ecg(channels_data.T.numpy(), fs)
+    return get_periodic_representations(ecg, beats_params, set_agg_beat_params, windows_params)
 
 
-def create_representations_dataset(
-    splits: List[str] = ["train", "val", "test"], fs: float = 100, use_multiprocessing: bool = True
-):
+def create_ptbxl_dataset(fs: float = 100):
     """Create and save data files (`.pt`) for all representations.
 
     Args:
         splits (list): Split types to create representations data for. Defaults to ['train', 'val', 'test'].
         fs (float): Sampling frequency of signals. Defaults to 100.
-        use_multiprocessing (bool): Whether to use `joblib` library for multiprocessing
-            or run everything in simple `for` loop. Defaults to `True`.
     """
-
-    REPRESENTATIONS_DATA_PATH = PTBXL_PATH / f"representations_{fs}"
-    REPRESENTATIONS_DATA_PATH.mkdir(parents=True, exist_ok=True)
-
-    for split in tqdm(splits):
-        data = torch.load(RAW_TENSORS_DATA_PATH / f"records{fs}/{split}_data.pt")
-        if use_multiprocessing:
-            representations = Parallel(n_jobs=-1)(delayed(get_representations)(channels, fs) for channels in tqdm(data))
-        else:
-            representations = [get_representations(channels) for channels in tqdm(data)]
-        representation_names = representations[0].keys()
-        representations = {
-            name: torch.tensor(np.array([rep[name] for rep in representations])) for name in representation_names
-        }
-        for name, representation_data in representations.items():
-            path = REPRESENTATIONS_DATA_PATH / name / f"{split}_data.pt"
-            torch.save(representation_data, path)
+    params = dict(
+        fs=fs,
+        beats_params=dict(source_channel=2),
+        agg_beat_params=dict(valid_only=False),
+        windows_params=dict(win_len=3, step=2),
+    )
+    create_dataset(
+        raw_tensors_path=RAW_TENSORS_DATA_PATH / f"records{fs}",
+        representations_path=PTBXL_PATH / f"representations_{fs}",
+        get_repr_func=get_ptbxl_representation,
+        **params,
+    )
 
 
 def load_ptbxl_split(representation_type: str, fs: float, target: str, split: str) -> Dict[str, np.ndarray]:
     """Load PTB-XL train, val or test split for specified representation type, target and sampling rate (fs).
 
+    What is loaded:
+    * data (torch tensor)
+    * targets (numpy array TODO: change it to tensor)
+    * info (numpy array TODO: change it to tensor)
     Args:
         representation_type (str): Type of representation to load data for.
             One of `["whole_signal_waveforms", "whole_signal_features", "per_beat_waveforms",
@@ -183,9 +176,9 @@ def load_ptbxl_split(representation_type: str, fs: float, target: str, split: st
     Returns:
         Dict[str, np.ndarray]: Dict with data, labels and classes mapper.
     """
-    REPRESENTATIONS_DATA_PATH = PTBXL_PATH / f"representations_{fs}"
-    data = torch.load(REPRESENTATIONS_DATA_PATH / f"{representation_type}/{split}_data.pt")
-    labels = np.load(RAW_TENSORS_DATA_PATH / f"labels/{target}/{split}_labels.npy")
-    classes = np.load(RAW_TENSORS_DATA_PATH / f"labels/{target}/classes.npy", allow_pickle=True)
-    classes = {i: classes[i] for i in range(len(classes))}
-    return {"data": data, "labels": labels, "classes": classes}
+    return load_split(
+        split=split,
+        representations_path=PTBXL_PATH / f"representations_{fs}",
+        targets_path=RAW_TENSORS_DATA_PATH / "targets" / target,
+        representation_type=representation_type,
+    )

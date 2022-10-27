@@ -1,5 +1,10 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+ROOT = Path(__file__).parent.parent
+DATA_PATH = ROOT / "data"
 
 
 def get_corr_matrix(df: pd.DataFrame):
