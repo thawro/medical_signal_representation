@@ -1,28 +1,49 @@
-import torch
-from sklearn.model_selection import StratifiedKFold
+from typing import List, Literal
 
 
-# source: https://discuss.pytorch.org/t/how-to-enable-the-dataloader-to-sample-from-each-class-with-equal-probability/911/7
-class StratifiedBatchSampler:
-    """Stratified batch sampling
-    Provides equal representation of target classes in each batch
-    """
+class BaseNamespace:
+    @classmethod
+    def all(cls) -> List[str]:
+        restricted_chars = ["__", "all", "None", ".", "dtype"]
+        attrs = [
+            attr for name, attr in cls.__dict__.items() if all([chars not in str(name) for chars in restricted_chars])
+        ]
+        return attrs
 
-    def __init__(self, y, batch_size, shuffle=True):
-        if torch.is_tensor(y):
-            y = y.numpy()
-        assert len(y.shape) == 1, "label array must be 1D"
-        self.n_batches = int(len(y) / batch_size)
-        self.skf = StratifiedKFold(n_splits=self.n_batches, shuffle=shuffle)
-        self.X = torch.randn(len(y), 1).numpy()
-        self.y = y
-        self.shuffle = shuffle
+    @classmethod
+    def get_type(cls):
+        return List[Literal[tuple(cls.all())]]
 
-    def __iter__(self):
-        if self.shuffle:
-            self.skf.random_state = torch.randint(0, int(1e8), size=()).item()
-        for train_idx, test_idx in self.skf.split(self.X, self.y):
-            yield test_idx
 
-    def __len__(self):
-        return self.n_batches
+class Representation(BaseNamespace):
+    WHOLE_SIGNAL_WAVEFORMS = "whole_signal_waveforms"
+    WHOLE_SIGNAL_FEATURS = "whole_signal_features"
+    WINDOWS_WAVEFORMS = "windows_waveforms"
+    WINDOWS_FEATURES = "windows_features"
+
+
+class PeriodicRepresentation(BaseNamespace):
+    WHOLE_SIGNAL_WAVEFORMS = "whole_signal_waveforms"
+    WHOLE_SIGNAL_FEATURS = "whole_signal_features"
+    WINDOWS_WAVEFORMS = "windows_waveforms"
+    WINDOWS_FEATURES = "windows_features"
+    BEATS_WAVEFORMS = "beats_waveforms"
+    BEATS_FEATURES = "beats_features"
+    AGG_BEAT_WAVEFORMS = "agg_beat_waveforms"
+    AGG_BEAT_FEATURES = "agg_beat_features"
+
+
+def get_setters_mask(representation_types: List[str]):
+    set_beats = (
+        PeriodicRepresentation.BEATS_WAVEFORMS in representation_types
+        or PeriodicRepresentation.BEATS_FEATURES in representation_types
+    )
+    set_windows = (
+        PeriodicRepresentation.WINDOWS_WAVEFORMS in representation_types
+        or PeriodicRepresentation.WINDOWS_FEATURES in representation_types
+    )
+    set_agg_beat = (
+        PeriodicRepresentation.AGG_BEAT_WAVEFORMS in representation_types
+        or PeriodicRepresentation.AGG_BEAT_FEATURES in representation_types
+    )
+    return set_beats, set_windows, set_agg_beat

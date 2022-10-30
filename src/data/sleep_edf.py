@@ -1,7 +1,7 @@
 import glob
 from collections import OrderedDict
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import mne
 import numpy as np
@@ -10,14 +10,27 @@ import torch
 from sklearn.model_selection import GroupShuffleSplit
 from tqdm.auto import tqdm
 
+from data.representations import (
+    create_dataset,
+    get_periodic_representations,
+    get_representations,
+    load_split,
+)
+from signals.eeg import create_multichannel_eeg
 from utils import DATA_PATH
 
 SLEEP_EDF_PATH = DATA_PATH / "sleepEDF"
 RAW_DATASET_PATH = SLEEP_EDF_PATH / "raw"
 RAW_CSV_PATH = SLEEP_EDF_PATH / "raw_csv"
-RAW_TENSORS_PATH = SLEEP_EDF_PATH / "raw_tensors"
+
 RAW_INFO_PATH = SLEEP_EDF_PATH / "raw_info.csv"
 SPLIT_INFO_PATH = SLEEP_EDF_PATH / "split_info.csv"
+
+RAW_TENSORS_PATH = SLEEP_EDF_PATH / "raw_tensors"
+RAW_TENSORS_DATA_PATH = RAW_TENSORS_PATH / "data"
+RAW_TENSORS_TARGETS_PATH = RAW_TENSORS_PATH / "targets"
+REPRESENTATIONS_PATH = SLEEP_EDF_PATH / f"representations"
+SLEEP_EDF_EEG_FS = 100
 
 EVENT_ID = OrderedDict(
     {
@@ -247,17 +260,56 @@ def create_raw_tensors_dataset(split_types: List[str] = ["train"]):
             }
         )
 
-        torch.save(all_data, RAW_TENSORS_PATH / f"data/{split_type}_data.pt")
-        np.save(RAW_TENSORS_PATH / f"targets/{split_type}_targets.npy", all_targets)
+        torch.save(all_data, RAW_TENSORS_DATA_PATH / f"{split_type}_data.pt")
+        np.save(RAW_TENSORS_TARGETS_PATH / f"{split_type}_targets.npy", all_targets)
 
         info = np.array(list(EVENT_ID.keys()))
-        np.save(RAW_TENSORS_PATH / f"targets/info.npy", info)
+        np.save(RAW_TENSORS_TARGETS_PATH / "info.npy", info)
 
         epochs_info.to_csv(SLEEP_EDF_PATH / f"{split_type}_epochs_info.csv", index=False)
 
 
-# TODO make sleep_edf work the same as ptbxl
-def load_data_split(split_type):
-    data = torch.load(RAW_TENSORS_PATH / "data" / f"{split_type}_data.pt")
-    targets = np.load(RAW_TENSORS_PATH / "targets" / f"{split_type}_targets.npy")
-    return data, targets
+def get_sleep_edf_representation(
+    channels_data: torch.Tensor,
+    representation_types: List[str] = ["whole_signal_waveforms"],
+    windows_params=dict(win_len_s=3, step_s=2),
+):
+    """Get all types of representations (returned by ECGSignal objects).
+    Args:
+        channels_data (torch.Tensor): ECG channels data of shape `[TODO]`, where TODO.
+        fs (float): Sampling rate. Defaults to 100.
+    Returns:
+        Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
+    """
+    eeg = create_multichannel_eeg(channels_data.numpy(), fs=SLEEP_EDF_EEG_FS)
+    return get_representations(eeg, windows_params, representation_types=representation_types)
+
+
+def create_sleep_edf_dataset(representation_types):
+    """Create and save data files (`.pt`) for all representations.
+
+    Args:
+        splits (list): Split types to create representations data for. Defaults to ['train', 'val', 'test'].
+        fs (float): Sampling frequency of signals. Defaults to 100.
+    """
+    params = dict(
+        representation_types=representation_types,
+        beats_params=dict(source_channel=2),
+        agg_beat_params=dict(valid_only=False),
+        windows_params=dict(win_len_s=3, step_s=2),
+    )
+    create_dataset(
+        raw_tensors_path=RAW_TENSORS_DATA_PATH,
+        representations_path=REPRESENTATIONS_PATH,
+        get_repr_func=get_sleep_edf_representation,
+        **params,
+    )
+
+
+def load_sleep_edf_split(split: str, representation_type: str) -> Dict[str, np.ndarray]:
+    return load_split(
+        split=split,
+        representations_path=REPRESENTATIONS_PATH,
+        targets_path=RAW_TENSORS_TARGETS_PATH,
+        representation_type=representation_type,
+    )

@@ -1,17 +1,13 @@
 """Module used to provide data for PTB-XL dataset"""
 
 import ast
-from collections import OrderedDict
-from pathlib import Path
-from typing import Dict, List, Type, Union
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import torch
 import wfdb
-from joblib import Parallel, delayed
 from sklearn.preprocessing import LabelEncoder
-from tqdm.auto import tqdm
 
 from data.representations import (
     create_dataset,
@@ -23,10 +19,15 @@ from utils import DATA_PATH
 
 PTBXL_PATH = DATA_PATH / "ptbxl"
 RAW_DATASET_PATH = PTBXL_PATH / "raw"
-RAW_TENSORS_DATA_PATH = PTBXL_PATH / "raw_tensors"
+RAW_TENSORS_PATH = PTBXL_PATH / "raw_tensors"
+RAW_TENSORS_DATA_PATH = RAW_TENSORS_PATH / "data"
+TARGETS_PATH = RAW_TENSORS_PATH / "targets"
+
+PTBXL_ECG_FS = 100
+PTBXL_TARGET = "diagnostic_class"
 
 
-def load_raw_ptbxl_data(fs: float, target: str = "diagnostic_class"):
+def load_raw_ptbxl_data(fs: float = PTBXL_ECG_FS, target: str = PTBXL_TARGET):
     """Load raw PTB-XL data.
 
     Args:
@@ -87,7 +88,7 @@ def load_raw_ptbxl_data(fs: float, target: str = "diagnostic_class"):
     return dataset
 
 
-def load_raw_ptbxl_data_and_save_to_tensors(fs: float = 100, target: str = "diagnostic_class", encode_labels=True):
+def load_raw_ptbxl_data_and_save_to_tensors(fs: float = PTBXL_ECG_FS, target: str = PTBXL_TARGET, encode_labels=True):
     """Load raw PTB-XL data (as downloaded from physionet) and save it to tensors.
 
     Waveforms are saved as torch `.pt` files.
@@ -98,11 +99,10 @@ def load_raw_ptbxl_data_and_save_to_tensors(fs: float = 100, target: str = "diag
         target (str): Target of PTB-XL data. `"diagnostic_class"` or `"diagnostic_subclass"`. Defaults to `"diagnostic_class"`.
         encode_labels (bool): Whether to use `LabelEncoder` to encode labels. Defaults to `True`.
     """
-    LABELS_PATH = RAW_TENSORS_DATA_PATH / f"targets/{target}"
-    LABELS_PATH.mkdir(parents=True, exist_ok=True)
+    TARGETS_PATH = TARGETS_PATH / target
+    TARGETS_PATH.mkdir(parents=True, exist_ok=True)
 
-    DATA_PATH = RAW_TENSORS_DATA_PATH / f"records{fs}"
-    DATA_PATH.mkdir(parents=True, exist_ok=True)
+    RAW_TENSORS_DATA_PATH.mkdir(parents=True, exist_ok=True)
 
     ptbxl_data = load_raw_ptbxl_data(fs, target)
     if encode_labels:
@@ -110,21 +110,22 @@ def load_raw_ptbxl_data_and_save_to_tensors(fs: float = 100, target: str = "diag
         ptbxl_data["train"]["y"] = label_encoder.transform(ptbxl_data["train"]["y"])
         ptbxl_data["val"]["y"] = label_encoder.transform(ptbxl_data["val"]["y"])
         ptbxl_data["test"]["y"] = label_encoder.transform(ptbxl_data["test"]["y"])
-        np.save(LABELS_PATH / "classes.npy", label_encoder.classes_)
+        np.save(TARGETS_PATH / "classes.npy", label_encoder.classes_)
 
     for split in ["train", "val", "test"]:
         data_tensor = torch.tensor(ptbxl_data[split]["X"])
         targets_npy = ptbxl_data[split]["y"]
         torch.save(data_tensor, DATA_PATH / f"{split}_data.pt")
-        np.save(LABELS_PATH / f"{split}_targets.npy", targets_npy)
+        np.save(TARGETS_PATH / f"{split}_targets.npy", targets_npy)
 
 
 def get_ptbxl_representation(
     channels_data: torch.Tensor,
-    fs: float = 100,
+    fs: float = PTBXL_ECG_FS,
     beats_params=dict(source_channel=2),
     agg_beat_params=dict(valid_only=False),
-    windows_params=dict(win_len=3, step=2),
+    windows_params=dict(win_len_s=3, step_s=2),
+    representation_types: List[str] = ["whole_signal_waveforms"],
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
@@ -134,10 +135,12 @@ def get_ptbxl_representation(
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
     ecg = create_multichannel_ecg(channels_data.T.numpy(), fs)
-    return get_periodic_representations(ecg, beats_params, set_agg_beat_params, windows_params)
+    return get_periodic_representations(
+        ecg, beats_params, agg_beat_params, windows_params, representation_types=representation_types
+    )
 
 
-def create_ptbxl_dataset(fs: float = 100):
+def create_ptbxl_dataset(representation_types: List[str], fs: float = PTBXL_ECG_FS):
     """Create and save data files (`.pt`) for all representations.
 
     Args:
@@ -145,20 +148,23 @@ def create_ptbxl_dataset(fs: float = 100):
         fs (float): Sampling frequency of signals. Defaults to 100.
     """
     params = dict(
+        representation_types=representation_types,
         fs=fs,
         beats_params=dict(source_channel=2),
         agg_beat_params=dict(valid_only=False),
-        windows_params=dict(win_len=3, step=2),
+        windows_params=dict(win_len_s=3, step_s=2),
     )
     create_dataset(
-        raw_tensors_path=RAW_TENSORS_DATA_PATH / f"records{fs}",
+        raw_tensors_path=RAW_TENSORS_DATA_PATH,
         representations_path=PTBXL_PATH / f"representations_{fs}",
         get_repr_func=get_ptbxl_representation,
         **params,
     )
 
 
-def load_ptbxl_split(representation_type: str, fs: float, target: str, split: str) -> Dict[str, np.ndarray]:
+def load_ptbxl_split(
+    split: str, representation_type: str, fs: float = PTBXL_ECG_FS, target: str = PTBXL_TARGET
+) -> Dict[str, np.ndarray]:
     """Load PTB-XL train, val or test split for specified representation type, target and sampling rate (fs).
 
     What is loaded:
@@ -179,6 +185,6 @@ def load_ptbxl_split(representation_type: str, fs: float, target: str, split: st
     return load_split(
         split=split,
         representations_path=PTBXL_PATH / f"representations_{fs}",
-        targets_path=RAW_TENSORS_DATA_PATH / "targets" / target,
+        targets_path=TARGETS_PATH / target,
         representation_type=representation_type,
     )

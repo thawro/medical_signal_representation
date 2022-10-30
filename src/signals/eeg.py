@@ -38,3 +38,8 @@ class EEGSignal(Signal):
 class MultiChannelEEGSignal(MultiChannelSignal):
     def __init__(self, signals):
         super().__init__(signals)
+
+
+def create_multichannel_eeg(data, fs):
+    signals = OrderedDict({i + 1: EEGSignal(f"EEG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)})
+    return MultiChannelEEGSignal(signals)

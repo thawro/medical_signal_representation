@@ -1,8 +1,8 @@
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-from data.utils import StratifiedBatchSampler
 from deeplearning.datasets import PTBXLDataset
+from deeplearning.utils import StratifiedBatchSampler
 
 
 class PTBXLDataModule(LightningDataModule):

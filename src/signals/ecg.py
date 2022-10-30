@@ -121,7 +121,7 @@ class ECGSignal(PeriodicSignal):
                 beat = beat.resample_with_interpolation(n_samples=100, kind="pchip")
             beats.append(beat)
         self.beats = np.array(beats)
-        self.aggregate()
+        self.set_agg_beat()
         if plot:
             self.plot_beats()
 
@@ -387,7 +387,7 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
             ax[1].set_title("")
         plt.tight_layout()
 
-    def get_beats(self, source_channel=2, return_arr=True, **kwargs):
+    def set_beats(self, source_channel=2, return_arr=True, **kwargs):
         """Return beats from all channels.
 
         If `source_channel` is specified, it will be used as source of beat intervals
@@ -412,7 +412,7 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
             new_source_channel = source_channel
             while not found_good_channel or len(source_channels) == 0:
                 try:
-                    self.signals[new_source_channel].get_beats(**kwargs)
+                    self.signals[new_source_channel].set_beats(**kwargs)
                     found_good_channel = True
                     if new_source_channel != source_channel:
                         print(f"Original source channel was corrupted. Found new source channel: {new_source_channel}")
@@ -420,21 +420,17 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
                     new_source_channel = source_channels.pop()
             if not found_good_channel:
                 new_source_channel = source_channel
-                self.signals[new_source_channel].get_beats(
+                self.signals[new_source_channel].set_beats(
                     **kwargs, use_hr=True
                 )  # use Heart Rate (most dominant frequency)
             source_channel_intervals = self.signals[new_source_channel].beats_intervals
         else:
             source_channel_intervals = None
-        all_channels_beats = [
-            signal.get_beats(source_channel_intervals, **kwargs) for _, signal in self.signals.items()
-        ]
-        beats_times = [beat.time for beat in all_channels_beats[0]]
-        if return_arr:
-            all_channels_beats = [[beat.data for beat in channel_beats] for channel_beats in all_channels_beats]
+        for _, signal in self.signals.items():
+            signal.set_beats(source_channel_intervals, **kwargs)
+        all_channels_beats = [signal.beats for _, signal in self.signals.items()]
         self.beats = np.array(all_channels_beats)
-        self.beats_times = np.array(beats_times)
-        return self.beats
+        self.beats_times = np.array([beat.time for beat in all_channels_beats[0]])
 
 
 def create_multichannel_ecg(data, fs):

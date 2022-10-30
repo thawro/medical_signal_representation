@@ -103,7 +103,7 @@ class BaseSignal:
     def is_in_time_bounds(self, start_s, end_s):
         return self.start_sec >= start_s and self.end_sec < end_s
 
-    def get_derivative(self, deriv=1, window_length=None, polyorder=5):
+    def get_derivative(self, deriv=1, window_length=None, polyorder=4):
         if window_length is None:
             window_length = int(np.ceil(5 / 100 * self.fs))
         if window_length % 2 == 0:
@@ -270,11 +270,14 @@ class Signal(BaseSignal):
     def set_windows(self, win_len_s, step_s):
         win_len_samples = win_len_s * self.fs
         step_samples = step_s * self.fs
-        intervals = get_windows(0, self.n_samples, win_len_samples, step_samples)
+        intervals = np.array(get_windows(0, self.n_samples, win_len_samples, step_samples))
+        if np.diff(intervals[-1]) != np.diff(intervals[0]):
+            intervals = intervals[:-1]
+
         intervals = np.array(intervals).astype(int)
-        self.windows = [
-            create_new_obj(self, data=self.data[start:end], start_sec=self.time[start]) for start, end in intervals
-        ]
+        self.windows = np.array(
+            [create_new_obj(self, data=self.data[start:end], start_sec=self.time[start]) for start, end in intervals]
+        )
 
     def plot_windows(self, **kwargs):
         for window in self.windows:
@@ -307,14 +310,14 @@ class PeriodicSignal(ABC, Signal):
     def set_windows(self, win_len_s, step_s):
         # aggregate beats for each window
         super().set_windows(win_len_s, step_s)
-        for window in self.windows:
-            window.beats = np.array(
-                [beat for beat in self.beats if beat.is_in_time_bounds(window.start_sec, window.end_sec)]
-            )
-            window.aggregate()
+        if hasattr(self, "beats"):
+            for window in self.windows:
+                window.beats = np.array(
+                    [beat for beat in self.beats if beat.is_in_time_bounds(window.start_sec, window.end_sec)]
+                )
+                window.set_agg_beat()
 
     def set_agg_beat(self, valid_only=True):
-        # agreguje listę uderzeń w pojedyncze uderzenie sPPG i je zwraca (jako obiekt PPGBeat)
         beats_to_aggregate_mask = self.valid_beats_mask if valid_only else len(self.beats) * [True]
         if beats_to_aggregate_mask is None:
             beats_to_aggregate_mask = len(self.beats) * [True]
@@ -474,7 +477,7 @@ class MultiChannelSignal:
         }
 
     def set_windows(self, win_len_s, step_s, **kwargs):
-        self.windows = {name: sig.get_windows(win_len_s, step_s) for name, sig in self.signals.items()}
+        self.windows = {name: sig.set_windows(win_len_s, step_s) for name, sig in self.signals.items()}
 
     def get_whole_signal_waveforms(self, **kwargs):
         return np.array([sig.data for name, sig in self.signals.items()])
@@ -485,14 +488,12 @@ class MultiChannelSignal:
         return OrderedDict({name: sig.extract_features(return_arr=False) for name, sig in self.signals.items()})
 
     def get_windows_waveforms(self, **kwargs):
-        return np.array([sig.extract_per_window_waveforms() for _, sig in self.signals.items()])
+        return np.array([sig.get_windows_waveforms() for _, sig in self.signals.items()])
 
     def get_windows_features(self, return_arr=True, **kwargs):
         if return_arr:
-            return np.array([sig.extract_per_window_features(return_arr=True) for _, sig in self.signals.items()])
-        return OrderedDict(
-            {name: sig.extract_per_window_features(return_arr=False) for name, sig in self.signals.items()}
-        )
+            return np.array([sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.get_windows_features(return_arr=False) for name, sig in self.signals.items()})
 
     def plot(self, **kwargs):
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 3 * self.n_signals))
@@ -522,7 +523,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             signal.set_beats(**kwargs)
         self.beats = {name: signal.beats for name, signal in self.signals.items()}
 
-    def set_agg_beat(self):
+    def set_agg_beat(self, **kwargs):
         for _, signal in self.signals.items():
             signal.set_agg_beat(**kwargs)
         self.agg_beat = {name: signal.agg_beat for name, signal in self.signals.items()}
