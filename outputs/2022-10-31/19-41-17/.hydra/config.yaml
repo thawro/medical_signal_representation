@@ -1,0 +1,20 @@
+ptbxl:
+  fs: 100
+  target: diagnostic_class
+  encode_labels: true
+sleep_edf:
+  fs: 100
+  sample_len_sec: 30
+  verbose: false
+  random_state: 42
+mimic:
+  fs: 125
+  max_samples_per_subject: 50
+  sig_names:
+  - ABP
+  - PLETH
+  - II
+  sample_len_sec: 240
+  max_n_same: 10
+  run_segmentation: true
+  run_creation: false
