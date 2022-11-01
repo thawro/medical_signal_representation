@@ -16,6 +16,8 @@ sleep_edf:
 
 
 mimic:
+  download: false
+  create_splits: true
   fs: 125                         # sampling frequency of mimic3wdb signals
   max_samples_per_subject: 50     # maximum number of samples per subject in created dataset
   sig_names:                      # which signals to obtain from mimic
@@ -24,5 +26,9 @@ mimic:
     - II                          # Lead II ECG
   sample_len_sec: 240             # desired length of sample in seconds
   max_n_same: 10                  # maximum number of repeated samples treated as valid
-  run_segmentation: true         # Whether to segment measurements
-  run_creation: false              # Whether to create dataset
+  split:
+    train_size: 0.7
+    val_size: 0.15
+    test_size: 0.15
+    random_state: 42
+    max_samples_per_subject_for_split: 10

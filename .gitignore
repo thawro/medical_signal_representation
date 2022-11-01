@@ -135,3 +135,4 @@ dmypy.json
 writing_tips
 
 *lightning_logs/
+outputs/

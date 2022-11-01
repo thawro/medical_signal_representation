@@ -1,3 +1,4 @@
+import glob
 import logging
 import multiprocessing
 import os
@@ -10,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
+import torch
 import wfdb
 from joblib import Parallel, delayed
 from omegaconf import DictConfig, OmegaConf
@@ -18,6 +20,7 @@ from requests.packages.urllib3.util.retry import Retry
 from tqdm.auto import tqdm
 
 from msr.data.raw.utils import validate_signal
+from msr.data.utils import create_train_val_test_split_info
 from msr.utils import DATA_PATH, append_txt_to_file, print_info
 
 log = logging.getLogger(__name__)
@@ -31,6 +34,7 @@ LOGS_PATH = MIMIC_PATH / "logs"
 
 SEGMENTS_FILE_PATH = LOGS_PATH / "segments_info.txt"  # file for segments info
 SAMPLE_SEGMENTS_FILE_PATH = LOGS_PATH / "sample_segments_info.txt"  # filename for samples segments info
+SPLIT_INFO_PATH = LOGS_PATH / "split_info.csv"
 
 RAW_DATASET_PATH = MIMIC_PATH / "raw"  # path to directory with csv files
 RAW_TENSORS_PATH = MIMIC_PATH / "raw_tensors"
@@ -423,24 +427,80 @@ def prepare_txt_files():
         )
 
 
+def get_all_samples_paths():
+    all_sample_paths = []
+    prefixes = glob.glob(str(RAW_DATASET_PATH / "*"))
+    for prefix in prefixes:
+        subjects = glob.glob(f"{prefix}/*")
+        for subject in subjects:
+            samples = glob.glob(f"{subject}/*.npy")
+            for sample in samples:
+                prefix, subject, sample_id = sample.split("/")[-3:]
+                all_sample_paths.append(
+                    {"subject": subject, "sample_id": sample_id, "path": f"{prefix}/{subject}/{sample_id}"}
+                )
+    return pd.DataFrame(all_sample_paths)
+
+
+def concat_samples(paths, save_path=None):
+    numpy_files = [RAW_DATASET_PATH / path for path in paths]
+    return np.stack([np.load(f) for f in numpy_files])
+
+
+def create_raw_tensors_dataset(train_size, val_size, test_size, max_samples_per_subject, random_state):
+    info = get_all_samples_paths()
+    info["sample_num"] = [int(sample_id.split("_")[1].split(".")[0]) for sample_id in info["sample_id"].values]
+    info = info.query(f"sample_num < {max_samples_per_subject}")
+    splits_info = create_train_val_test_split_info(
+        groups=info["subject"].values,
+        info=info,
+        train_size=train_size,
+        val_size=val_size,
+        test_size=test_size,
+        random_state=random_state,
+    )
+    splits_info.to_csv(SPLIT_INFO_PATH)
+    for split in splits_info["split"].unique():
+        current_split_info = splits_info.query(f"split == '{split}'")
+        all_data = concat_samples(paths=current_split_info["path"].values)  # shape [batch, n_samples, n_signals]
+        all_data = torch.from_numpy(all_data)
+        # signals order: ABP, PPG, ECG
+        targets = all_data[..., 0]  # ABP
+        data = all_data[..., 1:]  # PPG and ECG
+        print(all_data.shape, data.shape, targets.shape)
+        torch.save(data, RAW_TENSORS_DATA_PATH / f"{split}_data.pt")
+        torch.save(targets, TARGETS_PATH / f"{split}_targets.pt")
+
+
 @hydra.main(version_base=None, config_path="../../configs/data", config_name="raw")
 def main(cfg: DictConfig):
     cfg = cfg.mimic
 
     log.info(cfg)
 
-    for path in [MIMIC_PATH, RAW_DATASET_PATH, LOGS_PATH]:
+    for path in [MIMIC_PATH, RAW_DATASET_PATH, LOGS_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH]:
         path.mkdir(parents=True, exist_ok=True)
 
     prepare_txt_files()
+    if cfg.download:
+        log.info("Downloading and segmenting MIMIC dataset")
+        run_pipeline(
+            fs=cfg.fs,
+            sample_len_sec=cfg.sample_len_sec,
+            max_n_same=cfg.max_n_same,
+            sig_names=cfg.sig_names,
+            max_samples_per_subject=cfg.max_samples_per_subject,
+        )
 
-    run_pipeline(
-        fs=cfg.fs,
-        sample_len_sec=cfg.sample_len_sec,
-        max_n_same=cfg.max_n_same,
-        sig_names=cfg.sig_names,
-        max_samples_per_subject=cfg.max_samples_per_subject,
-    )
+    if cfg.create_splits:
+        log.info("Creating train/val/test tensors")
+        create_raw_tensors_dataset(
+            train_size=cfg.split.train_size,
+            val_size=cfg.split.val_size,
+            test_size=cfg.split.test_size,
+            max_samples_per_subject=cfg.split.max_samples_per_subject_for_split,
+            random_state=cfg.split.random_state,
+        )
 
 
 if __name__ == "__main__":

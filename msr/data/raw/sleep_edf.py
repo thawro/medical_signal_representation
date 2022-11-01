@@ -18,9 +18,10 @@ from msr.data.namespace import DATA_PATH
 SLEEP_EDF_PATH = DATA_PATH / "sleepEDF"
 RAW_DATASET_PATH = SLEEP_EDF_PATH / "raw"
 RAW_CSV_PATH = SLEEP_EDF_PATH / "raw_csv"
+LOGS_PATH = SLEEP_EDF_PATH / "logs"
 
-RAW_INFO_PATH = SLEEP_EDF_PATH / "raw_info.csv"
-SPLIT_INFO_PATH = SLEEP_EDF_PATH / "split_info.csv"
+RAW_INFO_PATH = LOGS_PATH / "raw_info.csv"
+SPLIT_INFO_PATH = LOGS_PATH / "split_info.csv"
 
 RAW_TENSORS_PATH = SLEEP_EDF_PATH / "raw_tensors"
 RAW_TENSORS_DATA_PATH = RAW_TENSORS_PATH / "data"
@@ -123,6 +124,7 @@ def create_sleep_edf_raw_csv_dataset(sample_len_sec: float = 30, verbose: bool =
         epochs_df.to_csv(RAW_CSV_PATH / f"{subject}_{night}.csv")
 
 
+# TODO: use version from utils
 def create_train_val_test_split_info(random_state: int = 42):
     """TODO
 
@@ -246,10 +248,10 @@ def create_raw_tensors_dataset():
         info = np.array(list(EVENT_ID.keys()))
         np.save(RAW_TENSORS_TARGETS_PATH / "info.npy", info)
 
-        epochs_info.to_csv(SLEEP_EDF_PATH / f"{split}_epochs_info.csv", index=False)
+        epochs_info.to_csv(LOGS_PATH / f"{split}_epochs_info.csv", index=False)
 
 
-# TODO: add files download from web if set to True
+# TODO: add files download from web, then remove it on the fly after csvs creation
 # TODO: check if works
 @hydra.main(version_base=None, config_path="../../configs/data", config_name="raw")
 def main(cfg: DictConfig):
@@ -264,6 +266,7 @@ def main(cfg: DictConfig):
         RAW_TENSORS_DATA_PATH,
         RAW_TENSORS_TARGETS_PATH,
         REPRESENTATIONS_PATH,
+        LOGS_PATH,
     ]
     for path in paths:
         path.mkdir(parents=True, exist_ok=True)
