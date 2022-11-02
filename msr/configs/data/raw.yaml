@@ -3,9 +3,11 @@ defaults:
   - override hydra/hydra_logging: colorlog
 
 ptbxl:
+  download: false
+  create_splits: true
   fs: 100                         # sampling frequency of PTB-XL signals
   target: diagnostic_class        # target used for predictions
-  encode_labels: true             # TODO
+  encode_targets: true             # TODO
 
 
 sleep_edf:

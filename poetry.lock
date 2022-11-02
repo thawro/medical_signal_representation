@@ -1649,6 +1649,14 @@ SoundFile = ">=0.10.0,<0.12.0"
 dev = ["Sphinx (>=4.5.0,<5.0.0)", "black (>=22.3.0,<23.0.0)", "pylint (>=2.13.7,<3.0.0)", "pytest (>=7.1.1,<8.0.0)", "pytest-xdist (>=2.5.0,<3.0.0)"]
 
 [[package]]
+name = "wget"
+version = "3.2"
+description = "pure python download utility"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "wheel"
 version = "0.37.1"
 description = "A built-package format for Python"
@@ -1688,7 +1696,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "8bd9cf6d59e6ac98584e2cc7c701d439a1a82f70ad214ee29a2bf5f84dfca429"
+content-hash = "68860bbfe4b290ca7c3a225896121ae3d8ae73a45e1c220d4ac8331a8ef8bca9"
 
 [metadata.files]
 antlr4-python3-runtime = [
@@ -2912,6 +2920,9 @@ websocket-client = [
 wfdb = [
     {file = "wfdb-4.0.0-py3-none-any.whl", hash = "sha256:c2130d8af0601df713b295ae10e00172019951734db590cd9b8ba9023cad15b9"},
     {file = "wfdb-4.0.0.tar.gz", hash = "sha256:e814d59997c0818ad74617a1d4a3412a2ae694d30f3c8c922c8683e54a0fb2fc"},
+]
+wget = [
+    {file = "wget-3.2.zip", hash = "sha256:35e630eca2aa50ce998b9b1a127bb26b30dfee573702782aa982f875e3f16061"},
 ]
 wheel = [
     {file = "wheel-0.37.1-py2.py3-none-any.whl", hash = "sha256:4bdcd7d840138086126cd09254dc6195fb4fc6f01c050a1d7236f2630db1d22a"},

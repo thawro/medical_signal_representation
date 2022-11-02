@@ -441,7 +441,7 @@ def download_validate_and_segment(
         max_samples_per_subject (int): Maximum number of samples to save for one subject.
         sig_names (List[str]): Required signals names.
     """
-    log.info("Performing MIMIC raw data creation")
+    log.info("Downloading and segmenting MIMIC dataset")
     all_subjects = requests.get(f"{MIMIC_URL}/RECORDS").text.split("/\n")[:-1]
     try:
         segments_info = pd.read_csv(SEGMENTS_FILE_PATH)
@@ -602,6 +602,7 @@ def create_raw_tensors_dataset(
         fs (float): Signals sampling frequency.
         targets (Literal["abp", "sbp_dbp", "sbp_dbp_avg"]): Which BP targets to save.
     """
+    log.info("Creating train/val/test tensors")
 
     def concat_samples(paths: List[str]):
         """Concatenate numpy arrays loaded from paths"""
@@ -658,7 +659,6 @@ def main(cfg: DictConfig):
 
     if cfg.download:
         prepare_txt_files()
-        log.info("Downloading and segmenting MIMIC dataset")
         download_validate_and_segment(
             sample_len_samples=int(cfg.sample_len_sec * cfg.fs),
             max_n_same=cfg.max_n_same,
@@ -667,7 +667,6 @@ def main(cfg: DictConfig):
         )
 
     if cfg.create_splits:
-        log.info("Creating train/val/test tensors")
         create_raw_tensors_dataset(
             train_size=cfg.split.train_size,
             val_size=cfg.split.val_size,

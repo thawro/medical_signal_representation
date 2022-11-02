@@ -3,19 +3,22 @@ import logging
 from collections import OrderedDict
 from typing import List, Tuple
 
+import hydra
 import mne
 import numpy as np
 import pandas as pd
 import torch
+from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import GroupShuffleSplit
 from tqdm.auto import tqdm
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-from msr.data.namespace import DATA_PATH
+from msr.utils import DATA_PATH
 
-SLEEP_EDF_PATH = DATA_PATH / "sleepEDF"
+DATASET_NAME = "sleepEDF"
+SLEEP_EDF_PATH = DATA_PATH / DATASET_NAME
 RAW_DATASET_PATH = SLEEP_EDF_PATH / "raw"
 RAW_CSV_PATH = SLEEP_EDF_PATH / "raw_csv"
 LOGS_PATH = SLEEP_EDF_PATH / "logs"
