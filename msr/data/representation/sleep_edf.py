@@ -2,25 +2,20 @@ from typing import Dict, List
 
 import numpy as np
 import torch
-from mrs.data.raw.sleep_edf import (
-    RAW_CSV_PATH,
-    RAW_DATASET_PATH,
-    RAW_INFO_PATH,
-    RAW_TENSORS_DATA_PATH,
-    RAW_TENSORS_PATH,
-    RAW_TENSORS_TARGETS_PATH,
-    REPRESENTATIONS_PATH,
-    SLEEP_EDF_PATH,
-    SPLIT_INFO_PATH,
-)
 
+from msr.data.raw.sleep_edf import (
+    DATASET_PATH,
+    RAW_TENSORS_DATA_PATH,
+    RAW_TENSORS_TARGETS_PATH,
+)
 from msr.data.representation.utils import (
     create_representations_dataset,
     get_representations,
     load_split,
 )
 from msr.signals.eeg import create_multichannel_eeg
-from msr.utils import DATA_PATH
+
+REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
 
 
 def get_sleep_edf_representation(
@@ -36,6 +31,7 @@ def get_sleep_edf_representation(
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
+    # TODO: Now we have 3 signals: [EEG_0, EEG_1, EOG]
     eeg = create_multichannel_eeg(channels_data.numpy(), fs=fs)
     return get_representations(eeg, windows_params, representation_types=representation_types)
 

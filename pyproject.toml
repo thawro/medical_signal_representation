@@ -25,6 +25,7 @@ neurokit2 = "^0.2.1"
 biosppy = "^1.0.0"
 ipywidgets = "7.0"
 wget = "^3.2"
+mne = "^1.2.1"
 
 
 [build-system]

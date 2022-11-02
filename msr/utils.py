@@ -1,12 +1,23 @@
+import os
+import zipfile
+from collections.abc import Iterable
 from itertools import groupby
 from pathlib import Path
-from typing import List, Union
+from typing import Callable, List, Union
 
 import numpy as np
 import pandas as pd
+import wget
+from joblib import Parallel, delayed
+from tqdm.auto import tqdm
 
 ROOT = Path(__file__).parent.parent
 DATA_PATH = ROOT / "data"
+
+import logging
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 
 def get_corr_matrix(df: pd.DataFrame):
@@ -42,3 +53,26 @@ def find_true_intervals(arr):
         (idxs[0], idxs[-1])
         for idxs in (list(group) for key, group in groupby(range(len(arr)), key=arr.__getitem__) if key)
     ]
+
+
+def download_zip_and_extract(zip_file_url, dest_path):
+    zip_file_path = str(dest_path / "tmp.zip")
+
+    log.info(f"Downloading zip file to {zip_file_path}.")
+    wget.download(zip_file_url, zip_file_path)
+
+    log.info(f"Unzipping {zip_file_path} file.")
+    with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
+        zip_ref.extractall(dest_path)
+
+    log.info(f"Removing {zip_file_path} file.")
+    os.remove(zip_file_path)
+
+    old_dir_name = zip_file_url.split("/")[-1].split(".zip")[0]
+    old_dir, new_dir = str(dest_path / old_dir_name), str(dest_path / "raw")
+    log.info(f"Renaming {old_dir} to {new_dir}.")
+    os.rename(old_dir, new_dir)
+
+
+def run_in_parallel_with_joblib(fn: Callable, iterable: Iterable, n_jobs: int = -1, desc=None):
+    return Parallel(n_jobs=n_jobs)(delayed(fn)(*args) for args in tqdm(iterable, total=len(iterable), desc=desc))

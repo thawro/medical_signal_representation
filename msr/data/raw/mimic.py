@@ -5,7 +5,6 @@ import os
 from functools import partial
 from typing import Dict, List, Literal, Tuple
 
-import hydra
 import matplotlib.pyplot as plt
 import neurokit2 as nk
 import numpy as np
@@ -13,11 +12,8 @@ import pandas as pd
 import requests
 import torch
 import wfdb
-from joblib import Parallel, delayed
-from omegaconf import DictConfig, OmegaConf
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from scipy.interpolate import interp1d
 from tqdm.auto import tqdm
 
 from msr.data.raw.utils import cut_segments_into_samples, validate_signal
@@ -29,22 +25,24 @@ from msr.utils import DATA_PATH, append_txt_to_file, find_true_intervals
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
+DATASET_NAME = "mimic_2"
 MIMIC_DB_NAME = "mimic3wdb-matched"  # specify type of mimic databes (mimic3wdb or mimic3wdb-matched)
 MIMIC_URL = f"https://physionet.org/files/{MIMIC_DB_NAME}/1.0"
-MIMIC_PATH = DATA_PATH / "mimic_2"
-MIMIC_DB_PATH = MIMIC_PATH / "db"  # raw data in .dat and .hea formats
-LOGS_PATH = MIMIC_PATH / "logs"
+DATASET_PATH = DATA_PATH / DATASET_NAME
+MIMIC_DB_PATH = DATASET_PATH / "db"  # raw data in .dat and .hea formats
+LOGS_PATH = DATASET_PATH / "logs"
 
 SEGMENTS_FILE_PATH = LOGS_PATH / "segments_info.txt"  # file for segments info
 SAMPLE_SEGMENTS_FILE_PATH = LOGS_PATH / "sample_segments_info.txt"  # filename for samples segments info
 SPLIT_INFO_PATH = LOGS_PATH / "split_info.csv"
 VALID_SEGMENTS_PATH = LOGS_PATH / "valid_segments.txt"
 
-RAW_DATASET_PATH = MIMIC_PATH / "raw"
-RAW_TENSORS_PATH = MIMIC_PATH / "raw_tensors"
+RAW_DATASET_PATH = DATASET_PATH / "raw"
+RAW_TENSORS_PATH = DATASET_PATH / "raw_tensors"
 RAW_TENSORS_DATA_PATH = RAW_TENSORS_PATH / "data"
 TARGETS_PATH = RAW_TENSORS_PATH / "targets"
-
+for path in [RAW_DATASET_PATH, LOGS_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH]:
+    path.mkdir(parents=True, exist_ok=True)
 SESSION = None
 
 
@@ -88,7 +86,7 @@ def check_signals_availability(measurement_path: str, sig_names: List[str]) -> D
     chunksize = 1024 * 1024
     directory, subject, measurement = measurement_path.split("/")
     url_hea = f"{MIMIC_URL}/{directory}/{subject}/{measurement}.hea"
-    tmp_path = MIMIC_PATH / "tmp"
+    tmp_path = DATASET_PATH / "tmp"
     tmp_path.mkdir(parents=True, exist_ok=True)
     hea_filename = tmp_path / f"{measurement}.hea"
     try:
@@ -646,37 +644,3 @@ def create_raw_tensors_dataset(
             target_path = TARGETS_PATH / name
             target_path.mkdir(parents=True, exist_ok=True)
             torch.save(target_data, target_path / f"{split}.pt")
-
-
-@hydra.main(version_base=None, config_path="../../configs/data", config_name="raw")
-def main(cfg: DictConfig):
-    cfg = cfg.mimic
-
-    log.info(cfg)
-
-    for path in [MIMIC_PATH, RAW_DATASET_PATH, LOGS_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH]:
-        path.mkdir(parents=True, exist_ok=True)
-
-    if cfg.download:
-        prepare_txt_files()
-        download_validate_and_segment(
-            sample_len_samples=int(cfg.sample_len_sec * cfg.fs),
-            max_n_same=cfg.max_n_same,
-            sig_names=cfg.sig_names,
-            max_samples_per_subject=cfg.max_samples_per_subject,
-        )
-
-    if cfg.create_splits:
-        create_raw_tensors_dataset(
-            train_size=cfg.split.train_size,
-            val_size=cfg.split.val_size,
-            test_size=cfg.split.test_size,
-            max_samples_per_subject=cfg.split.max_samples_per_subject_for_split,
-            random_state=cfg.split.random_state,
-            fs=cfg.fs,
-            targets=cfg.split.targets,
-        )
-
-
-if __name__ == "__main__":
-    main()

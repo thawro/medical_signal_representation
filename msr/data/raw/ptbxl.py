@@ -1,17 +1,11 @@
 import ast
 import logging
-import os
-import zipfile
 from typing import Dict, Literal, Union
 
-import hydra
 import numpy as np
 import pandas as pd
-import requests
 import torch
 import wfdb
-import wget
-from omegaconf import DictConfig, OmegaConf
 from sklearn.preprocessing import LabelEncoder
 from tqdm.auto import tqdm
 
@@ -20,34 +14,17 @@ from msr.utils import DATA_PATH
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-
 DATASET_NAME = "ptbxl_2"
-PTBXL_PATH = DATA_PATH / DATASET_NAME
-RAW_DATASET_PATH = PTBXL_PATH / "raw"
-RAW_TENSORS_PATH = PTBXL_PATH / "raw_tensors"
+ZIP_FILE_URL = "https://physionet.org/static/published-projects/ptb-xl/ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.2.zip"
+DATASET_PATH = DATA_PATH / DATASET_NAME
+RAW_DATASET_PATH = DATASET_PATH / "raw"
+RAW_TENSORS_PATH = DATASET_PATH / "raw_tensors"
 RAW_TENSORS_DATA_PATH = RAW_TENSORS_PATH / "data"
 TARGETS_PATH = RAW_TENSORS_PATH / "targets"
 TARGET_PATH = None
 
-
-def download_ptbxl_from_physionet(path):
-    zip_file_url = "https://physionet.org/static/published-projects/ptb-xl/ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.2.zip"
-    zip_file_path = str(path / "ptbxl.zip")
-
-    log.info(f"Downloading zip file from physionet to {zip_file_path}.")
-    wget.download(zip_file_url, zip_file_path)
-
-    log.info(f"Unzipping {zip_file_path} file.")
-    with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
-        zip_ref.extractall(path)
-
-    log.info(f"Removing {zip_file_path} file.")
-    os.remove(zip_file_path)
-
-    old_dir_name = "ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.2"
-    old_dir, new_dir = str(path / old_dir_name), str(path / "raw")
-    log.info(f"Renaming {old_dir} to {new_dir}.")
-    os.rename(old_dir, new_dir)
+for path in [RAW_DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH]:
+    path.mkdir(parents=True, exist_ok=True)
 
 
 def load_raw_ptbxl_data(
@@ -112,11 +89,12 @@ def load_raw_ptbxl_data(
     }
 
 
-def load_raw_ptbxl_data_and_save_to_tensors(fs: float, target: str, encode_targets: bool):
+def create_raw_tensors_dataset(fs: float, target: str, encode_targets: bool):
     """Load raw PTB-XL data (as downloaded from physionet) and save it to tensors.
 
     Waveforms are saved as torch `.pt` files.
-    Labels and classes mappings are saved as numpy  `.npy` files.
+    Targets are saved as torch `.pt` files.
+    Classes mappings are saved as numpy  `.npy` files.
 
     Args:
         fs (float): Sampling rate of PTB-XL dataset. `100` or `500`.
@@ -143,25 +121,3 @@ def load_raw_ptbxl_data_and_save_to_tensors(fs: float, target: str, encode_targe
         targets = torch.from_numpy(targets_npy)
         torch.save(data, RAW_TENSORS_DATA_PATH / f"{split}.pt")
         torch.save(targets, TARGET_PATH / f"{split}.pt")
-
-
-@hydra.main(version_base=None, config_path="../../configs/data", config_name="raw")
-def main(cfg: DictConfig):
-    cfg = cfg.ptbxl
-    log.info(cfg)
-
-    for path in [RAW_DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH]:
-        path.mkdir(parents=True, exist_ok=True)
-
-    if cfg.download:
-        download_ptbxl_from_physionet(path=PTBXL_PATH)
-
-    if cfg.create_splits:
-        load_raw_ptbxl_data_and_save_to_tensors(fs=cfg.fs, target=cfg.target, encode_targets=cfg.encode_targets)
-
-
-if __name__ == "__main__":
-    main()
-
-# TODO: check if works
-# TODO: Add docstrings

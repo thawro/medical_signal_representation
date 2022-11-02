@@ -5,15 +5,9 @@ from typing import Dict, List
 import numpy as np
 import torch
 
-from msr.data.raw.ptbxl import (
-    PTBXL_PATH,
-    RAW_DATASET_PATH,
-    RAW_TENSORS_DATA_PATH,
-    RAW_TENSORS_PATH,
-    TARGETS_PATH,
-)
+from msr.data.raw.ptbxl import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
 from msr.data.representation.utils import (
-    create_dataset,
+    create_representations_dataset,
     get_periodic_representations,
     load_split,
 )
@@ -58,7 +52,7 @@ def create_ptbxl_representations_dataset(representation_types: List[str], fs: fl
     )
     create_representations_dataset(
         raw_tensors_path=RAW_TENSORS_DATA_PATH,
-        representations_path=PTBXL_PATH / f"representations_{fs}",
+        representations_path=DATASET_PATH / f"representations_{fs}",
         get_repr_func=get_ptbxl_representation,
         **params,
     )
@@ -86,7 +80,7 @@ def load_ptbxl_split(
     """
     return load_split(
         split=split,
-        representations_path=PTBXL_PATH / f"representations_{fs}",
+        representations_path=DATASET_PATH / f"representations_{fs}",
         targets_path=TARGETS_PATH / target,
         representation_type=representation_type,
     )

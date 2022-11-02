@@ -1,12 +1,18 @@
+import logging
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
 from tqdm.auto import tqdm
 
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+
 
 def create_group_train_val_test_split_idxs(
     groups, sample_ids, train_size=0.7, val_size=0.15, test_size=0.15, random_state=42
 ):
+    log.info("Performing GroupShuffleSplit, to get indexes for train/val/test splits")
     train_size = train_size / (train_size + val_size + test_size)
     val_size = val_size / (train_size + val_size + test_size)
     test_size = 1 - train_size - val_size
