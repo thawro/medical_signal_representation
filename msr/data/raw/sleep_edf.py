@@ -242,8 +242,8 @@ def create_raw_tensors_dataset():
             }
         )
 
-        torch.save(all_data, RAW_TENSORS_DATA_PATH / f"{split}_data.pt")
-        np.save(RAW_TENSORS_TARGETS_PATH / f"{split}_targets.npy", all_targets)
+        torch.save(all_data, RAW_TENSORS_DATA_PATH / f"{split}.pt")
+        np.save(RAW_TENSORS_TARGETS_PATH / f"{split}.npy", all_targets)
 
         info = np.array(list(EVENT_ID.keys()))
         np.save(RAW_TENSORS_TARGETS_PATH / "info.npy", info)
@@ -251,8 +251,6 @@ def create_raw_tensors_dataset():
         epochs_info.to_csv(LOGS_PATH / f"{split}_epochs_info.csv", index=False)
 
 
-# TODO: add files download from web, then remove it on the fly after csvs creation
-# TODO: check if works
 @hydra.main(version_base=None, config_path="../../configs/data", config_name="raw")
 def main(cfg: DictConfig):
     cfg = cfg.sleep_edf
@@ -282,3 +280,8 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     main()
+
+# TODO: add files download from web, then remove it on the fly after csvs creation
+# TODO: check if works
+# TODO: get rid of raw_csv directory
+# TODO: Add docstrings

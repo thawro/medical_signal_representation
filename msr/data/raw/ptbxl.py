@@ -103,12 +103,10 @@ def load_raw_ptbxl_data_and_save_to_tensors(fs: float, target: str, encode_label
     for split in ["train", "val", "test"]:
         data_tensor = torch.tensor(ptbxl_data[split]["X"])
         targets_npy = ptbxl_data[split]["y"]
-        torch.save(data_tensor, DATA_PATH / f"{split}_data.pt")
-        np.save(TARGET_PATH / f"{split}_targets.npy", targets_npy)
+        torch.save(data_tensor, DATA_PATH / f"{split}.pt")
+        np.save(TARGET_PATH / f"{split}.npy", targets_npy)
 
 
-# TODO: add files download from web if set to True
-# TODO: check if works
 @hydra.main(version_base=None, config_path="../../configs/data", config_name="raw")
 def main(cfg: DictConfig):
     cfg = cfg.ptbxl
@@ -122,3 +120,8 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     main()
+
+
+# TODO: add files download from web if set to True
+# TODO: check if works
+# TODO: Add docstrings

@@ -47,7 +47,7 @@ def create_representations_dataset(
     representations_path.mkdir(parents=True, exist_ok=True)
     splits = ["train", "val", "test"]
     for split in tqdm(splits, "Creating representations for all splits"):
-        all_data = torch.load(raw_tensors_path / f"{split}_data.pt")
+        all_data = torch.load(raw_tensors_path / f"{split}.pt")
         if use_multiprocessing:
             reps = Parallel(n_jobs=-1)(
                 delayed(get_repr_func)(data, **kwargs) for data in tqdm(all_data, desc="Extracting representations")
@@ -59,13 +59,13 @@ def create_representations_dataset(
         for name, data in reps.items():
             representation_path = representations_path / name
             representation_path.mkdir(parents=True, exist_ok=True)
-            path = representation_path / f"{split}_data.pt"
+            path = representation_path / f"{split}.pt"
             torch.save(data, path)
 
 
 def load_split(split, representations_path, targets_path, representation_type):
-    data = torch.load(representations_path / f"{representation_type}/{split}_data.pt")
-    targets = np.load(targets_path / f"{split}_targets.npy")
+    data = torch.load(representations_path / f"{representation_type}/{split}.pt")
+    targets = np.load(targets_path / f"{split}.npy")
     info = np.load(targets_path / "info.npy", allow_pickle=True)
     info = {i: info[i] for i in range(len(info))}
     return {"data": data, "targets": targets, "info": info}

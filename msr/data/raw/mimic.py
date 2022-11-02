@@ -3,6 +3,7 @@ import logging
 import multiprocessing
 import os
 from functools import partial
+from typing import Dict, List, Literal, Tuple
 
 import hydra
 import matplotlib.pyplot as plt
@@ -48,6 +49,7 @@ SESSION = None
 
 
 def set_global_session():
+    """Set global session used for files downloading"""
     global SESSION
     if not SESSION:
         SESSION = requests.Session()
@@ -57,8 +59,15 @@ def set_global_session():
         SESSION.mount("https://", adapter)
 
 
-def get_measurements_paths(subject):
-    """Return measurements paths for single subject using RECORDS file in physionet mimic3db database."""
+def get_measurements_paths(subject: str) -> List[str]:
+    """Return measurements paths for single subject using RECORDS file in physionet mimic3db database.
+
+    Args:
+        subject (str): Subject code.
+
+    Returns:
+        List[str]: Measurement paths.
+    """
     url = f"{MIMIC_URL}/{subject}/RECORDS"
     with SESSION.get(url) as response:
         measurements = response.text.split("\n")[:-1]
@@ -66,8 +75,16 @@ def get_measurements_paths(subject):
         return measurements
 
 
-def check_signals_availability(measurement_path, sig_names):
-    """Check if all desired signals are available (in the header file)."""
+def check_signals_availability(measurement_path: str, sig_names: List[str]) -> Dict:
+    """Check if all desired signals are available (in the header file).
+
+    Args:
+        measurement_path (str): Measurement path in format <prefix>/<subject>/<measurement>.
+        sig_names (List[str]): Required signals names.
+
+    Returns:
+        Dict: Dictionary with measurement path, signals availability info and number of samples info.
+    """
     chunksize = 1024 * 1024
     directory, subject, measurement = measurement_path.split("/")
     url_hea = f"{MIMIC_URL}/{directory}/{subject}/{measurement}.hea"
@@ -96,10 +113,15 @@ def check_signals_availability(measurement_path, sig_names):
     }
 
 
-def download_measurement(measurement_path):
-    """Download measurement from physionet database."""
+def download_measurement(measurement_path: str):
+    """Download measurement from physionet database.
 
-    def download_file(url, filename, chunksize=1024 * 1024):
+    Args:
+        measurement_path (str): Measurement path in format <prefix>/<subject>/<measurement>.
+    """
+
+    def download_file(url: str, filename: str, chunksize=1024 * 1024):
+        """Download file with previously set session"""
         with SESSION.get(url, stream=True) as response:
             response.raise_for_status()
             with open(filename, "wb") as f:
@@ -119,15 +141,32 @@ def download_measurement(measurement_path):
     log.info(f"{measurement_path}: downloaded")
 
 
-def remove_measurement(measurement_path):
+def remove_measurement(measurement_path: str):
+    """Remove measurements .hea and .dat files
+
+    Args:
+        measurement_path (str): Measurement path in format <prefix>/<subject>/<measurement>.
+    """
     log.info(f"{measurement_path}: Removing .dat and .hea files.")
     path = str(MIMIC_DB_PATH / measurement_path)
     os.remove(f"{path}.hea")
     os.remove(f"{path}.dat")
 
 
-def load_raw_measurement_to_array(measurement_path, sig_names, start_idx=0, end_idx=-1):
-    """Load data to DataFrame using wfdb library"""
+def load_raw_measurement_to_array(
+    measurement_path: str, sig_names: List[str], start_idx: int = 0, end_idx: int = -1
+) -> np.ndarray:
+    """Load data to numpy.ndarray using wfdb library
+
+    Args:
+        measurement_path (str): Measurement path in format <prefix>/<subject>/<measurement>.
+        sig_names (List[str]): Required signals names.
+        start_idx (int, optional): Starting index of measurements slice. Defaults to 0.
+        end_idx (int, optional): Ending index of measurements slice. If -1, then length of measurement is used. Defaults to -1.
+
+    Returns:
+        np.ndarray: Numpy array with signals data.
+    """
     path = str(MIMIC_DB_PATH / measurement_path)
     try:
         data, info = wfdb.rdsamp(path)
@@ -142,9 +181,22 @@ def load_raw_measurement_to_array(measurement_path, sig_names, start_idx=0, end_
     return data[start_idx:end_idx, sig_idxs]  # data of shape [N, C], where C are signals from sig_names
 
 
-def validate_recording(abp, ppg, ecg, sample_len_samples, max_n_same, plot=False):
-    """Validate recordings all signals (ABP, PPG and ECG).
-    Returns list[bool] where True indicates samples which are good for all validation steps for all signals.
+def validate_recording(
+    abp: np.ndarray, ppg: np.ndarray, ecg: np.ndarray, sample_len_samples: int, max_n_same: int, plot: bool = False
+) -> np.ndarray:
+    """Check if recording is valid.
+    All signals (ABP, PPG and ECG) are checked for values bounds, nans and repeated values.
+
+    Args:
+        abp (np.ndarray): ABP signal.
+        ppg (np.ndarray): PPG (PLETH) signal.
+        ecg (np.ndarray): ECG (lead II) signal.
+        sample_len_samples (int): Minimum accepted signal length (in samples).
+        max_n_same (int): Maximum number of repeated samples.
+        plot (bool): Whether to plot validation process. Defaults to False.
+
+    Returns:
+        np.ndarray: True indicates samples which are good for all validation steps for all signals.
     """
     valid_sig_len = len(abp) >= sample_len_samples
 
@@ -172,8 +224,23 @@ def validate_recording(abp, ppg, ecg, sample_len_samples, max_n_same, plot=False
     return is_good
 
 
-def find_valid_segments(abp, ppg, ecg, sample_len_samples, max_n_same, plot=False):
-    """Find valid segments for given ABP, PPG and ECG signals using validate_recording func."""
+def find_valid_segments(
+    measurement_path: str, sample_len_samples: int, max_n_same: int, sig_names: List[str], plot: bool = False
+) -> List[Tuple[int, int]]:
+    """Find valid segments for given measurement.
+
+    Args:
+        measurement_path (str): Measurement path in format <prefix>/<subject>/<measurement>.
+        sample_len_samples (int): Minimum accepted signal length (in samples).
+        max_n_same (int): Maximum number of repeated samples.
+        sig_names (List[str]): Required signals names.
+        plot (bool): Whether to plot validation process. Defaults to False.
+
+    Returns:
+        List[Tuple[int, int]]: List with valid segments intervals.
+    """
+    data = load_raw_measurement_to_array(measurement_path, sig_names=sig_names)
+    abp, ppg, ecg = data.T
     is_good = validate_recording(abp, ppg, ecg, sample_len_samples, max_n_same, plot=plot)
     segments = find_true_intervals(is_good)
     valid_segments = [segment for segment in segments if (segment[1] - segment[0]) >= sample_len_samples]
@@ -192,14 +259,7 @@ def find_valid_segments(abp, ppg, ecg, sample_len_samples, max_n_same, plot=Fals
             ax.set_title(name, fontsize=22)
         percent_good = is_good.sum() / len(is_good) * 100
         fig.suptitle(f"Percent of good segments: {round(percent_good, 2)}%", fontsize=26)
-    return valid_segments
 
-
-def find_valid_segments_for_single_measurement(measurement_path, sample_len_samples, max_n_same, sig_names):
-    """Find valid segments for given measurement path using validate_recording func."""
-    data = load_raw_measurement_to_array(measurement_path, sig_names=sig_names)
-    abp, ppg, ecg = data.T
-    valid_segments = find_valid_segments(abp, ppg, ecg, sample_len_samples=sample_len_samples, max_n_same=max_n_same)
     valid_segments_lines = [f"{measurement_path}/{start}-{end}" for start, end in valid_segments]
     append_txt_to_file(VALID_SEGMENTS_PATH, valid_segments_lines)
     log.info(f"{measurement_path}: Found {len(valid_segments)} valid segments.")
@@ -208,21 +268,40 @@ def find_valid_segments_for_single_measurement(measurement_path, sample_len_samp
     return valid_segments
 
 
-def save_sample_to_numpy(sample_num, measurement_path, sample_start_idx, sample_end_idx, sig_names):
-    """Save sample to csv file."""
+def save_sample_to_numpy(sample_num: int, measurement_path: str, start_idx: int, end_idx: int, sig_names: List[str]):
+    """Save sample to numpy file.
+
+    Args:
+        sample_num (int): Sample number.
+        measurement_path (str): Measurement path in format <prefix>/<subject>/<measurement>.
+        start_idx (int): Starting index of sample.
+        end_idx (int): Ending index of sample.
+        sig_names (List[str]): Required signals names.
+    """
     subject_prefix, subject, measurement = measurement_path.split("/")
     subject_path = RAW_DATASET_PATH / subject_prefix / subject
     subject_path.mkdir(parents=True, exist_ok=True)
     file_path = str(subject_path / f"{subject}_{sample_num}.npy")
-    sample_data = load_raw_measurement_to_array(measurement_path, sig_names, sample_start_idx, sample_end_idx)
+    sample_data = load_raw_measurement_to_array(measurement_path, sig_names, start_idx, end_idx)
     np.save(file_path, sample_data)
     log.info(f"{measurement_path}: Saved sample {sample_num}")
-    append_txt_to_file(
-        SAMPLE_SEGMENTS_FILE_PATH, f"{subject}_{sample_num},{measurement_path},{sample_start_idx},{sample_end_idx}"
-    )
+    append_txt_to_file(SAMPLE_SEGMENTS_FILE_PATH, f"{subject}_{sample_num},{measurement_path},{start_idx},{end_idx}")
 
 
-def cut_segments_into_samples_and_save(segments, sample_len_samples, max_samples_per_subject, sig_names):
+def cut_segments_into_samples_and_save(
+    segments: Dict[str, List[Tuple[int, int]]],
+    sample_len_samples: int,
+    max_samples_per_subject: int,
+    sig_names: List[str],
+):
+    """Cut single subjects segments into samples and save it to numpy files.
+
+    Args:
+        segments (Dict[str, List[Tuple[int, int]]]): Dictionary with measurements paths as keys and corresponding segments as values.
+        sample_len_samples (int): Minimum accepted signal length (in samples).
+        max_samples_per_subject (int): Maximum number of samples to save for one subject.
+        sig_names (List[str]): Required signals names.
+    """
     measurement_paths = list(segments.keys())
     samples_count = 0
     measurements_count = 0
@@ -236,10 +315,10 @@ def cut_segments_into_samples_and_save(segments, sample_len_samples, max_samples
         measurement_path = measurement_paths[measurements_count]
         possible_segments_bounds = cut_measurements_segments[measurement_path]
         try:
-            sample_start_idx, sample_end_idx = possible_segments_bounds.pop()
+            start_idx, end_idx = possible_segments_bounds.pop()
         except IndexError:
             break  # no more samples
-        save_sample_to_numpy(samples_count, measurement_path, sample_start_idx, sample_end_idx, sig_names=sig_names)
+        save_sample_to_numpy(samples_count, measurement_path, start_idx, end_idx, sig_names=sig_names)
         samples_count += 1
         measurements_count += 1
         if measurements_count > len(measurement_paths) - 1:
@@ -247,8 +326,21 @@ def cut_segments_into_samples_and_save(segments, sample_len_samples, max_samples
     log.info(f"Saved {samples_count} samples")
 
 
-def segment_and_save_for_subject(subject, fs, sample_len_sec, max_n_same, sig_names, max_samples_per_subject):
-    sample_len_samples = sample_len_sec * fs
+def segment_and_save_for_subject(
+    subject: str, sample_len_samples: int, max_n_same: int, max_samples_per_subject: int, sig_names: List[str]
+) -> Dict[str, List[Tuple[int, int]]]:
+    """Segment subjects measurements and save valid segments to numpy files.
+
+    Args:
+        subject (str): Subject code.
+        sample_len_samples (int): Minimum accepted signal length (in samples).
+        max_n_same (int): Maximum number of repeated samples.
+        max_samples_per_subject (int): Maximum number of samples to save for one subject in a split.
+        sig_names (List[str]): Required signals names.
+
+    Returns:
+        Dict[str, List[Tuple[int, int]]]: Dictionary with measurements paths as keys and corresponding segments as values.
+    """
     measurements_paths = get_measurements_paths(subject)
     if not measurements_paths:
         log.warning(f"{subject}: No measurements")
@@ -269,15 +361,15 @@ def segment_and_save_for_subject(subject, fs, sample_len_sec, max_n_same, sig_na
     segmented_measurements = {}
     for path in measurements_paths:
         download_measurement(path)
-        params = dict(sample_len_samples=sample_len_sec * fs, max_n_same=max_n_same, sig_names=sig_names)
-        segmented_measurements[path] = find_valid_segments_for_single_measurement(path, **params)
+        params = dict(sample_len_samples=sample_len_samples, max_n_same=max_n_same, sig_names=sig_names)
+        segmented_measurements[path] = find_valid_segments(path, **params)
 
     valid_segmented_measurements = {
         path: segments for path, segments in segmented_measurements.items() if len(segments) > 0
     }
     if valid_segmented_measurements:
         params = dict(
-            sample_len_samples=sample_len_sec * fs, max_samples_per_subject=max_samples_per_subject, sig_names=sig_names
+            sample_len_samples=sample_len_samples, max_samples_per_subject=max_samples_per_subject, sig_names=sig_names
         )
         cut_segments_into_samples_and_save(valid_segmented_measurements, **params)
     else:
@@ -285,7 +377,12 @@ def segment_and_save_for_subject(subject, fs, sample_len_sec, max_n_same, sig_na
     return segmented_measurements
 
 
-def save_segments_info(segmented_measurements):
+def save_segments_info(segmented_measurements: Dict[str, List[Tuple[int, int]]]):
+    """Save segments info
+
+    Args:
+        segmented_measurements (Dict[str, List[Tuple[int, int]]]): Dictionary with measurements paths as keys and corresponding segments as values.
+    """
     lines = []
     for measurement_path, segments in segmented_measurements.items():
         path_split = measurement_path.split("/")
@@ -307,12 +404,22 @@ def save_segments_info(segmented_measurements):
     append_txt_to_file(SEGMENTS_FILE_PATH, lines)
 
 
-def segment_and_save_for_all_subjects(subjects, fs, sample_len_sec, max_n_same, sig_names, max_samples_per_subject):
+def segment_and_save_for_all_subjects(
+    subjects: List[str], sample_len_samples: int, max_n_same: int, max_samples_per_subject: int, sig_names: List[str]
+):
+    """Segment each subjects measurements and save valid segments to numpy files.
+
+    Args:
+        subjects (List[str]): List of subjects codes.
+        sample_len_samples (int): Minimum accepted signal length (in samples).
+        max_n_same (int): Maximum number of repeated samples.
+        max_samples_per_subject (int): Maximum number of samples to save for one subject.
+        sig_names (List[str]): Required signals names.
+    """
     with multiprocessing.Pool(initializer=set_global_session, processes=16) as pool:
         segment_fn = partial(
             segment_and_save_for_subject,
-            fs=fs,
-            sample_len_sec=sample_len_sec,
+            sample_len_samples=sample_len_samples,
             max_n_same=max_n_same,
             sig_names=sig_names,
             max_samples_per_subject=max_samples_per_subject,
@@ -323,7 +430,17 @@ def segment_and_save_for_all_subjects(subjects, fs, sample_len_sec, max_n_same, 
             save_segments_info(segmented_measurements)
 
 
-def download_validate_and_segment(fs, sample_len_sec, max_n_same, sig_names, max_samples_per_subject):
+def download_validate_and_segment(
+    sample_len_samples: int, max_n_same: int, max_samples_per_subject: int, sig_names: List[str]
+):
+    """Run mimic download -> validate -> segment -> save pipeline.
+
+    Args:
+        sample_len_samples (int): Minimum accepted signal length (in samples).
+        max_n_same (int): Maximum number of repeated samples.
+        max_samples_per_subject (int): Maximum number of samples to save for one subject.
+        sig_names (List[str]): Required signals names.
+    """
     log.info("Performing MIMIC raw data creation")
     all_subjects = requests.get(f"{MIMIC_URL}/RECORDS").text.split("/\n")[:-1]
     try:
@@ -337,8 +454,7 @@ def download_validate_and_segment(fs, sample_len_sec, max_n_same, sig_names, max
     subjects_to_segment = list(sorted(set(all_subjects).difference(set(segmented_subjects))))
     log.info(f"{len(subjects_to_segment)} subjects left (out of {len(all_subjects)})")
     params = dict(
-        fs=fs,
-        sample_len_sec=sample_len_sec,
+        sample_len_samples=sample_len_samples,
         max_n_same=max_n_same,
         sig_names=sig_names,
         max_samples_per_subject=max_samples_per_subject,
@@ -347,6 +463,7 @@ def download_validate_and_segment(fs, sample_len_sec, max_n_same, sig_names, max
 
 
 def prepare_txt_files():
+    """Prepare text logs files, i.e. write down needed headers."""
     try:
         with open(SAMPLE_SEGMENTS_FILE_PATH, "r") as myfile:
             header = myfile.read().split("\n")[0]
@@ -370,7 +487,8 @@ def prepare_txt_files():
         )
 
 
-def get_all_samples_paths():
+def get_all_samples_paths() -> pd.DataFrame:
+    """Return all numpy files samples paths in form of pandas.DataFrame"""
     all_sample_paths = []
     prefixes = glob.glob(str(RAW_DATASET_PATH / "*"))
     for prefix in prefixes:
@@ -385,7 +503,20 @@ def get_all_samples_paths():
     return pd.DataFrame(all_sample_paths)
 
 
-def find_sbp_and_dbp_idxs_with_rpeaks(abp, ecg, ecg_fs, correct=True):
+def find_sbp_and_dbp_idxs_with_rpeaks(
+    abp: np.ndarray, ecg: np.ndarray, ecg_fs: float, correct: bool = True
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Return systolic and diastolic blood pressure indexes (from ABP signal) with use of ECG rpeaks.
+
+    Args:
+        abp (np.ndarray): ABP signal from which sbp and dbp indexes are returned.
+        ecg (np.ndarray): ECG signal, i.e. source of rpeaks.
+        ecg_fs (float): ECG sampling frequency.
+        correct (bool, optional): Whether to correct badly extracted indexes. Defaults to True.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Systolic and diastolic indexes.
+    """
     cleaned = nk.ecg_clean(ecg, sampling_rate=ecg_fs)
     rpeaks = nk.ecg_peaks(cleaned, sampling_rate=ecg_fs, correct_artifacts=True)[1]["ECG_R_Peaks"]
     if len(rpeaks) == 0:
@@ -413,7 +544,20 @@ def find_sbp_and_dbp_idxs_with_rpeaks(abp, ecg, ecg_fs, correct=True):
     return sbp_idxs, dbp_idxs
 
 
-def get_abp_targets(abp, ecg, ecg_fs, targets):
+def get_abp_targets(
+    abp: np.ndarray, ecg: np.ndarray, ecg_fs: float, targets: Literal["abp", "sbp_dbp", "sbp_dbp_avg"]
+) -> Dict[str, np.ndarray]:
+    """Calculate systolic and diastolic targets.
+
+    Args:
+        abp (np.ndarray): ABP signal from which sbp and dbp indexes are returned.
+        ecg (np.ndarray): ECG signal, i.e. source of rpeaks.
+        ecg_fs (float): ECG sampling frequency.
+        targets (Literal["abp", "sbp_dbp", "sbp_dbp_avg"]): Which BP targets to return.
+
+    Returns:
+        Dict[str, np.ndarray]: Dictionary with targets.
+    """
     if isinstance(abp, torch.Tensor):
         abp = abp.numpy()
     if isinstance(ecg, torch.Tensor):
@@ -438,8 +582,29 @@ def get_abp_targets(abp, ecg, ecg_fs, targets):
     return bp_values
 
 
-def create_raw_tensors_dataset(train_size, val_size, test_size, max_samples_per_subject, random_state, fs, targets):
-    def concat_samples(paths):
+def create_raw_tensors_dataset(
+    train_size: float,
+    val_size: float,
+    test_size: float,
+    max_samples_per_subject: int,
+    random_state: int,
+    fs: float,
+    targets: Literal["abp", "sbp_dbp", "sbp_dbp_avg"],
+):
+    """Create raw tensors dataset, i.e. train/val/test data and targets tensors.
+
+    Args:
+        train_size (float): Train ratio of dataset.
+        val_size (float): Val ratio of dataset.
+        test_size (float): Test ratio of dataset.
+        max_samples_per_subject (int): Maximum number of samples to save for one subject.
+        random_state (int): Seed for random.
+        fs (float): Signals sampling frequency.
+        targets (Literal["abp", "sbp_dbp", "sbp_dbp_avg"]): Which BP targets to save.
+    """
+
+    def concat_samples(paths: List[str]):
+        """Concatenate numpy arrays loaded from paths"""
         numpy_files = [RAW_DATASET_PATH / path for path in paths]
         return np.stack([np.load(f) for f in numpy_files])
 
@@ -459,12 +624,11 @@ def create_raw_tensors_dataset(train_size, val_size, test_size, max_samples_per_
     for split in splits:
         current_split_info = splits_info.query(f"split == '{split}'")
         all_data = concat_samples(paths=current_split_info["path"].values)  # shape [batch, n_samples, n_signals]
-        all_data = torch.from_numpy(all_data)
-        # signals order: ABP, PPG, ECG
+        all_data = torch.from_numpy(all_data)  # signals order: ABP, PPG, ECG
         abp_data = all_data[..., 0]  # ABP
         data = all_data[..., 1:]  # PPG and ECG
         ecg_data = data[..., 1]
-        torch.save(data, RAW_TENSORS_DATA_PATH / f"{split}_data.pt")
+        torch.save(data, RAW_TENSORS_DATA_PATH / f"{split}.pt")
 
         bp_values = [
             get_abp_targets(abp, ecg, ecg_fs=fs, targets=targets)
@@ -480,7 +644,7 @@ def create_raw_tensors_dataset(train_size, val_size, test_size, max_samples_per_
         for name, target_data in bp_values.items():
             target_path = TARGETS_PATH / name
             target_path.mkdir(parents=True, exist_ok=True)
-            torch.save(target_data, target_path / f"{split}_targets.pt")
+            torch.save(target_data, target_path / f"{split}.pt")
 
 
 @hydra.main(version_base=None, config_path="../../configs/data", config_name="raw")
@@ -496,8 +660,7 @@ def main(cfg: DictConfig):
         prepare_txt_files()
         log.info("Downloading and segmenting MIMIC dataset")
         download_validate_and_segment(
-            fs=cfg.fs,
-            sample_len_sec=cfg.sample_len_sec,
+            sample_len_samples=int(cfg.sample_len_sec * cfg.fs),
             max_n_same=cfg.max_n_same,
             sig_names=cfg.sig_names,
             max_samples_per_subject=cfg.max_samples_per_subject,
