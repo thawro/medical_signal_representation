@@ -74,8 +74,6 @@ class ECGSignal(PeriodicSignal):
         validate=True,
         plot=False,
         use_raw=False,
-        return_arr=False,
-        use_hr=False,
     ):
         if intervals is None:
             try:
@@ -105,12 +103,11 @@ class ECGSignal(PeriodicSignal):
                     intervals[-1][1] = self.n_samples - 1
                 if intervals[0][0] < 0:
                     intervals[0][0] = 0
-                intervals = [tuple(interval) for interval in intervals]
             except ZeroDivisionError:
-                if use_hr:
-                    intervals = find_intervals_using_hr(self)
-                else:
-                    raise ZeroDivisionError
+                intervals = find_intervals_using_hr(self)
+        intervals = np.array(intervals)
+        if not resample:
+            intervals[:, 1] = intervals[:, 0] + n_samples
         self.beats_intervals = intervals
         self.valid_beats_mask = len(intervals) * [True]
         data_source = self.data if use_raw else self.cleaned
@@ -123,7 +120,6 @@ class ECGSignal(PeriodicSignal):
                 beat = beat.resample_with_interpolation(n_samples=100, kind="pchip")
             beats.append(beat)
         self.beats = np.array(beats)
-        self.set_agg_beat()
         if plot:
             self.plot_beats()
 
@@ -422,9 +418,7 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
                     new_source_channel = source_channels.pop()
             if not found_good_channel:
                 new_source_channel = source_channel
-                self.signals[new_source_channel].set_beats(
-                    **kwargs, use_hr=True
-                )  # use Heart Rate (most dominant frequency)
+                self.signals[new_source_channel].set_beats(**kwargs)  # use Heart Rate (most dominant frequency)
             source_channel_intervals = self.signals[new_source_channel].beats_intervals
         else:
             source_channel_intervals = None

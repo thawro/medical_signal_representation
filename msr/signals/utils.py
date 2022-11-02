@@ -118,3 +118,8 @@ def get_windows(start, max_len, win_len, step):
         end += step
     windows.append((start, max_len))
     return windows
+
+
+def resample(old_time, old_values, new_time, kind="nearest"):
+    interp_fn = interp1d(old_time, old_values, kind=kind, fill_value="extrapolate")
+    return interp_fn(new_time)

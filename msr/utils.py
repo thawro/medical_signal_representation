@@ -1,3 +1,4 @@
+from itertools import groupby
 from pathlib import Path
 from typing import List, Union
 
@@ -34,3 +35,10 @@ def append_txt_to_file(filename: str, txt: Union[str, List[str]]):
                 myfile.write(f"{line}\n")
         else:
             myfile.write(f"{txt}\n")
+
+
+def find_true_intervals(arr):
+    return [
+        (idxs[0], idxs[-1])
+        for idxs in (list(group) for key, group in groupby(range(len(arr)), key=arr.__getitem__) if key)
+    ]

@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 
 
@@ -53,3 +55,16 @@ def validate_signal(data: np.ndarray, low: float = None, high: float = None, max
     valid_no_nans = validate_sig_nan_values(data)
     valid_different_vals = validate_sig_repeat_values(data, max_n_same)
     return valid_no_nans & valid_range & valid_different_vals
+
+
+def cut_segments_into_samples(segments, n_samples, shuffle=True):
+    """Split bigger segments bounds into smaller samples bounds"""
+    samples_bounds = []
+    for start, end in segments:
+        segment_start, segment_end = start, start + n_samples
+        while segment_end < end:
+            samples_bounds.append((segment_start, segment_end))
+            segment_start, segment_end = segment_end, segment_end + n_samples
+    if shuffle:
+        random.shuffle(samples_bounds)
+    return samples_bounds

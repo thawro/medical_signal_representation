@@ -32,3 +32,5 @@ mimic:
     test_size: 0.15
     random_state: 42
     max_samples_per_subject_for_split: 10
+    targets:
+      - sbp_dbp_avg
