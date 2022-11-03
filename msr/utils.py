@@ -1,3 +1,4 @@
+import inspect
 import os
 import zipfile
 from collections.abc import Iterable
@@ -76,3 +77,45 @@ def download_zip_and_extract(zip_file_url, dest_path):
 
 def run_in_parallel_with_joblib(fn: Callable, iterable: Iterable, n_jobs: int = -1, desc=None):
     return Parallel(n_jobs=n_jobs)(delayed(fn)(*args) for args in tqdm(iterable, total=len(iterable), desc=desc))
+
+
+def create_new_obj(obj: object, **kwargs) -> object:
+    """Create new instance of object passed with new arguments specified in `kwargs`.
+
+    Args:
+        obj (object): Object used as source of attributes for new object instance.
+
+    Returns:
+        object: New object instance with newly specified attributed.
+    """
+    init_args = list(inspect.signature(obj.__init__).parameters.items())
+    args = {}
+    for arg, val in init_args:
+        if arg in kwargs.keys():
+            args[arg] = kwargs[arg]
+        else:
+            if arg in vars(obj).keys():
+                args[arg] = getattr(obj, arg)
+            else:
+                args[arg] = val.default
+    return obj.__class__(**args)
+
+
+def lazy_property(fn: Callable) -> Callable:
+    """Lazily evaluated property.
+
+    Args:
+        fn (Callable): Function to decorate.
+
+    Returns:
+        Callable: Decorated function.
+    """
+    attr_name = "_lazy_" + fn.__name__
+
+    @property
+    def _lazy_property(self):
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, fn(self))
+        return getattr(self, attr_name)
+
+    return _lazy_property

@@ -14,7 +14,7 @@ log.setLevel(logging.INFO)
 
 from msr.utils import DATA_PATH, run_in_parallel_with_joblib
 
-DATASET_NAME = "sleepEDF_2"
+DATASET_NAME = "sleep_edf"
 ZIP_FILE_URL = "https://www.physionet.org/static/published-projects/sleep-edfx/sleep-edf-database-expanded-1.0.0.zip"
 DATASET_PATH = DATA_PATH / DATASET_NAME
 RAW_DATASET_PATH = DATASET_PATH / "raw"

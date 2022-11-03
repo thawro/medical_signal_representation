@@ -25,7 +25,7 @@ from msr.utils import DATA_PATH, append_txt_to_file, find_true_intervals
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-DATASET_NAME = "mimic_2"
+DATASET_NAME = "mimic"
 MIMIC_DB_NAME = "mimic3wdb-matched"  # specify type of mimic databes (mimic3wdb or mimic3wdb-matched)
 MIMIC_URL = f"https://physionet.org/files/{MIMIC_DB_NAME}/1.0"
 DATASET_PATH = DATA_PATH / DATASET_NAME

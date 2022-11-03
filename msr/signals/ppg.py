@@ -1,3 +1,5 @@
+from typing import List
+
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -5,41 +7,44 @@ from scipy import integrate
 from scipy.signal import butter, filtfilt, find_peaks
 
 from msr.signals.base import BeatSignal, PeriodicSignal
-from msr.signals.utils import FIGSIZE_2, get_outliers_mask, parse_nested_feats, z_score
+from msr.signals.ppg import PPGBeat
+from msr.signals.utils import (
+    FIGSIZE_2,
+    get_outliers_mask,
+    moving_average,
+    parse_nested_feats,
+    z_score,
+)
+from msr.utils import lazy_property
 
 
-def get_no_outlier_beats_mask(beats, IQR_scale=1.5):
+def get_valid_beats_values_mask(beats, IQR_scale=1.5):
     beats_data = np.array([beat.data for beat in beats])
     beats_times = np.array([beat.time for beat in beats])
 
-    mean_beats = beats_data.mean(axis=1)
-    beats_durations = np.array([t[-1] - t[0] for t in beats_times])
-    min_vals = np.array([v.min() for v in beats_data])
-    max_vals = np.array([v.max() for v in beats_data])
+    mean_vals = beats_data.mean(axis=1)
+    min_vals = beats_data.min(axis=1)
+    max_vals = beats_data.max(axis=1)
+    durations = np.array([t[-1] - t[0] for t in beats_times])
 
-    data_mask = get_outliers_mask(mean_beats, IQR_scale=IQR_scale)
-    duration_mask = get_outliers_mask(beats_durations, IQR_scale=IQR_scale)
+    mean_vals_mask = get_outliers_mask(mean_vals, IQR_scale=IQR_scale)
     min_vals_mask = get_outliers_mask(min_vals, IQR_scale=IQR_scale)
     max_vals_mask = get_outliers_mask(max_vals, IQR_scale=IQR_scale)
+    duration_mask = get_outliers_mask(durations, IQR_scale=IQR_scale)
 
-    valid_beats_mask = data_mask & duration_mask & min_vals_mask & max_vals_mask
-    return valid_beats_mask
+    return mean_vals_mask & duration_mask & min_vals_mask & max_vals_mask
 
 
-def get_valid_beats_mask(beats, max_duration=1.1):
+def get_valid_beats_mask(beats: List[PPGBeat], max_duration=1.1):
     duration_mask = np.array([beat.duration <= max_duration for beat in beats])
-    no_outlier_beats_mask = get_no_outlier_beats_mask(beats)
-    return duration_mask & no_outlier_beats_mask
+    values_mask = get_valid_beats_values_mask(beats)
+    return duration_mask & values_mask
 
 
-def moving_average(data, winsize):
-    extended_data = np.concatenate((np.ones(winsize) * data[0], data, np.ones(winsize) * data[-1]))
-    win = np.ones(winsize) / winsize
-    smoothed = np.convolve(extended_data, win, mode="same")
-    return smoothed[winsize:-winsize]
-
-
-def find_systolic_peaks_ELGENDI(data, fs, f1=0.5, f2=8, w1=0.111, w2=0.667, beta=0.2):
+def find_systolic_peaks_ELGENDI(
+    data: np.ndarray, fs: float, f1: float = 0.5, f2: float = 8, w1: float = 0.111, w2: float = 0.667, beta: float = 0.2
+):
+    # http://dx.doi.org/10.1371/journal.pone.0076585
     cutoff = [f1, f2]
     cutoff = 2.0 * np.array(cutoff) / fs
     b, a = butter(N=2, Wn=cutoff, btype="bandpass", analog=False, output="ba")
@@ -74,38 +79,25 @@ def find_systolic_peaks_ELGENDI(data, fs, f1=0.5, f2=8, w1=0.111, w2=0.667, beta
 
 
 class PPGSignal(PeriodicSignal):
-    def __init__(self, name, data, fs, start_sec=0):
+    def __init__(self, name: str, data: np.ndarray, fs: float, start_sec: float = 0):
         super().__init__(name, data, fs, start_sec)
 
     def find_troughs(self):
         data_z_score = z_score(self.data)
         troughs, _ = find_peaks(-data_z_score, height=0.5)
-        self.troughs = troughs
         return troughs
 
     def find_peaks(self):
-        peaks_idxs = find_systolic_peaks_ELGENDI(self.data, self.fs)
-        self.peaks = peaks_idxs
-        return self.peaks
+        peaks = find_systolic_peaks_ELGENDI(self.data, self.fs)
+        return peaks
 
-    def set_beats(self, resample_beats=True, n_samples=100, validate=True, plot=False):
-        if self.peaks is None:
-            self.find_peaks()
-        if self.troughs is None:
-            self.find_troughs()
-
-        peaks_time = self.time[self.peaks]
-        peaks_values = self.data[self.peaks]
-
+    def set_beats(self, resample_beats=True, n_samples=100, plot=False):
         beats = []
         for i, (trough_start, trough_end) in enumerate(zip(self.troughs[:-1], self.troughs[1:])):
             peaks_between = self.peaks[(self.peaks > trough_start) & (self.peaks < trough_end)]
             if len(peaks_between) == 0:
                 continue
             beat_data = self.data[trough_start:trough_end]
-            beat_time = (
-                self.time[trough_start:trough_end] - self.time[trough_start]
-            )  # removing first time value to get proper beat timing
             beat = PPGBeat(f"beat_{i}", beat_data, fs=self.fs, start_sec=self.time[trough_start], beat_num=len(beats))
             if resample_beats:
                 beat = beat.resample(n_samples)
@@ -117,7 +109,6 @@ class PPGSignal(PeriodicSignal):
             beat.is_valid = is_valid
 
         if plot:
-            # self.plot(extrema=True)
             fig, axes = plt.subplots(1, 2, figsize=(24, 5))
             self.aggregate(valid_only=False)
             self.plot_beats(plot_valid=True, plot_invalid=True, ax=axes[0])
@@ -127,22 +118,21 @@ class PPGSignal(PeriodicSignal):
             self.aggregate(valid_only=True)
 
     def extract_hrv_features(self):
-        if self.hrv_features is None:
-            self.find_peaks()  # hrv_features are calculated there
-        return self.hrv_features
+        # TODO
+        return {}
 
-    def extract_features(self, plot=True, parse=True):
-        # rozwinięcie cech podstawowej klasy Signal o cechy typowe dla sygnału PPG (do wyczytania z artykułów)
+    def extract_features(self, plot=False, parse=True):
         if self.agg_beat is None:
             self.get_beats(plot=plot)
-        self.features = super().extract_features()
+        features = super().extract_features()
         ppg_features = {
             "agg_beat_features": self.agg_beat.extract_features(plot=plot),
             "hrv_features": self.extract_hrv_features(),
         }
-        self.features.update(ppg_features)
-        features = parse_nested_feats(self.features) if parse else self.features
+        features.update(ppg_features)
+        features = parse_nested_feats(features) if parse else features
         features = {f"{self.name}__{feat_name}": feat_val for feat_name, feat_val in features.items()}
+        self.feature_names = list(features.keys())
         return features
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
@@ -155,18 +145,15 @@ class PPGBeat(BeatSignal):
         self.find_systolic_peak()
 
     def find_systolic_peak(self):
-        # metoda znajdująca pik systolic (algorytm do znalezienia w artykułach)
-        self.systolic_peak_loc = self.data.argmax()  # XD
+        self.systolic_peak_loc = self.data.argmax()
         self.systolic_peak_time = self.time[self.systolic_peak_loc]
         self.systolic_peak_val = self.data[self.systolic_peak_loc]
 
-    def find_dicrotic_notch(self):
-        # metoda znajdująca dołek dicrotic (algorytm do znalezienia w artykułach)
-        pass
-
-    def find_diastolic_peak(self):
-        # metoda znajdująca pik diastolic (algorytm do znalezienia w artykułach)
-        pass
+    @lazy_property
+    def crit_points(self):
+        return {
+            "systolic_peak": self.systolic_peak_loc,
+        }
 
     def extract_agg_beat_features(self, plot=True):
         systolic_onset_slope = (self.systolic_peak_val - self.data[0]) / self.systolic_peak_time
@@ -224,12 +211,15 @@ class PPGBeat(BeatSignal):
         }
         return self.agg_beat_features
 
-    def extract_features(self, plot=True):
+    def extract_features(self, plot=True, parse=True):
         # rozwinięcie cech podstawowej klasy Signal o cechy typowe dla zagregowanego sygnału PPG, czyli sPPG (do wyczytania z artykułów)
-        self.features = super().extract_features()
+        features = super().extract_features()
         sppg_features = self.extract_agg_beat_features(plot=plot)
-        self.features.update(sppg_features)
-        return self.features
+        features.update(sppg_features)
+        features = parse_nested_feats(features) if parse else features
+        features = {f"{self.name}__{feat_name}": feat_val for feat_name, feat_val in features.items()}
+        self.feature_names.extend(list(features.keys()))
+        return features
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)

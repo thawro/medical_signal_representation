@@ -21,17 +21,17 @@ class EEGSignal(Signal):
 
     # TODO: Add another features
 
-    def extract_features(self, return_arr=True, flatten=False, plot=False):
+    def extract_features(self, return_arr=True, plot=False, parse=True):
         features = OrderedDict({"whole_signal_features": {}})
         features["whole_signal_features"] = super().extract_features(return_arr=False)
         features["whole_signal_features"]["rel_power_features"] = self.extract_relative_power_frequency_features()
-
+        features = parse_nested_feats(features) if parse else features
+        features = {f"{self.name}__{feat_name}": feat_val for feat_name, feat_val in features.items()}
+        self.feature_names = list(features.keys())
         # TODO: Add another features
 
         if return_arr:
             return parse_feats_to_array(features)
-        if flatten:
-            return parse_nested_feats(features)
         return features
 
 

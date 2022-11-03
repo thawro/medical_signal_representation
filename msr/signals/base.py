@@ -23,12 +23,12 @@ from scipy.stats import kurtosis, skew
 from statsmodels.tsa.seasonal import STL
 
 from msr.signals.utils import (
-    create_new_obj,
     get_windows,
-    lazy_property,
+    parse_feats_to_array,
     parse_nested_feats,
     z_score,
 )
+from msr.utils import create_new_obj, lazy_property
 
 
 class BaseSignal:
@@ -42,15 +42,19 @@ class BaseSignal:
         self.time = np.arange(0, self.n_samples) / fs
         self.end_sec = self.start_sec + self.time[-1]
 
+    def find_peaks(self):
+        return find_peaks(self.data)[0]
+
+    def find_troughs(self):
+        return find_peaks(-self.data)[0]
+
     @lazy_property
     def troughs(self):
-        troughs, _ = find_peaks(-self.data)
-        return troughs
+        return self.find_troughs()
 
     @lazy_property
     def peaks(self):
-        peaks, _ = find_peaks(self.data)
-        return peaks
+        return self.find_peaks()
 
     def interpolate(self, fs, kind="cubic"):
         if kind == "pchip":
@@ -172,30 +176,6 @@ class BaseSignal:
         ax.set_xlabel("Time [s]", fontsize=18)
         return spectrum, freqs, t
 
-    def extract_basic_features(self, return_arr=True):
-        features = OrderedDict(
-            {
-                "mean": np.mean(self.data),
-                "std": np.std(self.data),
-                "median": np.median(self.data),
-                "skewness": skew(self.data),
-                "kurtosis": kurtosis(self.data),
-            }
-        )
-        if return_arr:
-            return np.array(list(features.values()))
-        return features
-
-    def extract_features(self, return_arr=True):
-        features = OrderedDict({"basic_features": self.extract_basic_features(return_arr=return_arr)})
-        if return_arr:
-            return np.array(list(parse_nested_feats(features).values()))
-        return features
-
-    def extract_embedding(self, embedding_model):
-        embedding = embedding_model(self.data)
-        return embedding
-
     def plot(
         self, start_time=0, width=10, scatter=False, line=True, first_der=False, label=None, use_samples=False, ax=None
     ):
@@ -279,6 +259,29 @@ class Signal(BaseSignal):
             [create_new_obj(self, data=self.data[start:end], start_sec=self.time[start]) for start, end in intervals]
         )
 
+    def extract_basic_features(self, return_arr=True):
+        features = OrderedDict(
+            {
+                "mean": self.data.mean(),
+                "std": self.data.std(),
+                "median": np.median(self.data),
+                "skewness": skew(self.data),
+                "kurtosis": kurtosis(self.data),
+            }
+        )
+        if return_arr:
+            return np.array(list(features.values()))
+        return features
+
+    def extract_features(self, return_arr=True):
+        features = OrderedDict({"basic_features": self.extract_basic_features(return_arr=return_arr)})
+        features = parse_nested_feats(features)
+        features = {feat_name: feat_val for feat_name, feat_val in features.items()}
+        self.feature_names = list(features.keys())
+        if return_arr:
+            return np.array(list(features.values()))
+        return features
+
     def plot_windows(self, **kwargs):
         for window in self.windows:
             window.plot(**kwargs)
@@ -304,7 +307,7 @@ class PeriodicSignal(ABC, Signal):
         self.cleaned = np.copy(self.data)
 
     @abstractmethod
-    def set_beats(self, resample=True, n_samples=100, validate=True, plot=False, use_raw=True):
+    def set_beats(self, resample=True, n_samples=100, plot=False, use_raw=True):
         pass
 
     def set_windows(self, win_len_s, step_s):
@@ -405,20 +408,28 @@ class BeatSignal(ABC, BaseSignal):
         self.is_valid = is_valid
         self.beat_num = beat_num
 
-    @abstractmethod
-    def extract_crit_points_features(self, plot=True):
-        pass
-
     @lazy_property
     def crit_points(self):
         return {}
 
+    def extract_crit_points_features(self, return_arr=True, plot=False, ax=None):
+        features = OrderedDict()
+        for name, loc in self.crit_points.items():
+            features[f"{name}_loc"] = loc
+            features[f"{name}_time"] = self.time[loc]
+            features[f"{name}_val"] = self.data[loc]
+        if plot:
+            self.plot(ax=ax, with_crit_points=True)
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
     def plot_crit_points(self, points=None, plot_sig=False, use_samples=False, offset=0, ax=None, **kwargs):
         if points is None:
             points = list(self.crit_points.keys())
-        xaxes_data = np.arange(self.n_samples) if use_samples else self.time
-        xrange = xaxes_data[-1] - xaxes_data[0]
-        yrange = self.data.max() - self.data.min()
+        t = np.arange(self.n_samples) if use_samples else self.time
+        t_range = t[-1] - t[0]
+        y_range = self.data.max() - self.data.min()
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(12, 7))
@@ -428,11 +439,10 @@ class BeatSignal(ABC, BaseSignal):
         for name, loc in self.crit_points.items():
             if name not in points:
                 continue
-            t = xaxes_data[loc]
+            t_loc = t[loc]
             val = self.data[loc] + offset
-            ax.scatter(t, val, label=name, s=160)
-            ax.annotate(name.upper(), (t + 0.012 * xrange, val + 0.012 * yrange), fontweight="bold", fontsize=18)
-        # plt.legend()
+            ax.scatter(t_loc, val, label=name, s=160)
+            ax.annotate(name.upper(), (t_loc + 0.012 * t_range, val + 0.012 * y_range), fontweight="bold", fontsize=18)
 
     def plot(
         self,
@@ -465,7 +475,7 @@ class BeatSignal(ABC, BaseSignal):
 
 
 class MultiChannelSignal:
-    def __init__(self, signals: Dict[str, PeriodicSignal]):
+    def __init__(self, signals: Dict[str, Signal]):
         self.signals = signals
         self.n_signals = len(signals)
 
@@ -484,8 +494,11 @@ class MultiChannelSignal:
 
     def get_whole_signal_features(self, return_arr=True, **kwargs):
         if return_arr:
-            return np.array([sig.extract_features(return_arr=True) for _, sig in self.signals.items()])
+            return np.concatenate([sig.extract_features(return_arr=True) for _, sig in self.signals.items()])
         return OrderedDict({name: sig.extract_features(return_arr=False) for name, sig in self.signals.items()})
+
+    def get_whole_signal_feature_names(self):
+        return np.concatenate([sig.feature_names for name, sig in self.signals.items()])
 
     def get_windows_waveforms(self, **kwargs):
         return np.array([sig.get_windows_waveforms() for _, sig in self.signals.items()])

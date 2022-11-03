@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Dict, List
 
 import numpy as np
@@ -13,12 +14,25 @@ from msr.data.representation.utils import (
     get_representations,
     load_split,
 )
+from msr.signals.base import MultiChannelSignal
+from msr.signals.ecg import ECGSignal
+from msr.signals.ppg import PPGSignal
 
 REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
 
 
+def create_multichannel_mimic(data, fs):
+    signals = OrderedDict(
+        {
+            0: PPGSignal("PLETH", data[0], fs),
+            1: ECGSignal("ECG II", data[1], fs),
+        }
+    )
+    return MultiChannelSignal(signals)
+
+
 def get_mimic_representation(
-    channels_data: torch.Tensor,
+    data: torch.Tensor,
     fs: float,
     representation_types: List[str] = ["whole_signal_waveforms"],
     windows_params=dict(win_len_s=3, step_s=2),
@@ -30,9 +44,8 @@ def get_mimic_representation(
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    # TODO: implement create multichannel for PPG/ECG
-    ppg_ecg = _  # TODO
-    return get_representations(ppg_ecg, windows_params, representation_types=representation_types)
+    multichannel_mimic = create_multichannel_mimic(data.numpy(), fs)
+    return get_representations(multichannel_mimic, windows_params, representation_types)
 
 
 def create_mimic_representations_dataset(representation_types: List[str], fs: float = 100):
@@ -62,3 +75,6 @@ def load_mimic_split(split: str, representation_type: str) -> Dict[str, np.ndarr
         targets_path=RAW_TENSORS_TARGETS_PATH,
         representation_type=representation_type,
     )
+
+
+# TODO: make it work

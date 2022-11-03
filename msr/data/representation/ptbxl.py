@@ -12,7 +12,6 @@ from msr.data.representation.utils import (
     load_split,
 )
 from msr.signals.ecg import create_multichannel_ecg
-from msr.utils import DATA_PATH
 
 
 def get_ptbxl_representation(

@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Dict, List
 
 import numpy as np
@@ -13,27 +14,39 @@ from msr.data.representation.utils import (
     get_representations,
     load_split,
 )
-from msr.signals.eeg import create_multichannel_eeg
+from msr.signals.base import MultiChannelSignal
+from msr.signals.eeg import EEGSignal, create_multichannel_eeg
+from msr.signals.eog import EOGSignal
 
 REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
 
 
+def create_multichannel_sleep_edf(data, fs):
+    signals = OrderedDict(
+        {
+            0: EEGSignal("EEG Fpz-Cz", data[0], fs),
+            1: EEGSignal("EEG Pz-Oz", data[1], fs),
+            2: EOGSignal("EOG horizontal", data[2], fs),
+        }
+    )
+    return MultiChannelSignal(signals)
+
+
 def get_sleep_edf_representation(
-    channels_data: torch.Tensor,
+    data: torch.Tensor,
     fs: float,
     representation_types: List[str] = ["whole_signal_waveforms"],
     windows_params=dict(win_len_s=3, step_s=2),
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
-        channels_data (torch.Tensor): ECG channels data of shape `[TODO]`, where TODO.
+        data (torch.Tensor): ECG channels data of shape `[TODO]`, where TODO.
         fs (float): Sampling rate. Defaults to 100.
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    # TODO: Now we have 3 signals: [EEG_0, EEG_1, EOG]
-    eeg = create_multichannel_eeg(channels_data.numpy(), fs=fs)
-    return get_representations(eeg, windows_params, representation_types=representation_types)
+    multichannel_sleep_edf = create_multichannel_sleep_edf(data.numpy(), fs)
+    return get_representations(multichannel_sleep_edf, windows_params, representation_types)
 
 
 def create_sleep_edf_representations_dataset(representation_types: List[str], fs: float = 100):

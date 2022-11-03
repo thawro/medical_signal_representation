@@ -1,11 +1,9 @@
 from collections import OrderedDict
-from typing import Dict
 
 import matplotlib.pyplot as plt
 import neurokit2 as nk
 import numpy as np
 import seaborn as sns
-from biosppy.signals.ecg import ecg
 from scipy.signal import find_peaks
 
 from msr.signals.base import BeatSignal, MultiChannelPeriodicSignal, PeriodicSignal
@@ -13,9 +11,10 @@ from msr.signals.utils import (
     calculate_area,
     calculate_energy,
     calculate_slope,
-    lazy_property,
     parse_feats_to_array,
+    parse_nested_feats,
 )
+from msr.utils import lazy_property
 
 CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
 
@@ -71,7 +70,6 @@ class ECGSignal(PeriodicSignal):
         align_to_r=True,
         resample=True,
         n_samples=100,
-        validate=True,
         plot=False,
         use_raw=False,
     ):
@@ -136,7 +134,7 @@ class ECGSignal(PeriodicSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_features(self, return_arr=True, feats_to_extract=["basic", "hrv", "agg_beat"], plot=False):
+    def extract_features(self, return_arr=True, feats_to_extract=["basic", "hrv", "agg_beat"], plot=False, parse=True):
         features = OrderedDict({"whole_signal_features": {}})
         if "basic" in feats_to_extract:
             features["whole_signal_features"] = super().extract_features(return_arr=False)
@@ -146,8 +144,12 @@ class ECGSignal(PeriodicSignal):
             features["agg_beat_features"] = self.agg_beat.extract_features(plot=plot, return_arr=False)
         if "per_beat" in feats_to_extract:
             features["per_beat_features"] = self.extract_per_beat_features(plot=plot, return_arr=False)
+        features = parse_nested_feats(features) if parse else features
+        features = {f"{self.name}__{feat_name}": feat_val for feat_name, feat_val in features.items()}
+        self.feature_names = list(features.keys())
         if return_arr:
             return parse_feats_to_array(features)
+
         return features
 
 
@@ -286,18 +288,6 @@ class ECGBeat(BeatSignal):
             "t": self.t_loc,
             "t_offset": self.t_offset_loc,
         }
-
-    def extract_crit_points_features(self, return_arr=True, plot=False, ax=None):
-        features = OrderedDict()
-        for name, loc in self.crit_points.items():
-            features[f"{name}_loc"] = loc
-            features[f"{name}_time"] = self.time[loc]
-            features[f"{name}_val"] = self.data[loc]
-        if plot:
-            self.plot(ax=ax, with_crit_points=True)
-        if return_arr:
-            return parse_feats_to_array(features)
-        return features
 
     def extract_area_features(self, return_arr=True, method="trapz", plot=False, ax=None):
         params = [

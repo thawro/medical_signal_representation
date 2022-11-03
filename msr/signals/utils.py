@@ -1,55 +1,13 @@
-import inspect
 from collections import OrderedDict
-from typing import Callable, Dict, Union
+from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
 from scipy.integrate import simps
+from scipy.interpolate import interp1d
 
 FIGSIZE = (24, 4)
 FIGSIZE_2 = (10, 4)
-
-
-def create_new_obj(obj: object, **kwargs) -> object:
-    """Create new instance of object passed with new arguments specified in `kwargs`.
-
-    Args:
-        obj (object): Object used as source of attributes for new object instance.
-
-    Returns:
-        object: New object instance with newly specified attributed.
-    """
-    init_args = list(inspect.signature(obj.__init__).parameters.items())
-    args = {}
-    for arg, val in init_args:
-        if arg in kwargs.keys():
-            args[arg] = kwargs[arg]
-        else:
-            if arg in vars(obj).keys():
-                args[arg] = getattr(obj, arg)
-            else:
-                args[arg] = val.default
-    return obj.__class__(**args)
-
-
-def lazy_property(fn: Callable) -> Callable:
-    """Lazily evaluated property.
-
-    Args:
-        fn (Callable): Function to decorate.
-
-    Returns:
-        Callable: Decorated function.
-    """
-    attr_name = "_lazy_" + fn.__name__
-
-    @property
-    def _lazy_property(self):
-        if not hasattr(self, attr_name):
-            setattr(self, attr_name, fn(self))
-        return getattr(self, attr_name)
-
-    return _lazy_property
 
 
 def parse_nested_feats(
@@ -65,7 +23,7 @@ def parse_nested_feats(
     """
     feats_df = pd.json_normalize(nested_feats, sep=sep)
     feats = feats_df.to_dict(orient="records")[0]
-    return OrderedDict({name[2:]: val for name, val in feats.items()})
+    return OrderedDict({name: val for name, val in feats.items()})
 
 
 def parse_feats_to_array(features):
@@ -118,6 +76,13 @@ def get_windows(start, max_len, win_len, step):
         end += step
     windows.append((start, max_len))
     return windows
+
+
+def moving_average(data: np.ndarray, winsize: int):
+    extended_data = np.concatenate((np.ones(winsize) * data[0], data, np.ones(winsize) * data[-1]))
+    win = np.ones(winsize) / winsize
+    smoothed = np.convolve(extended_data, win, mode="same")
+    return smoothed[winsize:-winsize]
 
 
 def resample(old_time, old_values, new_time, kind="nearest"):

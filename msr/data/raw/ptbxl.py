@@ -14,7 +14,7 @@ from msr.utils import DATA_PATH
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-DATASET_NAME = "ptbxl_2"
+DATASET_NAME = "ptbxl"
 ZIP_FILE_URL = "https://physionet.org/static/published-projects/ptb-xl/ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.2.zip"
 DATASET_PATH = DATA_PATH / DATASET_NAME
 RAW_DATASET_PATH = DATASET_PATH / "raw"
