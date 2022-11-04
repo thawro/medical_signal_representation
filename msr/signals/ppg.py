@@ -1,4 +1,5 @@
-from typing import List
+from collections import OrderedDict
+from typing import List, Type
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,13 +7,12 @@ import seaborn as sns
 from scipy import integrate
 from scipy.signal import butter, filtfilt, find_peaks
 
-from msr.signals.base import BeatSignal, PeriodicSignal
-from msr.signals.ppg import PPGBeat
+from msr.signals.base import BaseSignal, BeatSignal, PeriodicSignal
 from msr.signals.utils import (
     FIGSIZE_2,
     get_outliers_mask,
     moving_average,
-    parse_nested_feats,
+    parse_feats_to_array,
     z_score,
 )
 from msr.utils import lazy_property
@@ -35,7 +35,7 @@ def get_valid_beats_values_mask(beats, IQR_scale=1.5):
     return mean_vals_mask & duration_mask & min_vals_mask & max_vals_mask
 
 
-def get_valid_beats_mask(beats: List[PPGBeat], max_duration=1.1):
+def get_valid_beats_mask(beats: List[Type[BaseSignal]], max_duration=1.1):
     duration_mask = np.array([beat.duration <= max_duration for beat in beats])
     values_mask = get_valid_beats_values_mask(beats)
     return duration_mask & values_mask
@@ -81,6 +81,11 @@ def find_systolic_peaks_ELGENDI(
 class PPGSignal(PeriodicSignal):
     def __init__(self, name: str, data: np.ndarray, fs: float, start_sec: float = 0):
         super().__init__(name, data, fs, start_sec)
+        self.feature_extraction_funcs.update(
+            {
+                "hrv_features": self.extract_hrv_features,
+            }
+        )
 
     def find_troughs(self):
         data_z_score = z_score(self.data)
@@ -110,30 +115,22 @@ class PPGSignal(PeriodicSignal):
 
         if plot:
             fig, axes = plt.subplots(1, 2, figsize=(24, 5))
-            self.aggregate(valid_only=False)
+            self.set_agg_beat(valid_only=False)
             self.plot_beats(plot_valid=True, plot_invalid=True, ax=axes[0])
-            self.aggregate(valid_only=True)
+            self.set_agg_beat(valid_only=True)
             self.plot_beats(plot_valid=True, plot_invalid=False, ax=axes[1])
         else:
-            self.aggregate(valid_only=True)
+            self.set_agg_beat(valid_only=True)
 
-    def extract_hrv_features(self):
-        # TODO
-        return {}
-
-    def extract_features(self, plot=False, parse=True):
-        if self.agg_beat is None:
-            self.get_beats(plot=plot)
-        features = super().extract_features()
-        ppg_features = {
-            "agg_beat_features": self.agg_beat.extract_features(plot=plot),
-            "hrv_features": self.extract_hrv_features(),
-        }
-        features.update(ppg_features)
-        features = parse_nested_feats(features) if parse else features
-        features = {f"{self.name}__{feat_name}": feat_val for feat_name, feat_val in features.items()}
-        self.feature_names = list(features.keys())
+    def extract_hrv_features(self, return_arr=False, plot=False):
+        ibi = np.diff(self.time[self.peaks])
+        features = OrderedDict({"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi)})
+        if return_arr:
+            return parse_feats_to_array(features)
         return features
+
+    def extract_agg_beat_features(self, return_arr=True, plot=False):
+        return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)
@@ -142,6 +139,12 @@ class PPGSignal(PeriodicSignal):
 class PPGBeat(BeatSignal):
     def __init__(self, name, data, fs, start_sec, beat_num=0):
         super().__init__(name, data, fs, start_sec, beat_num)
+        self.feature_extraction_funcs.update(
+            {
+                "sppg_features": self.extract_sppg_features,
+            }
+        )
+
         self.find_systolic_peak()
 
     def find_systolic_peak(self):
@@ -155,7 +158,7 @@ class PPGBeat(BeatSignal):
             "systolic_peak": self.systolic_peak_loc,
         }
 
-    def extract_agg_beat_features(self, plot=True):
+    def extract_sppg_features(self, return_arr=False, plot=True):
         systolic_onset_slope = (self.systolic_peak_val - self.data[0]) / self.systolic_peak_time
         systolic_offset_slope = (self.systolic_peak_val - self.data[-1]) / (self.duration - self.systolic_peak_time)
         energy = (self.data**2).mean()
@@ -199,26 +202,20 @@ class PPGBeat(BeatSignal):
             ax.legend()
             fig.savefig("sppg.png", dpi=500)
 
-        self.agg_beat_features = {
-            "duration": self.duration,
-            "systolic_peak_val": self.systolic_peak_val,
-            "systolic_peak_time": self.systolic_peak_time,
-            "systolic_onset_slope": systolic_onset_slope,
-            "systolic_offset_slope": systolic_offset_slope,
-            "energy": energy,
-            "before_systolic_area": before_systolic_area,
-            "after_systolic_area": after_systolic_area,
-        }
-        return self.agg_beat_features
-
-    def extract_features(self, plot=True, parse=True):
-        # rozwinięcie cech podstawowej klasy Signal o cechy typowe dla zagregowanego sygnału PPG, czyli sPPG (do wyczytania z artykułów)
-        features = super().extract_features()
-        sppg_features = self.extract_agg_beat_features(plot=plot)
-        features.update(sppg_features)
-        features = parse_nested_feats(features) if parse else features
-        features = {f"{self.name}__{feat_name}": feat_val for feat_name, feat_val in features.items()}
-        self.feature_names.extend(list(features.keys()))
+        features = OrderedDict(
+            {
+                "duration": self.duration,
+                "systolic_peak_val": self.systolic_peak_val,
+                "systolic_peak_time": self.systolic_peak_time,
+                "systolic_onset_slope": systolic_onset_slope,
+                "systolic_offset_slope": systolic_offset_slope,
+                "energy": energy,
+                "before_systolic_area": before_systolic_area,
+                "after_systolic_area": after_systolic_area,
+            }
+        )
+        if return_arr:
+            return parse_feats_to_array(features)
         return features
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):

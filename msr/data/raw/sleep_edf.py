@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-from msr.utils import DATA_PATH, run_in_parallel_with_joblib
+from msr.utils import DATA_PATH, load_tensor, run_in_parallel_with_joblib
 
 DATASET_NAME = "sleep_edf"
 ZIP_FILE_URL = "https://www.physionet.org/static/published-projects/sleep-edfx/sleep-edf-database-expanded-1.0.0.zip"
@@ -223,3 +223,7 @@ def create_raw_tensors_dataset():
         info = np.array(list(EVENT_ID.keys()))
         np.save(RAW_TENSORS_TARGETS_PATH / "info.npy", info)
         epochs_info.to_csv(LOGS_PATH / f"{split}_epochs_info.csv", index=False)
+
+
+def load_sleep_edf_raw_data(split):
+    return load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt")

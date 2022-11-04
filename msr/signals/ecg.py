@@ -12,7 +12,6 @@ from msr.signals.utils import (
     calculate_energy,
     calculate_slope,
     parse_feats_to_array,
-    parse_nested_feats,
 )
 from msr.utils import lazy_property
 
@@ -59,6 +58,11 @@ class ECGSignal(PeriodicSignal):
         polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
         self.cleaned = nk.ecg_clean(self.data, sampling_rate=self.fs)
+        self.feature_extraction_funcs.update(
+            {
+                "hrv_features": self.extract_hrv_features,
+            }
+        )
 
     @lazy_property
     def rpeaks(self):
@@ -121,41 +125,33 @@ class ECGSignal(PeriodicSignal):
         if plot:
             self.plot_beats()
 
-    def extract_hrv_features(self, return_arr=True):
+    def extract_hrv_features(self, return_arr=True, **kwargs):
         if self.rpeaks is None:
             self.find_rpeaks()
         r_peaks = self.rpeaks
         r_vals = self.data[r_peaks]
         r_times = self.time[r_peaks]
         ibi = np.diff(r_times)
-
         features = OrderedDict({"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi), "R_val": np.mean(r_vals)})
         if return_arr:
             return parse_feats_to_array(features)
         return features
 
-    def extract_features(self, return_arr=True, feats_to_extract=["basic", "hrv", "agg_beat"], plot=False, parse=True):
-        features = OrderedDict({"whole_signal_features": {}})
-        if "basic" in feats_to_extract:
-            features["whole_signal_features"] = super().extract_features(return_arr=False)
-        if "hrv" in feats_to_extract:
-            features["whole_signal_features"]["hrv_features"] = self.extract_hrv_features(return_arr=False)
-        if "agg_beat" in feats_to_extract:
-            features["agg_beat_features"] = self.agg_beat.extract_features(plot=plot, return_arr=False)
-        if "per_beat" in feats_to_extract:
-            features["per_beat_features"] = self.extract_per_beat_features(plot=plot, return_arr=False)
-        features = parse_nested_feats(features) if parse else features
-        features = {f"{self.name}__{feat_name}": feat_val for feat_name, feat_val in features.items()}
-        self.feature_names = list(features.keys())
-        if return_arr:
-            return parse_feats_to_array(features)
-
-        return features
+    def extract_agg_beat_features(self, return_arr=True, plot=False):
+        return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
 
 
 class ECGBeat(BeatSignal):
     def __init__(self, name, data, fs, start_sec, beat_num=0):
         super().__init__(name, data, fs, start_sec, beat_num)
+        self.feature_extraction_funcs.update(
+            {
+                "area_features": self.extract_area_features,
+                "energy_features": self.extract_energy_features,
+                "slope_features": self.extract_slope_features,
+                "energy_features": self.extract_energy_features,
+            }
+        )
 
     @lazy_property
     def fder(self):
@@ -326,7 +322,7 @@ class ECGBeat(BeatSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_energy_features(self, return_arr=True):
+    def extract_energy_features(self, return_arr=True, **kwargs):
         params = [
             {"name": "ZeroPQ_E", "start": self.p_onset_loc, "end": self.p_offset_loc},
             {"name": "QRS_E", "start": self.r_onset_loc, "end": self.r_offset_loc},
@@ -349,16 +345,6 @@ class ECGBeat(BeatSignal):
         ]
 
         features = OrderedDict({p["name"]: calculate_slope(self.time, self.data, p["start"], p["end"]) for p in params})
-        if return_arr:
-            return parse_feats_to_array(features)
-        return features
-
-    def extract_features(self, return_arr=True, plot=False):
-        features = super().extract_features(return_arr=False)
-        features["crit_points_features"] = self.extract_crit_points_features(return_arr=False, plot=plot)
-        features["area_features"] = self.extract_area_features(return_arr=False, plot=plot)
-        features["energy_features"] = self.extract_energy_features(return_arr=False)
-        features["slope_features"] = self.extract_slope_features(return_arr=False, plot=plot)
         if return_arr:
             return parse_feats_to_array(features)
         return features
@@ -420,5 +406,7 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
 
 
 def create_multichannel_ecg(data, fs):
-    signals = OrderedDict({i + 1: ECGSignal(f"ECG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)})
+    signals = OrderedDict(
+        {f"ecg_{i+1}": ECGSignal(f"ecg_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)}
+    )
     return MultiChannelECGSignal(signals)

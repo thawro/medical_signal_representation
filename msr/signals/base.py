@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections import OrderedDict
+from collections import ChainMap, OrderedDict
 from typing import Dict
 
 import matplotlib.pyplot as plt
@@ -41,6 +41,9 @@ class BaseSignal:
         self.duration = self.n_samples / fs
         self.time = np.arange(0, self.n_samples) / fs
         self.end_sec = self.start_sec + self.time[-1]
+        self.feature_extraction_funcs = {
+            "basic_features": self.extract_basic_features,
+        }
 
     def find_peaks(self):
         return find_peaks(self.data)[0]
@@ -176,6 +179,33 @@ class BaseSignal:
         ax.set_xlabel("Time [s]", fontsize=18)
         return spectrum, freqs, t
 
+    def extract_basic_features(self, return_arr=True, **kwargs):
+        features = OrderedDict(
+            {
+                "mean": self.data.mean(),
+                "std": self.data.std(),
+                "median": np.median(self.data),
+                "skewness": skew(self.data),
+                "kurtosis": kurtosis(self.data),
+            }
+        )
+        if return_arr:
+            return np.array(list(features.values()))
+        return features
+
+    def extract_features(self, return_arr=True, plot=False):
+        features = OrderedDict(
+            {
+                f"{self.name}_{name}": func(return_arr=False, plot=plot)
+                for name, func in self.feature_extraction_funcs.items()
+            }
+        )
+        features = parse_nested_feats(features)
+        self.feature_names = list(features.keys())
+        if return_arr:
+            return np.array(list(features.values()))
+        return features
+
     def plot(
         self, start_time=0, width=10, scatter=False, line=True, first_der=False, label=None, use_samples=False, ax=None
     ):
@@ -259,29 +289,6 @@ class Signal(BaseSignal):
             [create_new_obj(self, data=self.data[start:end], start_sec=self.time[start]) for start, end in intervals]
         )
 
-    def extract_basic_features(self, return_arr=True):
-        features = OrderedDict(
-            {
-                "mean": self.data.mean(),
-                "std": self.data.std(),
-                "median": np.median(self.data),
-                "skewness": skew(self.data),
-                "kurtosis": kurtosis(self.data),
-            }
-        )
-        if return_arr:
-            return np.array(list(features.values()))
-        return features
-
-    def extract_features(self, return_arr=True):
-        features = OrderedDict({"basic_features": self.extract_basic_features(return_arr=return_arr)})
-        features = parse_nested_feats(features)
-        features = {feat_name: feat_val for feat_name, feat_val in features.items()}
-        self.feature_names = list(features.keys())
-        if return_arr:
-            return np.array(list(features.values()))
-        return features
-
     def plot_windows(self, **kwargs):
         for window in self.windows:
             window.plot(**kwargs)
@@ -305,6 +312,11 @@ class PeriodicSignal(ABC, Signal):
         super().__init__(name, data, fs, start_sec)
         self.valid_beats_mask = None
         self.cleaned = np.copy(self.data)
+        self.feature_extraction_funcs.update({"agg_beat_features": self.extract_agg_beat_features})
+
+    @abstractmethod
+    def extract_agg_beat_features(self, return_arr=False, plot=False):
+        pass
 
     @abstractmethod
     def set_beats(self, resample=True, n_samples=100, plot=False, use_raw=True):
@@ -407,6 +419,11 @@ class BeatSignal(ABC, BaseSignal):
         super().__init__(name, data, fs, start_sec)
         self.is_valid = is_valid
         self.beat_num = beat_num
+        self.feature_extraction_funcs.update(
+            {
+                "crit_points": self.extract_crit_points_features,
+            }
+        )
 
     @lazy_property
     def crit_points(self):
@@ -485,6 +502,16 @@ class MultiChannelSignal:
             "windows_waveforms": self.get_windows_waveforms,
             "windows_features": self.get_windows_features,
         }
+
+    def extract_features(self, return_arr=False, plot=False):
+        all_signals_features = [sig.extract_features(return_arr=False, plot=plot) for name, sig in self.signals.items()]
+        # print(all_signals_features)
+        features = OrderedDict(ChainMap(*all_signals_features))
+        features = parse_nested_feats(features)
+        self.feature_names = list(features.keys())
+        if return_arr:
+            return np.array(list(features.values()))
+        return features
 
     def set_windows(self, win_len_s, step_s, **kwargs):
         self.windows = {name: sig.set_windows(win_len_s, step_s) for name, sig in self.signals.items()}

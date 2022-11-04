@@ -4,17 +4,13 @@ from typing import Dict, List
 import numpy as np
 import torch
 
-from msr.data.raw.mimic import (
-    DATASET_PATH,
-    RAW_TENSORS_DATA_PATH,
-    RAW_TENSORS_TARGETS_PATH,
-)
+from msr.data.raw.mimic import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
 from msr.data.representation.utils import (
     create_representations_dataset,
     get_representations,
     load_split,
 )
-from msr.signals.base import MultiChannelSignal
+from msr.signals.base import MultiChannelPeriodicSignal
 from msr.signals.ecg import ECGSignal
 from msr.signals.ppg import PPGSignal
 
@@ -24,11 +20,11 @@ REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
 def create_multichannel_mimic(data, fs):
     signals = OrderedDict(
         {
-            0: PPGSignal("PLETH", data[0], fs),
-            1: ECGSignal("ECG II", data[1], fs),
+            "ppg": PPGSignal("PLETH", data[0], fs),
+            "ecg": ECGSignal("ECG II", data[1], fs),
         }
     )
-    return MultiChannelSignal(signals)
+    return MultiChannelPeriodicSignal(signals)
 
 
 def get_mimic_representation(

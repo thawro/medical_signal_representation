@@ -20,7 +20,7 @@ from msr.data.raw.utils import cut_segments_into_samples, validate_signal
 from msr.data.utils import create_train_val_test_split_info
 from msr.signals.ecg import ECGSignal, check_ecg_polarity, find_intervals_using_hr
 from msr.signals.utils import resample
-from msr.utils import DATA_PATH, append_txt_to_file, find_true_intervals
+from msr.utils import DATA_PATH, append_txt_to_file, find_true_intervals, load_tensor
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -644,3 +644,7 @@ def create_raw_tensors_dataset(
             target_path = TARGETS_PATH / name
             target_path.mkdir(parents=True, exist_ok=True)
             torch.save(target_data, target_path / f"{split}.pt")
+
+
+def load_mimic_raw_data(split):
+    return load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt")

@@ -10,21 +10,6 @@ class EOGSignal(Signal):
 
     # TODO: Add features
 
-    def extract_features(self, return_arr=True, plot=False, parse=True):
-        features = OrderedDict({"whole_signal_features": {}})
-        features["whole_signal_features"] = super().extract_features(return_arr=False)
-        features = parse_nested_feats(features) if parse else features
-        features = {
-            f"{self.name}__{feat_name}" if self.name not in feat_name else feat_name: feat_val
-            for feat_name, feat_val in features.items()
-        }
-        self.feature_names = list(features.keys())
-        # TODO: Add another features
-
-        if return_arr:
-            return parse_feats_to_array(features)
-        return features
-
 
 class MultiChannelEOGSignal(MultiChannelSignal):
     def __init__(self, signals):

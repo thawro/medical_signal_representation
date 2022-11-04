@@ -8,6 +8,7 @@ from typing import Callable, List, Union
 
 import numpy as np
 import pandas as pd
+import torch
 import wget
 from joblib import Parallel, delayed
 from tqdm.auto import tqdm
@@ -119,3 +120,7 @@ def lazy_property(fn: Callable) -> Callable:
         return getattr(self, attr_name)
 
     return _lazy_property
+
+
+def load_tensor(path):
+    return torch.load(path)

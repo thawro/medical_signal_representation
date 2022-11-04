@@ -9,7 +9,7 @@ import wfdb
 from sklearn.preprocessing import LabelEncoder
 from tqdm.auto import tqdm
 
-from msr.utils import DATA_PATH
+from msr.utils import DATA_PATH, load_tensor
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -121,3 +121,7 @@ def create_raw_tensors_dataset(fs: float, target: str, encode_targets: bool):
         targets = torch.from_numpy(targets_npy)
         torch.save(data, RAW_TENSORS_DATA_PATH / f"{split}.pt")
         torch.save(targets, TARGET_PATH / f"{split}.pt")
+
+
+def load_ptbxl_raw_data(split):
+    return load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt")
