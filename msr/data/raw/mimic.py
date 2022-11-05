@@ -31,6 +31,7 @@ MIMIC_URL = f"https://physionet.org/files/{MIMIC_DB_NAME}/1.0"
 DATASET_PATH = DATA_PATH / DATASET_NAME
 MIMIC_DB_PATH = DATASET_PATH / "db"  # raw data in .dat and .hea formats
 LOGS_PATH = DATASET_PATH / "logs"
+FS = 125
 
 SEGMENTS_FILE_PATH = LOGS_PATH / "segments_info.txt"  # file for segments info
 SAMPLE_SEGMENTS_FILE_PATH = LOGS_PATH / "sample_segments_info.txt"  # filename for samples segments info

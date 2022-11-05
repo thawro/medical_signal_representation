@@ -4,6 +4,7 @@ from typing import Dict, List
 import numpy as np
 import torch
 
+from msr.data.measurements.sleep_edf import SleepEDFMeasurement
 from msr.data.raw.sleep_edf import (
     DATASET_PATH,
     RAW_TENSORS_DATA_PATH,
@@ -14,22 +15,8 @@ from msr.data.representation.utils import (
     get_representations,
     load_split,
 )
-from msr.signals.base import MultiChannelSignal
-from msr.signals.eeg import EEGSignal, create_multichannel_eeg
-from msr.signals.eog import EOGSignal
 
 REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
-
-
-def create_multichannel_sleep_edf(data, fs):
-    signals = OrderedDict(
-        {
-            0: EEGSignal("EEG Fpz-Cz", data[0], fs),
-            1: EEGSignal("EEG Pz-Oz", data[1], fs),
-            2: EOGSignal("EOG horizontal", data[2], fs),
-        }
-    )
-    return MultiChannelSignal(signals)
 
 
 def get_sleep_edf_representation(
@@ -45,7 +32,8 @@ def get_sleep_edf_representation(
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    multichannel_sleep_edf = create_multichannel_sleep_edf(data.numpy(), fs)
+    eeg_0, eeg_1, eog = data.numpy()
+    multichannel_sleep_edf = SleepEDFMeasurement(eeg_0, eeg_1, eog, fs)
     return get_representations(multichannel_sleep_edf, windows_params, representation_types)
 
 

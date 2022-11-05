@@ -5,13 +5,13 @@ from typing import Dict, List
 import numpy as np
 import torch
 
+from msr.data.measurements.ptbxl import PtbXLMeasurement
 from msr.data.raw.ptbxl import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
 from msr.data.representation.utils import (
     create_representations_dataset,
     get_periodic_representations,
     load_split,
 )
-from msr.signals.ecg import create_multichannel_ecg
 
 
 def get_ptbxl_representation(
@@ -29,9 +29,10 @@ def get_ptbxl_representation(
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    ecg = create_multichannel_ecg(channels_data.T.numpy(), fs)
+    ecg_leads_data = channels_data.T.numpy()
+    multichannel_ptbxl = PtbXLMeasurement(ecg_leads_data, fs)
     return get_periodic_representations(
-        ecg, beats_params, agg_beat_params, windows_params, representation_types=representation_types
+        multichannel_ptbxl, beats_params, agg_beat_params, windows_params, representation_types=representation_types
     )
 
 

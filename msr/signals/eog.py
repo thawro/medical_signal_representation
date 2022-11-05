@@ -14,8 +14,3 @@ class EOGSignal(Signal):
 class MultiChannelEOGSignal(MultiChannelSignal):
     def __init__(self, signals):
         super().__init__(signals)
-
-
-def create_multichannel_eog(data, fs):
-    signals = OrderedDict({i + 1: EOGSignal(f"EOG_{i}", channel_data, fs) for i, channel_data in enumerate(data)})
-    return MultiChannelEOGSignal(signals)

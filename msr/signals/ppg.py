@@ -5,40 +5,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from scipy import integrate
-from scipy.signal import butter, filtfilt, find_peaks
+from scipy.signal import butter, filtfilt
 
-from msr.signals.base import BaseSignal, BeatSignal, PeriodicSignal
-from msr.signals.utils import (
-    FIGSIZE_2,
-    get_outliers_mask,
-    moving_average,
-    parse_feats_to_array,
-    z_score,
-)
+from msr.signals.base import BeatSignal, PeriodicSignal
+from msr.signals.utils import moving_average, parse_feats_to_array
 from msr.utils import lazy_property
-
-
-def get_valid_beats_values_mask(beats, IQR_scale=1.5):
-    beats_data = np.array([beat.data for beat in beats])
-    beats_times = np.array([beat.time for beat in beats])
-
-    mean_vals = beats_data.mean(axis=1)
-    min_vals = beats_data.min(axis=1)
-    max_vals = beats_data.max(axis=1)
-    durations = np.array([t[-1] - t[0] for t in beats_times])
-
-    mean_vals_mask = get_outliers_mask(mean_vals, IQR_scale=IQR_scale)
-    min_vals_mask = get_outliers_mask(min_vals, IQR_scale=IQR_scale)
-    max_vals_mask = get_outliers_mask(max_vals, IQR_scale=IQR_scale)
-    duration_mask = get_outliers_mask(durations, IQR_scale=IQR_scale)
-
-    return mean_vals_mask & duration_mask & min_vals_mask & max_vals_mask
-
-
-def get_valid_beats_mask(beats: List[Type[BaseSignal]], max_duration=1.1):
-    duration_mask = np.array([beat.duration <= max_duration for beat in beats])
-    values_mask = get_valid_beats_values_mask(beats)
-    return duration_mask & values_mask
 
 
 def find_systolic_peaks_ELGENDI(
@@ -87,40 +58,21 @@ class PPGSignal(PeriodicSignal):
             }
         )
 
+    @property
+    def BeatClass(self):
+        return PPGBeat
+
     def find_troughs(self):
-        data_z_score = z_score(self.data)
-        troughs, _ = find_peaks(-data_z_score, height=0.5)
-        return troughs
+        peaks = zip(self.peaks[:-1], self.peaks[1:])
+        return np.array([self.data[prev_peak:next_peak].argmin() + prev_peak for prev_peak, next_peak in peaks])
 
     def find_peaks(self):
         peaks = find_systolic_peaks_ELGENDI(self.data, self.fs)
         return peaks
 
-    def set_beats(self, resample_beats=True, n_samples=100, plot=False):
-        beats = []
-        for i, (trough_start, trough_end) in enumerate(zip(self.troughs[:-1], self.troughs[1:])):
-            peaks_between = self.peaks[(self.peaks > trough_start) & (self.peaks < trough_end)]
-            if len(peaks_between) == 0:
-                continue
-            beat_data = self.data[trough_start:trough_end]
-            beat = PPGBeat(f"beat_{i}", beat_data, fs=self.fs, start_sec=self.time[trough_start], beat_num=len(beats))
-            if resample_beats:
-                beat = beat.resample(n_samples)
-            beats.append(beat)
-
-        self.beats = np.array(beats, dtype=PPGBeat)
-        self.valid_beats_mask = get_valid_beats_mask(self.beats)
-        for beat, is_valid in zip(self.beats, self.valid_beats_mask):
-            beat.is_valid = is_valid
-
-        if plot:
-            fig, axes = plt.subplots(1, 2, figsize=(24, 5))
-            self.set_agg_beat(valid_only=False)
-            self.plot_beats(plot_valid=True, plot_invalid=True, ax=axes[0])
-            self.set_agg_beat(valid_only=True)
-            self.plot_beats(plot_valid=True, plot_invalid=False, ax=axes[1])
-        else:
-            self.set_agg_beat(valid_only=True)
+    def _get_beats_intervals(self):
+        intervals = np.vstack((self.troughs[:-1], self.troughs[1:])).T
+        return intervals
 
     def extract_hrv_features(self, return_arr=False, plot=False):
         ibi = np.diff(self.time[self.peaks])
@@ -170,12 +122,12 @@ class PPGBeat(BeatSignal):
         )
 
         if plot:
-            fig, ax = plt.subplots(figsize=FIGSIZE_2)
+            fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
             ax.plot(self.time, self.data, c=sns.color_palette()[0], lw=3)
             ax.scatter(
                 self.time[self.systolic_peak_loc],
                 self.data[self.systolic_peak_loc],
-                s=200,
+                s=self.fig_params["marker_size"],
                 c="r",
                 marker="^",
                 label="systolic peak",
@@ -186,7 +138,7 @@ class PPGBeat(BeatSignal):
                 self.data.min(),
                 where=self.time <= self.time[self.systolic_peak_loc],
                 color="g",
-                alpha=0.2,
+                alpha=self.fig_params["fill_alpha"],
             )
             ax.fill_between(
                 self.time,
@@ -194,13 +146,12 @@ class PPGBeat(BeatSignal):
                 self.data.min(),
                 where=self.time >= self.time[self.systolic_peak_loc],
                 color="r",
-                alpha=0.2,
+                alpha=self.fig_params["fill_alpha"],
             )
-            ax.set_title(f"Pojedyncze uderzenie PPG", fontsize=24)
-            ax.set_xlabel("Czas [s]", fontsize=20)
-            ax.set_ylabel("j.u.", fontsize=20)
+            ax.set_title(f"sPPG", fontsize=self.fig_params["title_size"])
+            ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
+            ax.set_ylabel("Values [a.u.]", fontsize=self.fig_params["label_size"])
             ax.legend()
-            fig.savefig("sppg.png", dpi=500)
 
         features = OrderedDict(
             {

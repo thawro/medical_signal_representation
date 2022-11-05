@@ -1,30 +1,17 @@
-from collections import OrderedDict
 from typing import Dict, List
 
 import numpy as np
 import torch
 
+from msr.data.measurements.mimic import MimicMeasurement
 from msr.data.raw.mimic import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
 from msr.data.representation.utils import (
     create_representations_dataset,
     get_representations,
     load_split,
 )
-from msr.signals.base import MultiChannelPeriodicSignal
-from msr.signals.ecg import ECGSignal
-from msr.signals.ppg import PPGSignal
 
 REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
-
-
-def create_multichannel_mimic(data, fs):
-    signals = OrderedDict(
-        {
-            "ppg": PPGSignal("PLETH", data[0], fs),
-            "ecg": ECGSignal("ECG II", data[1], fs),
-        }
-    )
-    return MultiChannelPeriodicSignal(signals)
 
 
 def get_mimic_representation(
@@ -40,7 +27,8 @@ def get_mimic_representation(
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    multichannel_mimic = create_multichannel_mimic(data.numpy(), fs)
+    ppg, ecg = data.numpy()
+    multichannel_mimic = MimicMeasurement(ppg, ecg, fs=125)
     return get_representations(multichannel_mimic, windows_params, representation_types)
 
 

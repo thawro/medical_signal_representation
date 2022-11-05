@@ -22,6 +22,7 @@ RAW_TENSORS_PATH = DATASET_PATH / "raw_tensors"
 RAW_TENSORS_DATA_PATH = RAW_TENSORS_PATH / "data"
 TARGETS_PATH = RAW_TENSORS_PATH / "targets"
 TARGET_PATH = None
+FS = 100
 
 for path in [RAW_DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH]:
     path.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import ChainMap, OrderedDict
-from typing import Dict
+from typing import Dict, List, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,6 +23,12 @@ from scipy.stats import kurtosis, skew
 from statsmodels.tsa.seasonal import STL
 
 from msr.signals.utils import (
+    BEAT_FIG_PARAMS,
+    SIGNAL_FIG_PARAMS,
+    calculate_area,
+    calculate_energy,
+    calculate_slope,
+    get_valid_beats_mask,
     get_windows,
     parse_feats_to_array,
     parse_nested_feats,
@@ -41,6 +47,7 @@ class BaseSignal:
         self.duration = self.n_samples / fs
         self.time = np.arange(0, self.n_samples) / fs
         self.end_sec = self.start_sec + self.time[-1]
+        self.fig_params = SIGNAL_FIG_PARAMS
         self.feature_extraction_funcs = {
             "basic_features": self.extract_basic_features,
         }
@@ -118,6 +125,14 @@ class BaseSignal:
         new_name = self.name + f"_derivative({deriv})"
         new_data = savgol_filter(self.data, window_length, polyorder, deriv, delta=1 / self.fs)
         return BaseSignal(name=new_name, data=new_data, fs=self.fs, start_sec=self.start_sec)
+
+    @lazy_property
+    def fder(self):
+        return self.get_derivative(1)
+
+    @lazy_property
+    def sder(self):
+        return self.get_derivative(2)
 
     def detrend(self):
         detrended = detrend(self.data)
@@ -207,10 +222,19 @@ class BaseSignal:
         return features
 
     def plot(
-        self, start_time=0, width=10, scatter=False, line=True, first_der=False, label=None, use_samples=False, ax=None
+        self,
+        start_time=0,
+        width=10,
+        scatter=False,
+        line=True,
+        first_der=False,
+        label=None,
+        use_samples=False,
+        ax=None,
+        title="",
     ):
         if ax is None:
-            fig, ax = plt.subplots(figsize=(24, 6))
+            fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
         if width == -1:
             width = self.time[-1] - start_time
         end_time = start_time + width
@@ -240,7 +264,7 @@ class BaseSignal:
         ax.legend(plots, labels, loc=0, fontsize=18)
         ax.set_ylabel("Values", fontsize=18)
         ax.set_xlabel("Samples" if use_samples else "Time [s]", fontsize=18)
-        ax.set_title(self.name, fontsize=22)
+        ax.set_title(f"{self.name} {title}", fontsize=22)
 
     def explore(self, start_time, width=None, window_size=4, min_hz=0, max_hz=20):
         if width is None:
@@ -319,8 +343,35 @@ class PeriodicSignal(ABC, Signal):
         pass
 
     @abstractmethod
-    def set_beats(self, resample=True, n_samples=100, plot=False, use_raw=True):
-        pass
+    def _get_beats_intervals(self, **kwargs):
+        return None
+
+    @property
+    def BeatClass(self):
+        return BeatSignal
+
+    def set_beats(self, intervals=None, resample=True, n_samples=100, plot=False, use_raw=False, **kwargs):
+        if intervals is None:
+            intervals = self._get_beats_intervals(**kwargs)
+        if not resample:
+            intervals[:, 1] = intervals[:, 0] + n_samples
+        data = self.data if use_raw else self.cleaned
+        beats = []
+        for i, (start, end) in enumerate(intervals):
+            start_sec = start / self.fs
+            beat = self.BeatClass(name=f"beat_{i}", data=data[start:end], fs=self.fs, start_sec=start_sec, beat_num=i)
+            if resample:
+                beat = beat.resample_with_interpolation(n_samples=100, kind="pchip")
+            beats.append(beat)
+        self.beats = np.array(beats, dtype=self.BeatClass)
+        self.validate_beats()
+        if plot:
+            self.plot_beats()
+
+    def validate_beats(self, max_duration=1.1, IQR_scale=1.5):
+        self.valid_beats_mask = get_valid_beats_mask(beats=self.beats, max_duration=max_duration, IQR_scale=IQR_scale)
+        for beat, is_valid in zip(self.beats, self.valid_beats_mask):
+            beat.is_valid = is_valid
 
     def set_windows(self, win_len_s, step_s):
         # aggregate beats for each window
@@ -341,8 +392,7 @@ class PeriodicSignal(ABC, Signal):
         beats_times = np.array([beat.time for beat in beats_to_aggregate])
         agg_beat_data, agg_beat_time = beats_data.mean(axis=0), beats_times.mean(axis=0)
         agg_fs = len(agg_beat_data) / (agg_beat_time[-1] - agg_beat_time[0])
-        BeatClass = beats_to_aggregate[0].__class__
-        self.agg_beat = BeatClass("agg_beat", agg_beat_data, agg_fs, start_sec=0)
+        self.agg_beat = self.BeatClass(f"{self.name}_agg_beat", agg_beat_data, agg_fs, start_sec=0)
 
     def get_beats_features(self, return_arr=True):
         if return_arr:
@@ -356,7 +406,7 @@ class PeriodicSignal(ABC, Signal):
         if axes is None:
             fig, axes = plt.subplots(1, 2, figsize=(24, 4), gridspec_kw={"width_ratios": [8, 2]})
         if use_raw:
-            self.plot(ax=axes[0])
+            self.plot(ax=axes[0], title="beats segmentation")
         else:
             axes[0].plot(self.time, self.cleaned, lw=3, label=self.name)
         beats_bounds = []
@@ -375,10 +425,8 @@ class PeriodicSignal(ABC, Signal):
             ax.set_ylabel("")
         plt.tight_layout()
 
-    def plot_beats(self, same_ax=True, ax=None, plot_valid=True, plot_invalid=True):
-        beats_to_plot = [
-            beat for beat in self.beats if (beat.is_valid and plot_valid) or (not beat.is_valid and plot_invalid)
-        ]
+    def plot_beats(self, same_ax=True, ax=None, valid=True, invalid=True):
+        beats_to_plot = [beat for beat in self.beats if (beat.is_valid and valid) or (not beat.is_valid and invalid)]
 
         n_beats = len(beats_to_plot)
         n_valid = np.sum([beat.is_valid for beat in beats_to_plot])
@@ -419,6 +467,7 @@ class BeatSignal(ABC, BaseSignal):
         super().__init__(name, data, fs, start_sec)
         self.is_valid = is_valid
         self.beat_num = beat_num
+        self.fig_params = BEAT_FIG_PARAMS
         self.feature_extraction_funcs.update(
             {
                 "crit_points": self.extract_crit_points_features,
@@ -429,6 +478,30 @@ class BeatSignal(ABC, BaseSignal):
     def crit_points(self):
         return {}
 
+    @lazy_property
+    def energy_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        """Must return list of dicts with `name`, `start` and `end` keys
+
+        Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
+        """
+        return []
+
+    @lazy_property
+    def area_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        """Must return list of dicts with `name`, `start` and `end` keys
+
+        Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
+        """
+        return []
+
+    @lazy_property
+    def slope_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        """Must return list of dicts with `name`, `start` and `end` keys
+
+        Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
+        """
+        return []
+
     def extract_crit_points_features(self, return_arr=True, plot=False, ax=None):
         features = OrderedDict()
         for name, loc in self.crit_points.items():
@@ -436,56 +509,90 @@ class BeatSignal(ABC, BaseSignal):
             features[f"{name}_time"] = self.time[loc]
             features[f"{name}_val"] = self.data[loc]
         if plot:
-            self.plot(ax=ax, with_crit_points=True)
+            self.plot_crit_points(plot_sig=True, ax=ax)
         if return_arr:
             return parse_feats_to_array(features)
         return features
 
-    def plot_crit_points(self, points=None, plot_sig=False, use_samples=False, offset=0, ax=None, **kwargs):
-        if points is None:
-            points = list(self.crit_points.keys())
-        t = np.arange(self.n_samples) if use_samples else self.time
+    def extract_energy_features(self, return_arr=True, **kwargs):
+        features = OrderedDict(
+            {
+                point["name"]: calculate_energy(self.data, point["start"], point["end"])
+                for point in self.energy_features_crit_points
+            }
+        )
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_area_features(self, return_arr=True, method="trapz", plot=False, **kwargs):
+        features = OrderedDict(
+            {
+                point["name"]: calculate_area(self.data, self.fs, point["start"], point["end"], method=method)
+                for point in self.area_features_crit_points
+            }
+        )
+        if plot:
+            self.plot_area_features()
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_slope_features(self, return_arr=True, plot=False, ax=None):
+        features = OrderedDict(
+            {
+                point["name"]: calculate_slope(self.time, self.data, point["start"], point["end"])
+                for point in self.slope_features_crit_points
+            }
+        )
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def plot_crit_points(self, plot_sig=False, ax=None, **kwargs):
+        t = self.time
         t_range = t[-1] - t[0]
         y_range = self.data.max() - self.data.min()
-
+        offset = 0
         if ax is None:
-            fig, ax = plt.subplots(figsize=(12, 7))
-
+            fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
         if plot_sig:
-            self.plot(ax=ax)
+            self.plot(ax=ax, title="crit points")
         for name, loc in self.crit_points.items():
-            if name not in points:
-                continue
             t_loc = t[loc]
             val = self.data[loc] + offset
-            ax.scatter(t_loc, val, label=name, s=160)
-            ax.annotate(name.upper(), (t_loc + 0.012 * t_range, val + 0.012 * y_range), fontweight="bold", fontsize=18)
+            ax.scatter(t_loc, val, label=name, s=self.fig_params["marker_size"])
+            ax.annotate(
+                name.upper(),
+                (t_loc + 0.012 * t_range, val + 0.012 * y_range),
+                fontweight="bold",
+                fontsize=self.fig_params["annot_size"],
+            )
 
-    def plot(
-        self,
-        start_time=0,
-        width=10,
-        scatter=False,
-        line=True,
-        first_der=False,
-        label=None,
-        use_samples=False,
-        with_crit_points=True,
-        ax=None,
-    ):
-        super().plot(
-            start_time=start_time,
-            width=width,
-            scatter=scatter,
-            line=line,
-            first_der=first_der,
-            label=label,
-            use_samples=use_samples,
-            ax=ax,
-        )
+    def plot_area_features(self, ax=None):
+        if ax is None:
+            fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
+        palette = sns.color_palette("pastel", len(self.area_features_crit_points))
+        self.plot_crit_points(ax=ax)
         ax = plt.gca()
-        if with_crit_points:
-            self.plot_crit_points(use_samples=use_samples, ax=ax)
+        self.plot(ax=ax, title="area features")
+        areas = []
+        for i, point in enumerate(self.area_features_crit_points):
+            offset = min([self.data[point["start"]], self.data[point["end"]]])
+            mask = (np.arange(self.n_samples) >= point["start"]) & (np.arange(self.n_samples) <= point["end"])
+            a = ax.fill_between(
+                self.time[mask],
+                self.data[mask],
+                offset,
+                alpha=0.4,
+                color=palette[i],
+                edgecolor="black",
+                lw=1,
+                label=point["name"],
+            )
+            areas.append(a)
+        leg = ax.legend(handles=areas, fontsize=self.fig_params["legend_size"])
+        ax.add_artist(leg)
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20, ax=None):
         pass
@@ -503,10 +610,19 @@ class MultiChannelSignal:
             "windows_features": self.get_windows_features,
         }
 
+        signals_extraction_funcs = [
+            {f"{sig_name}_{func_name}": func for func_name, func in sig.feature_extraction_funcs.items()}
+            for sig_name, sig in self.signals.items()
+        ]
+        self.feature_extraction_funcs = OrderedDict(ChainMap(*signals_extraction_funcs))
+
+    def __getitem__(self, key):
+        return self.signals[key]
+
     def extract_features(self, return_arr=False, plot=False):
-        all_signals_features = [sig.extract_features(return_arr=False, plot=plot) for name, sig in self.signals.items()]
-        # print(all_signals_features)
-        features = OrderedDict(ChainMap(*all_signals_features))
+        features = OrderedDict(
+            {name: func(return_arr=False, plot=plot) for name, func in self.feature_extraction_funcs.items()}
+        )
         features = parse_nested_feats(features)
         self.feature_names = list(features.keys())
         if return_arr:

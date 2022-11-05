@@ -1,13 +1,15 @@
 from collections import OrderedDict
-from typing import Dict, Union
+from typing import Dict, List, Type, Union
 
 import numpy as np
 import pandas as pd
 from scipy.integrate import simps
 from scipy.interpolate import interp1d
 
-FIGSIZE = (24, 4)
-FIGSIZE_2 = (10, 4)
+SIGNAL_FIG_PARAMS = dict(fig_size=(24, 4), label_size=12, annot_size=10)
+BEAT_FIG_PARAMS = dict(
+    fig_size=(6, 3), label_size=12, title_size=14, annot_size=10, marker_size=120, fill_alpha=0.2, legend_size=12
+)
 
 
 def parse_nested_feats(
@@ -40,7 +42,7 @@ def get_outliers_mask(arr: np.ndarray, IQR_scale: float) -> np.ndarray:
     Returns:
         np.ndarray: Boolean mask, where False values indicate outliers.
     """
-    return (arr < np.mean(arr) + IQR_scale * np.std(arr)) & (arr > np.mean(arr) - IQR_scale * np.std(arr))
+    return (arr >= np.mean(arr) + IQR_scale * np.std(arr)) | (arr <= np.mean(arr) - IQR_scale * np.std(arr))
 
 
 def z_score(arr: np.ndarray) -> np.ndarray:
@@ -88,3 +90,26 @@ def moving_average(data: np.ndarray, winsize: int):
 def resample(old_time, old_values, new_time, kind="nearest"):
     interp_fn = interp1d(old_time, old_values, kind=kind, fill_value="extrapolate")
     return interp_fn(new_time)
+
+
+def get_valid_beats_values_mask(beats, IQR_scale=1.5):
+    beats_data = np.array([beat.data for beat in beats])
+    beats_times = np.array([beat.time for beat in beats])
+
+    mean_vals = beats_data.mean(axis=1)
+    min_vals = beats_data.min(axis=1)
+    max_vals = beats_data.max(axis=1)
+    durations = np.array([t[-1] - t[0] for t in beats_times])
+
+    mean_vals_mask = ~get_outliers_mask(mean_vals, IQR_scale=IQR_scale)
+    min_vals_mask = ~get_outliers_mask(min_vals, IQR_scale=IQR_scale)
+    max_vals_mask = ~get_outliers_mask(max_vals, IQR_scale=IQR_scale)
+    duration_mask = ~get_outliers_mask(durations, IQR_scale=IQR_scale)
+
+    return mean_vals_mask & duration_mask & min_vals_mask & max_vals_mask
+
+
+def get_valid_beats_mask(beats: List, max_duration=1.1, IQR_scale=1.5):
+    duration_mask = np.array([beat.duration <= max_duration for beat in beats])
+    values_mask = get_valid_beats_values_mask(beats, IQR_scale=IQR_scale)
+    return duration_mask & values_mask
