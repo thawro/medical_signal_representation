@@ -99,7 +99,7 @@
 
 
 
-3. MIMIR-III Waveform
+3. MIMIC-III Waveform
 
     * [source URL](https://physionet.org/content/mimic3wdb/1.0/)
     * preprocessing:
@@ -110,6 +110,10 @@
         *
     * interesting urls:
         * [The MIMIC-III Waveform Database](https://archive.physionet.org/physiobank/database/mimic3wdb/)
+
+4. Sleep-EDF
+
+
 
 
 # Signal representations
@@ -141,6 +145,129 @@
 
 
 
-# Extra libs:
+# Signals
+
+## All signals
+
+1. Papers
+
+2. Features
+    * Statistical features
+        * quantiles
+        * mean
+        * median
+        * minimum
+        * maximum
+        * variance
+        * skewness
+        * kurtosis
+    * Other
+        * zero crossing
+        *
+
+## ECG (Electrocardiogram)
+
+1. Papers
+    * [A novel ECG signal classification method using DEA-ELM](https://www.sciencedirect.com/science/article/pii/S0306987719312381#b0085)
+    * [An Overview of Heart Rate Variability Metrics and Norms](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5624990/)
+    * [ECG-based heartbeat classification for arrhythmia detection: A survey](https://www.sciencedirect.com/science/article/pii/S0169260715003314)
+    * [A survey on ECG analysis](https://www.sciencedirect.com/science/article/pii/S1746809418300636#bib0175)
+    * [Interpretable deep learning for automatic diagnosis of 12-lead electrocardiogram](https://www.sciencedirect.com/science/article/pii/S2589004221003412)
+    * [Automatic diagnosis of the 12-lead ECG using a deep neural network](https://www.nature.com/articles/s41467-020-15432-4)
+
+2. Features
+    * Single episode:
+        * for each peak (P, Q, R, S, T):
+            * start time
+            * end time
+            * duration
+            * peak time
+            * peak val
+            * onset slope
+            * offset slope
+            * surface
+            * energy
+        * PQ segment and interval
+        * PR segment and interval
+        * ST segment and interval
+        * QT segment and interval
+        * QRS interval
+    * Many episodes:
+        * PP interval
+        * QQ interval
+        * RR interval
+        * SS interval
+        * TT interval
+        * P signal
+        * Q signal
+        * R signal
+        * S signal
+        * T signal
+        * most dominant frequency
+        * HRV features:
+            * heart rate
+            * breathing rate
+            * SDRR
+            * SDNN
+            * RMSSD
+
+
+
+## PPG (Photopletysmogram)
+
+1. Papers
+    * [Continuous PPG-Based Blood Pressure Monitoring Using Multi-Linear Regression](https://arxiv.org/abs/2011.02231)
+    * [Assessment of Non-Invasive Blood Pressure Prediction from PPG and rPPG Signals Using Deep Learning](https://www.mdpi.com/1424-8220/21/18/6022)
+    * [End-to-End Blood Pressure Prediction via Fully Convolutional Networks](https://ieeexplore.ieee.org/abstract/document/8936850)
+    * [A Benchmark Study of Machine Learning for Analysis of Signal Feature Extraction Techniques for Blood Pressure Estimation Using Photoplethysmography (PPG)](https://ieeexplore.ieee.org/document/9558767)
+    * [A Deep Learning Approach to Predict Blood Pressure from PPG Signals](https://arxiv.org/abs/2108.00099)
+    * [A Comparison of Deep Learning Techniques for Arterial Blood Pressure Prediction ](https://link.springer.com/article/10.1007/s12559-021-09910-0)
+    * [BP-Net: Efficient Deep Learning for Continuous Arterial Blood Pressure Estimation using Photoplethysmogram](https://arxiv.org/abs/2111.14558)
+    * [Assessment of Non-Invasive Blood Pressure Prediction from PPG and rPPG Signals Using Deep Learning](https://www.mdpi.com/1424-8220/21/18/6022)
+    * [PPG2ABP: Translating Photoplethysmogram (PPG) Signals to Arterial Blood Pressure (ABP) Waveforms using Fully Convolutional Neural Networks](https://arxiv.org/abs/2005.01669)
+    * [Beat-to-Beat Continuous Blood Pressure Estimation Using Bidirectional Long Short-Term Memory Network](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7795062/)
+    * [Cuffless Blood Pressure Estimation Algorithms for Continuous Health-Care Monitoring](https://pubmed.ncbi.nlm.nih.gov/27323356/)
+    * [Continuous Blood Pressure Estimation Using Exclusively Photopletysmography by LSTM-Based Signal-to-Signal Translation](https://www.mdpi.com/1424-8220/21/9/2952)
+    * [Generalized Deep Neural Network Model for Cuffless Blood Pressure Estimation with Photoplethysmogram Signal Only](https://www.mdpi.com/1424-8220/20/19/5668)
+
+
+2. Features
+    *
+
+## EEG (Encephalogram)
+
+1. Papers
+    * [Automatic Human Sleep Stage Scoring Using Deep Neural Networks](https://www.frontiersin.org/articles/10.3389/fnins.2018.00781/full)
+    * [SleepEEGNet: Automated sleep stage scoring with sequence to sequence deep learning approach](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6504038/) (https://arxiv.org/abs/1903.02108)
+    * [Analysis and visualization of sleep stages based on deep neural networks](https://www.sciencedirect.com/science/article/pii/S2451994421000055)
+    * [https://towardsdatascience.com/sleep-stage-classification-from-single-channel-eeg-using-convolutional-neural-networks-5c710d92d38e](https://towardsdatascience.com/sleep-stage-classification-from-single-channel-eeg-using-convolutional-neural-networks-5c710d92d38e)
+    * [DeepSleepNet: a Model for Automatic Sleep Stage Scoring based on Raw Single-Channel EEG](https://arxiv.org/abs/1703.04046)
+
+
+2. Features
+    *
+
+
+# Extra libs
 
  * [BioSPPy](https://github.com/PIA-Group/BioSPPy) - nice lib, PPG and ECG preprocessing available
+
+
+# Representations
+
+* Features - tabular features extracted from signals
+* Whole signal waveforms - samples taken from whole signals (may be preprocessed)
+* Per beat/window waveforms - samples taken from beats/windows extracted from signals
+* Per beat/window features - features extracted from beats/windows
+* Single beat/window waveforms - samples taken from aggregated beats/windows
+
+
+# Models
+
+* Support Vector Machine
+* LGBM
+* RNN (+ attn)
+* CNN + RNN (+ attn)
+* CNN
+* Transformer
+* CNN + Transformer

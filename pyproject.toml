@@ -2,21 +2,32 @@
 name = "msr"
 version = "0.1.0"
 description = ""
-authors = ["shate"]
-
+authors = ["shate <tomashawro.kontakt@gmail.com>"]
+readme = "README.md"
+packages = [
+    { include = "msr" },
+]
 [tool.poetry.dependencies]
 python = "^3.8"
-numpy = "^1.22.3"
-pandas = "^1.4.1"
-jupyterlab = "^3.3.2"
-seaborn = "^0.11.2"
-plotly = "^5.6.0"
-biosppy = "^0.8.0"
-mlflow = "^1.24.0"
-optuna = "^2.10.0"
+jupyterlab = "^3.5.0"
+scikit-learn = "^1.1.3"
+matplotlib = "<3.6.1"
+numpy = "^1.23.4"
+plotly = "^5.11.0"
+pandas = "^1.5.1"
+wfdb = "^4.0.0"
+tqdm = "^4.64.1"
+hydra-colorlog = "^1.2.0"
+seaborn = "^0.12.1"
+torch = "^1.13.0"
+statsmodels = "^0.13.4"
+neurokit2 = "^0.2.1"
+biosppy = "^1.0.0"
+ipywidgets = "7.0"
+wget = "^3.2"
+mne = "^1.2.1"
 
-[tool.poetry.dev-dependencies]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
