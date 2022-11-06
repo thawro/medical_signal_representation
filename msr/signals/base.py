@@ -636,9 +636,7 @@ class MultiChannelSignal:
         return np.array([sig.data for name, sig in self.signals.items()])
 
     def get_whole_signal_features(self, return_arr=True, **kwargs):
-        if return_arr:
-            return np.concatenate([sig.extract_features(return_arr=True) for _, sig in self.signals.items()])
-        return OrderedDict({name: sig.extract_features(return_arr=False) for name, sig in self.signals.items()})
+        return self.extract_features(return_arr=return_arr, plot=False)
 
     def get_whole_signal_feature_names(self):
         return np.concatenate([sig.feature_names for name, sig in self.signals.items()])
