@@ -1,4 +1,5 @@
 import inspect
+import json
 import os
 import zipfile
 from collections.abc import Iterable
@@ -124,3 +125,11 @@ def lazy_property(fn: Callable) -> Callable:
 
 def load_tensor(path):
     return torch.load(path)
+
+
+def ordered_dict_to_dict(dct):
+    """Parse nested OrderedDict to dict"""
+    try:
+        return json.loads(json.dumps(dct))
+    except TypeError:
+        return dict(dct)

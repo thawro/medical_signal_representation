@@ -194,6 +194,9 @@ class BaseSignal:
         ax.set_xlabel("Time [s]", fontsize=18)
         return spectrum, freqs, t
 
+    def get_whole_signal_waveform(self):
+        return self.data
+
     def extract_basic_features(self, return_arr=True, **kwargs):
         features = OrderedDict(
             {
@@ -307,7 +310,6 @@ class Signal(BaseSignal):
         intervals = np.array(get_windows(0, self.n_samples, win_len_samples, step_samples))
         if np.diff(intervals[-1]) != np.diff(intervals[0]):
             intervals = intervals[:-1]
-
         intervals = np.array(intervals).astype(int)
         self.windows = np.array(
             [create_new_obj(self, data=self.data[start:end], start_sec=self.time[start]) for start, end in intervals]
@@ -317,11 +319,10 @@ class Signal(BaseSignal):
         for window in self.windows:
             window.plot(**kwargs)
 
-    def get_whole_signal_waveform(self):
-        return self.data
-
-    def get_windows_waveforms(self):
-        return np.array([window.data for window in self.windows])
+    def get_windows_waveforms(self, return_arr=True):
+        if return_arr:
+            return np.array([window.get_whole_signal_waveform() for window in self.windows])
+        return OrderedDict({f"window_{i}": window.get_whole_signal_waveform() for i, window in enumerate(self.windows)})
 
     def get_windows_features(self, return_arr=True):
         if return_arr:
@@ -399,8 +400,16 @@ class PeriodicSignal(ABC, Signal):
             return np.array([beat.extract_features(return_arr=True) for beat in self.beats])
         return OrderedDict({f"beat_{beat.beat_num}": beat.extract_features(return_arr=False) for beat in self.beats})
 
-    def get_beats_waveforms(self):
-        return np.array([beat.data for beat in self.beats])
+    def get_beats_waveforms(self, return_arr=True):
+        if return_arr:
+            return np.array([beat.get_whole_signal_waveform() for beat in self.beats])
+        return OrderedDict({f"beat_{beat.beat_num}": beat.get_whole_signal_waveform() for beat in self.beats})
+
+    def get_agg_beat_features(self, return_arr=True):
+        return self.agg_beat.extract_features(return_arr=return_arr)
+
+    def get_agg_beat_waveform(self):
+        return self.agg_beat.data
 
     def plot_beats_segmentation(self, use_raw=False, axes=None):
         if axes is None:
@@ -610,10 +619,7 @@ class MultiChannelSignal:
             "windows_features": self.get_windows_features,
         }
 
-        signals_extraction_funcs = [
-            {f"{sig_name}_{func_name}": func for func_name, func in sig.feature_extraction_funcs.items()}
-            for sig_name, sig in self.signals.items()
-        ]
+        signals_extraction_funcs = [{name: sig.extract_features for name, sig in self.signals.items()}]
         self.feature_extraction_funcs = OrderedDict(ChainMap(*signals_extraction_funcs))
 
     def __getitem__(self, key):
@@ -632,21 +638,27 @@ class MultiChannelSignal:
     def set_windows(self, win_len_s, step_s, **kwargs):
         self.windows = {name: sig.set_windows(win_len_s, step_s) for name, sig in self.signals.items()}
 
-    def get_whole_signal_waveforms(self, **kwargs):
-        return np.array([sig.data for name, sig in self.signals.items()])
+    def get_whole_signal_waveforms(self, return_arr=True, **kwargs):
+        if return_arr:
+            return np.array([sig.get_whole_signal_waveform() for name, sig in self.signals.items()])
+        return OrderedDict({name: sig.get_whole_signal_waveform() for name, sig in self.signals.items()})
 
     def get_whole_signal_features(self, return_arr=True, **kwargs):
-        return self.extract_features(return_arr=return_arr, plot=False)
+        if return_arr:
+            return self.extract_features(return_arr=True)
+        return OrderedDict({name: func(return_arr=False) for name, func in self.feature_extraction_funcs.items()})
 
-    def get_whole_signal_feature_names(self):
-        return np.concatenate([sig.feature_names for name, sig in self.signals.items()])
-
-    def get_windows_waveforms(self, **kwargs):
-        return np.array([sig.get_windows_waveforms() for _, sig in self.signals.items()])
+    # TODO
+    def get_windows_waveforms(self, return_arr=True, **kwargs):
+        if return_arr:
+            return np.array([sig.get_windows_waveforms(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.get_windows_waveforms(return_arr=False) for name, sig in self.signals.items()})
 
     def get_windows_features(self, return_arr=True, **kwargs):
         if return_arr:
-            return np.array([sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()])
+            return np.concatenate(
+                [sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()], axis=1
+            )
         return OrderedDict({name: sig.get_windows_features(return_arr=False) for name, sig in self.signals.items()})
 
     def plot(self, **kwargs):
@@ -672,32 +684,71 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             }
         )
 
-    def set_beats(self, **kwargs):
+    def set_beats(self, source_channel=None, **kwargs):
+        """Return beats from all channels.
+
+        If `source_channel` is specified, it will be used as source of beat intervals
+        for other channels. If `ZeroDivisionError` occurs (from `neurokit2`) for specified source_channel,
+        other channels are tested.
+        If `source_channel` is `None`, beats are extracter for every channel separately. In that case, there
+        is no guarantee, that number of beats and their alignment is preserved across all channels.
+
+        Args:
+            source_channel (int, optional): Channel used as source of beat intervals. Defaults to `2`.
+            return_arr (bool, optional): Whether to return beats data as `np.ndarray` or :class:`ECGBeat` objects.
+                Defaults to `True`.
+
+        Returns:
+            _type_: Beats as `np.ndarray` or as :class:`ECGBeat` objects.
+        """
+        if source_channel is not None:
+            source_channels = list(self.signals.keys())
+            source_channels.remove(source_channel)
+            source_channels.reverse()
+            found_good_channel = False
+            new_source_channel = source_channel
+            while not found_good_channel or len(source_channels) == 0:
+                try:
+                    self.signals[new_source_channel].set_beats(**kwargs)
+                    found_good_channel = True
+                    if new_source_channel != source_channel:
+                        print(f"Original source channel was corrupted. Found new source channel: {new_source_channel}")
+                except Exception as e:
+                    new_source_channel = source_channels.pop()
+            if not found_good_channel:
+                new_source_channel = source_channel
+                self.signals[new_source_channel].set_beats(**kwargs)  # use Heart Rate (most dominant frequency)
+            intervals = self.signals[new_source_channel]._get_beats_intervals()
+        else:
+            intervals = None
         for _, signal in self.signals.items():
-            signal.set_beats(**kwargs)
-        self.beats = {name: signal.beats for name, signal in self.signals.items()}
+            signal.set_beats(intervals, **kwargs)
 
     def set_agg_beat(self, **kwargs):
         for _, signal in self.signals.items():
             signal.set_agg_beat(**kwargs)
-        self.agg_beat = {name: signal.agg_beat for name, signal in self.signals.items()}
 
     def get_beats_features(self, return_arr=True, **kwargs):
         if return_arr:
-            return np.array([sig.get_beats_features(return_arr=True) for _, sig in self.signals.items()])
+            return np.concatenate([sig.get_beats_features(return_arr=True) for _, sig in self.signals.items()], axis=1)
         return OrderedDict({name: sig.get_beats_features(return_arr=False) for name, sig in self.signals.items()})
 
-    def get_beats_waveforms(self, **kwargs):
-        return np.array([sig.get_beats_waveforms() for _, sig in self.signals.items()])
+    def get_beats_waveforms(self, return_arr=True, **kwargs):
+        if return_arr:
+            return np.array([sig.get_beats_waveforms(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.get_beats_waveforms(return_arr=False) for name, sig in self.signals.items()})
 
-    def get_agg_beat_waveforms(self, **kwargs):
-        return np.array([signal.agg_beat.data for _, signal in self.signals.items()])
+    def get_agg_beat_waveforms(self, return_arr=True, **kwargs):
+        if return_arr:
+            return np.array([sig.get_agg_beat_waveform() for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.get_agg_beat_waveform() for name, sig in self.signals.items()})
 
     def get_agg_beat_features(self, return_arr=True, **kwargs):
-        agg_beats = OrderedDict({name: signal.agg_beat for name, signal in self.signals.items()})
         if return_arr:
-            return np.array([agg_beat.extract_features(return_arr=True) for _, agg_beat in agg_beats.items()])
-        return OrderedDict({name: agg_beat.extract_features(return_arr=False) for name, agg_beat in agg_beats.items()})
+            return np.concatenate([sig.agg_beat.extract_features(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict(
+            {name: sig.agg_beat.extract_features(return_arr=False) for name, sig in self.signals.items()}
+        )
 
     def plot(self, **kwargs):
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)

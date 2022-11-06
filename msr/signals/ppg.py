@@ -101,6 +101,8 @@ class PPGBeat(BeatSignal):
 
     def find_systolic_peak(self):
         self.systolic_peak_loc = self.data.argmax()
+        if self.systolic_peak_loc == 0:
+            self.systolic_peak_loc = self.n_samples // 2
         self.systolic_peak_time = self.time[self.systolic_peak_loc]
         self.systolic_peak_val = self.data[self.systolic_peak_loc]
 
