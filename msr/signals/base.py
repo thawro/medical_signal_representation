@@ -5,6 +5,7 @@ from typing import Dict, List, Union
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from nptyping import Float, Int, NDArray, Shape
 from scipy.fft import rfft, rfftfreq
 from scipy.interpolate import PchipInterpolator, interp1d
 from scipy.signal import (
@@ -638,23 +639,66 @@ class MultiChannelSignal:
     def set_windows(self, win_len_s, step_s, **kwargs):
         self.windows = {name: sig.set_windows(win_len_s, step_s) for name, sig in self.signals.items()}
 
-    def get_whole_signal_waveforms(self, return_arr=True, **kwargs):
+    def get_whole_signal_waveforms(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["N, C"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
+        """Return whole signal waveforms representation, i.e. timeseries signals data.
+
+        N - number of samples in a signal
+        C - number of channels
+
+        If return_arr is True, then `NDArray[Shape["N, C"], Float]` is returned
+        If return_arr if False, then signal for each channel is returned in dict form (`Dict[str, NDArray[Shape["N"], Float]]`)
+        """
         if return_arr:
-            return np.array([sig.get_whole_signal_waveform() for name, sig in self.signals.items()])
+            return np.array([sig.get_whole_signal_waveform() for name, sig in self.signals.items()]).T
         return OrderedDict({name: sig.get_whole_signal_waveform() for name, sig in self.signals.items()})
 
-    def get_whole_signal_features(self, return_arr=True, **kwargs):
+    def get_whole_signal_features(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["F"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
+        """Return whole signal features representation
+
+        F - number of features from single signal
+        C - number of channels
+
+        If return_arr is True, then `NDArray[Shape["FC"], Float]` is returned
+        If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
+        """
         if return_arr:
             return self.extract_features(return_arr=True)
         return OrderedDict({name: func(return_arr=False) for name, func in self.feature_extraction_funcs.items()})
 
-    # TODO
-    def get_windows_waveforms(self, return_arr=True, **kwargs):
+    def get_windows_waveforms(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["W, N, C"], Float], Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]:
+        """Return windows waveforms representation, i.e. timeseries data for each window.
+
+        B - number of windows
+        N - number of samples in a window
+        C - number of channels
+
+        If return_arr is True, then `NDArray[Shape["B, N, C"], Float]` is returned
+        If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]`)
+        """
         if return_arr:
-            return np.array([sig.get_windows_waveforms(return_arr=True) for _, sig in self.signals.items()])
+            return np.array([sig.get_windows_waveforms(return_arr=True) for _, sig in self.signals.items()]).transpose(
+                1, 2, 0
+            )
         return OrderedDict({name: sig.get_windows_waveforms(return_arr=False) for name, sig in self.signals.items()})
 
-    def get_windows_features(self, return_arr=True, **kwargs):
+    def get_windows_features(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["B, FC"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
+        """Return windows features representation, i.e. features extracted for each window.
+
+        B - number of windows
+        F - number of features in a window
+        C - number of channels
+
+        If return_arr is True, then `NDArray[Shape["B, FC"], Float]` is returned
+        If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
+        """
         if return_arr:
             return np.concatenate(
                 [sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()], axis=1
@@ -728,27 +772,70 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         for _, signal in self.signals.items():
             signal.set_agg_beat(**kwargs)
 
-    def get_beats_features(self, return_arr=True, **kwargs):
+    def get_beats_features(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["B, FC"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
+        """Return beats features representation, i.e. features extracted for each beat.
+
+        B - number of beats
+        F - number of features in a beat
+        C - number of channels
+
+        If return_arr is True, then `NDArray[Shape["B, FC"], Float]` is returned
+        If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
+        """
+
         if return_arr:
             return np.concatenate([sig.get_beats_features(return_arr=True) for _, sig in self.signals.items()], axis=1)
         return OrderedDict({name: sig.get_beats_features(return_arr=False) for name, sig in self.signals.items()})
 
-    def get_beats_waveforms(self, return_arr=True, **kwargs):
+    def get_beats_waveforms(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["W, N, C"], Float], Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]:
+        """Return beats waveforms representation, i.e. timeseries data for each beat.
+
+        B - number of beats
+        N - number of samples in a beat
+        C - number of channels
+
+        If return_arr is True, then `NDArray[Shape["B, N, C"], Float]` is returned
+        If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]`)
+        """
         if return_arr:
-            return np.array([sig.get_beats_waveforms(return_arr=True) for _, sig in self.signals.items()])
+            return np.array([sig.get_beats_waveforms(return_arr=True) for _, sig in self.signals.items()]).transpose(
+                1, 2, 0
+            )
         return OrderedDict({name: sig.get_beats_waveforms(return_arr=False) for name, sig in self.signals.items()})
 
-    def get_agg_beat_waveforms(self, return_arr=True, **kwargs):
+    def get_agg_beat_waveforms(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["N, C"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
+        """Return aggregated beat waveforms representation, i.e. timeseries data for each aggregated beat.
+
+        N - number of samples in an aggregated beat.
+        C - number of channels
+
+        If return_arr is True, then `NDArray[Shape["N, C"], Float]` is returned
+        If return_arr if False, then signal for each channel is returned in dict form (`Dict[str, NDArray[Shape["N"], Float]]`)
+        """
         if return_arr:
-            return np.array([sig.get_agg_beat_waveform() for _, sig in self.signals.items()])
+            return np.array([sig.get_agg_beat_waveform() for _, sig in self.signals.items()]).T
         return OrderedDict({name: sig.get_agg_beat_waveform() for name, sig in self.signals.items()})
 
-    def get_agg_beat_features(self, return_arr=True, **kwargs):
+    def get_agg_beat_features(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["F"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
+        """Return aggregated beat features representation, i.e. features extracted for each aggregated beat.
+
+        F - number of features from single aggregated beat.
+        C - number of channels
+
+        If return_arr is True, then `NDArray[Shape["FC"], Float]` is returned
+        If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
+        """
         if return_arr:
-            return np.concatenate([sig.agg_beat.extract_features(return_arr=True) for _, sig in self.signals.items()])
-        return OrderedDict(
-            {name: sig.agg_beat.extract_features(return_arr=False) for name, sig in self.signals.items()}
-        )
+            return np.concatenate([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()])
+        return OrderedDict({name: sig.get_agg_beat_features(return_arr=False) for name, sig in self.signals.items()})
 
     def plot(self, **kwargs):
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)

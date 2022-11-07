@@ -929,6 +929,23 @@ jupyter-server = ">=1.8,<3"
 test = ["pytest", "pytest-console-scripts", "pytest-tornasync"]
 
 [[package]]
+name = "nptyping"
+version = "2.3.1"
+description = "Type hints for NumPy."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+numpy = {version = ">=1.20.0,<2.0.0", markers = "python_version >= \"3.8\""}
+typing-extensions = {version = ">=4.0.0,<5.0.0", markers = "python_version < \"3.10\""}
+
+[package.extras]
+build = ["invoke (>=1.6.0)", "pip-tools (>=6.5.0)"]
+dev = ["autoflake", "beartype (<0.10.0)", "beartype (>=0.10.0)", "black", "codecov (>=2.1.0)", "coverage", "feedparser", "invoke (>=1.6.0)", "isort", "mypy", "pip-tools (>=6.5.0)", "pylint", "pyright", "setuptools", "typeguard", "wheel"]
+qa = ["autoflake", "beartype (<0.10.0)", "beartype (>=0.10.0)", "black", "codecov (>=2.1.0)", "coverage", "feedparser", "isort", "mypy", "pylint", "pyright", "setuptools", "typeguard", "wheel"]
+
+[[package]]
 name = "numpy"
 version = "1.23.4"
 description = "NumPy is the fundamental package for array computing with Python."
@@ -1744,7 +1761,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "5621b8e93405557b64b32678563437ca2e1266d49b189a07fc06a8dbd0655fc0"
+content-hash = "04a29a1bec91a955ec221cf94bcd34ac3361ef659fe9862a80e63fcf014b36dd"
 
 [metadata.files]
 antlr4-python3-runtime = [
@@ -2322,6 +2339,10 @@ notebook = [
 notebook-shim = [
     {file = "notebook_shim-0.2.0-py3-none-any.whl", hash = "sha256:481711abddfb2e5305b83cf0efe18475824eb47d1ba9f87f66a8c574b8b5c9e4"},
     {file = "notebook_shim-0.2.0.tar.gz", hash = "sha256:fdb81febb05932c6d19e44e10382ce05469cac5e1b6e99b49be6159ddb5e4804"},
+]
+nptyping = [
+    {file = "nptyping-2.3.1-py3-none-any.whl", hash = "sha256:7549bc1fb334178d0309ad1ab89e174844ebe38dd427eae2f61e7495a9bda388"},
+    {file = "nptyping-2.3.1.tar.gz", hash = "sha256:df491b7113bfe87aefb6e86dab72d7b9972f622514401bf3ca69a9b68ae80dc6"},
 ]
 numpy = [
     {file = "numpy-1.23.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:95d79ada05005f6f4f337d3bb9de8a7774f259341c70bc88047a1f7b96a4bcb2"},
