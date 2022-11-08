@@ -226,5 +226,6 @@ def create_raw_tensors_dataset():
         epochs_info.to_csv(LOGS_PATH / f"{split}_epochs_info.csv", index=False)
 
 
-def load_sleep_edf_raw_data(split):
-    return load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt")
+def load_sleep_edf_raw_tensors_for_split(split):
+    data, targets = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt"), load_tensor(TARGETS_PATH / f"{split}.pt")
+    return data, targets

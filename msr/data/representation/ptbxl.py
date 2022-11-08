@@ -1,6 +1,7 @@
 """Module used to provide data for PTB-XL dataset"""
 
-from typing import Dict, List
+from functools import partial
+from typing import Dict, List, Union
 
 import numpy as np
 import torch
@@ -16,11 +17,12 @@ from msr.data.representation.utils import (
 
 def get_ptbxl_representation(
     channels_data: torch.Tensor,
-    fs: float,
-    beats_params=dict(source_channel=2),
-    agg_beat_params=dict(valid_only=False),
-    windows_params=dict(win_len_s=3, step_s=2),
+    beats_params: Dict[str, Union[str, float, int]] = dict(source_channel=2),
+    n_beats: int = 10,
+    agg_beat_params: Dict[str, Union[str, float, int]] = dict(valid_only=False),
+    windows_params: Dict[str, Union[str, float, int]] = dict(win_len_s=3, step_s=2),
     representation_types: List[str] = ["whole_signal_waveforms"],
+    fs: float = 100,
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
@@ -32,29 +34,41 @@ def get_ptbxl_representation(
     ecg_leads_data = channels_data.T.numpy()
     multichannel_ptbxl = PtbXLMeasurement(ecg_leads_data, fs)
     return get_periodic_representations(
-        multichannel_ptbxl, beats_params, agg_beat_params, windows_params, representation_types=representation_types
+        multichannel_ptbxl,
+        representation_types=representation_types,
+        beats_params=beats_params,
+        n_beats=n_beats,
+        agg_beat_params=agg_beat_params,
+        windows_params=windows_params,
     )
 
 
-def create_ptbxl_representations_dataset(representation_types: List[str], fs: float = 100):
+def create_ptbxl_representations_dataset(
+    representation_types: List[str],
+    beats_params: Dict[str, Union[str, float, int]],
+    n_beats: int,
+    agg_beat_params: Dict[str, Union[str, float, int]],
+    windows_params: Dict[str, Union[str, float, int]],
+    fs: float = 100,
+):
     """Create and save data files (`.pt`) for all representations.
-
+    TODO
     Args:
-        splits (list): Split types to create representations data for. Defaults to ['train', 'val', 'test'].
         fs (float): Sampling frequency of signals. Defaults to 100.
     """
-    params = dict(
+    get_repr_func = partial(
+        get_ptbxl_representation,
         representation_types=representation_types,
+        beats_params=beats_params,
+        n_beats=n_beats,
+        agg_beat_params=agg_beat_params,
+        windows_params=windows_params,
         fs=fs,
-        beats_params=dict(source_channel=2),
-        agg_beat_params=dict(valid_only=False),
-        windows_params=dict(win_len_s=3, step_s=2),
     )
     create_representations_dataset(
         raw_tensors_path=RAW_TENSORS_DATA_PATH,
         representations_path=DATASET_PATH / f"representations_{fs}",
-        get_repr_func=get_ptbxl_representation,
-        **params,
+        get_repr_func=get_repr_func,
     )
 
 

@@ -124,5 +124,8 @@ def create_raw_tensors_dataset(fs: float, target: str, encode_targets: bool):
         torch.save(targets, TARGET_PATH / f"{split}.pt")
 
 
-def load_ptbxl_raw_data(split):
-    return load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt")
+def load_ptbxl_raw_tensors_for_split(split, target):
+    data, targets = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt"), load_tensor(
+        TARGETS_PATH / target / f"{split}.pt"
+    )
+    return data, targets

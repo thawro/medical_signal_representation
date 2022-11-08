@@ -1,5 +1,6 @@
 from collections import OrderedDict
-from typing import Dict, List
+from functools import partial
+from typing import Dict, List, Union
 
 import numpy as np
 import torch
@@ -21,9 +22,9 @@ REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
 
 def get_sleep_edf_representation(
     data: torch.Tensor,
-    fs: float,
-    representation_types: List[str] = ["whole_signal_waveforms"],
-    windows_params=dict(win_len_s=3, step_s=2),
+    representation_types: List[str],
+    windows_params: Dict[str, Union[str, float, int]],
+    fs: float = 100,
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
@@ -34,26 +35,31 @@ def get_sleep_edf_representation(
     """
     eeg_0, eeg_1, eog = data.numpy()
     multichannel_sleep_edf = SleepEDFMeasurement(eeg_0, eeg_1, eog, fs)
-    return get_representations(multichannel_sleep_edf, windows_params, representation_types)
+    return get_representations(
+        multichannel_sleep_edf, representation_types=representation_types, windows_params=windows_params
+    )
 
 
-def create_sleep_edf_representations_dataset(representation_types: List[str], fs: float = 100):
+def create_sleep_edf_representations_dataset(
+    representation_types: List[str],
+    windows_params: Dict[str, Union[str, float, int]],
+    fs: float = 100,
+):
     """Create and save data files (`.pt`) for all representations.
-
+    TODO
     Args:
-        splits (list): Split types to create representations data for. Defaults to ['train', 'val', 'test'].
         fs (float): Sampling frequency of signals. Defaults to 100.
     """
-    params = dict(
-        fs=fs,
+    get_repr_func = partial(
+        get_sleep_edf_representation,
         representation_types=representation_types,
-        windows_params=dict(win_len_s=3, step_s=2),
+        windows_params=windows_params,
+        fs=fs,
     )
     create_representations_dataset(
         raw_tensors_path=RAW_TENSORS_DATA_PATH,
         representations_path=REPRESENTATIONS_PATH,
-        get_repr_func=get_sleep_edf_representation,
-        **params,
+        get_repr_func=get_repr_func,
     )
 
 

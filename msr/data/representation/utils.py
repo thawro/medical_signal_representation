@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, List, Type
 
 import numpy as np
@@ -12,13 +13,17 @@ from msr.signals.representation_extractor import (
     RepresentationExtractor,
 )
 
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+
 
 def get_periodic_representations(
     multichannel_signal: Type[MultiChannelPeriodicSignal],
+    representation_types: List[str],
     beats_params: dict,
+    n_beats: int,
     agg_beat_params: dict,
     windows_params: dict,
-    representation_types: List[str],
 ) -> Dict[str, torch.Tensor]:
     rep_extractor = PeriodicRepresentationExtractor(multichannel_signal)
     set_beats, set_windows, set_agg_beat = get_setters_mask(representation_types)
@@ -28,7 +33,7 @@ def get_periodic_representations(
             rep_extractor.set_agg_beat(**agg_beat_params)
     if set_windows:
         rep_extractor.set_windows(**windows_params)
-    return rep_extractor.get_representations(representation_types=representation_types)
+    return rep_extractor.get_representations(representation_types=representation_types, n_beats=n_beats)
 
 
 def get_representations(
@@ -41,26 +46,31 @@ def get_representations(
     return rep_extractor.get_representations(representation_types=representation_types)
 
 
-def create_representations_dataset(
-    raw_tensors_path, representations_path, get_repr_func, use_multiprocessing=False, **kwargs
-):
+def create_representations_dataset(raw_tensors_path, representations_path, get_repr_func, use_multiprocessing=False):
+    log.info(f"Creating representation dataset.")
+    log.info(f"Data used to create representations is loaded from {raw_tensors_path}")
+    log.info(f"Representations will be stored in {representations_path}")
     representations_path.mkdir(parents=True, exist_ok=True)
     splits = ["train", "val", "test"]
     for split in tqdm(splits, "Creating representations for all splits"):
         all_data = torch.load(raw_tensors_path / f"{split}.pt")
         if use_multiprocessing:
             reps = Parallel(n_jobs=-1)(
-                delayed(get_repr_func)(data, **kwargs) for data in tqdm(all_data, desc="Extracting representations")
+                delayed(get_repr_func)(data) for data in tqdm(all_data, desc="Extracting representations")
             )
         else:
-            reps = [get_repr_func(data, **kwargs) for data in tqdm(all_data, desc="Extracting representations")]
+            reps = [get_repr_func(data) for data in tqdm(all_data, desc="Extracting representations")]
+        # return reps
         rep_names = reps[0].keys()
         reps = {name: torch.tensor(np.array([rep[name] for rep in reps])) for name in rep_names}
+
         for name, data in reps.items():
             representation_path = representations_path / name
             representation_path.mkdir(parents=True, exist_ok=True)
             path = representation_path / f"{split}.pt"
             torch.save(data, path)
+        log.info(f"{split} split finished")
+    log.info("Representation dataset creation finished.")
 
 
 def load_split(split, representations_path, targets_path, representation_type):

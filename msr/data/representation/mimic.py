@@ -1,4 +1,5 @@
-from typing import Dict, List
+from functools import partial
+from typing import Dict, List, Union
 
 import numpy as np
 import torch
@@ -7,7 +8,7 @@ from msr.data.measurements.mimic import MimicMeasurement
 from msr.data.raw.mimic import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
 from msr.data.representation.utils import (
     create_representations_dataset,
-    get_representations,
+    get_periodic_representations,
     load_split,
 )
 
@@ -16,9 +17,12 @@ REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
 
 def get_mimic_representation(
     data: torch.Tensor,
-    fs: float,
-    representation_types: List[str] = ["whole_signal_waveforms"],
-    windows_params=dict(win_len_s=3, step_s=2),
+    representation_types: List[str],
+    beats_params: Dict[str, Union[str, float, int]],
+    n_beats: int,
+    agg_beat_params: Dict[str, Union[str, float, int]],
+    windows_params: Dict[str, Union[str, float, int]],
+    fs: float = 125,
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
@@ -28,27 +32,43 @@ def get_mimic_representation(
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
     ppg, ecg = data.numpy()
-    multichannel_mimic = MimicMeasurement(ppg, ecg, fs=125)
-    return get_representations(multichannel_mimic, windows_params, representation_types)
+    multichannel_mimic = MimicMeasurement(ppg, ecg, fs=fs)
+    return get_periodic_representations(
+        multichannel_mimic,
+        representation_types=representation_types,
+        beats_params=beats_params,
+        n_beats=n_beats,
+        agg_beat_params=agg_beat_params,
+        windows_params=windows_params,
+    )
 
 
-def create_mimic_representations_dataset(representation_types: List[str], fs: float = 100):
+def create_mimic_representations_dataset(
+    representation_types: List[str],
+    beats_params: Dict[str, Union[str, float, int]],
+    n_beats: int,
+    agg_beat_params: Dict[str, Union[str, float, int]],
+    windows_params: Dict[str, Union[str, float, int]],
+    fs: float = 100,
+):
     """Create and save data files (`.pt`) for all representations.
-
+    TODO
     Args:
-        splits (list): Split types to create representations data for. Defaults to ['train', 'val', 'test'].
         fs (float): Sampling frequency of signals. Defaults to 100.
     """
-    params = dict(
-        fs=fs,
+    get_repr_func = partial(
+        get_mimic_representation,
         representation_types=representation_types,
-        windows_params=dict(win_len_s=3, step_s=2),
+        beats_params=beats_params,
+        n_beats=n_beats,
+        agg_beat_params=agg_beat_params,
+        windows_params=windows_params,
+        fs=fs,
     )
     create_representations_dataset(
         raw_tensors_path=RAW_TENSORS_DATA_PATH,
         representations_path=REPRESENTATIONS_PATH,
-        get_repr_func=get_mimic_representation,
-        **params,
+        get_repr_func=get_repr_func,
     )
 
 
@@ -56,7 +76,7 @@ def load_mimic_split(split: str, representation_type: str) -> Dict[str, np.ndarr
     return load_split(
         split=split,
         representations_path=REPRESENTATIONS_PATH,
-        targets_path=RAW_TENSORS_TARGETS_PATH,
+        targets_path=TARGETS_PATH,
         representation_type=representation_type,
     )
 

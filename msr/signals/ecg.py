@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Dict, List, Union
+from typing import Dict, List, Type, Union
 
 import matplotlib.pyplot as plt
 import neurokit2 as nk
@@ -11,6 +11,18 @@ from msr.signals.utils import parse_feats_to_array
 from msr.utils import lazy_property
 
 CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
+
+
+def find_intervals_using_hr(signal: Type[PeriodicSignal]):
+    T_in_samples = int(1 / signal.hr * signal.fs)
+    x = signal.cleaned
+    neg_x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1
+    troughs, _ = find_peaks(neg_x_minmax, height=0.9)
+    intervals = [(troughs[0], troughs[0] + T_in_samples)]
+    while intervals[-1][1] + T_in_samples < signal.n_samples:
+        prev_end = intervals[-1][1]
+        intervals.append((prev_end, prev_end + T_in_samples))
+    return intervals
 
 
 def check_ecg_polarity(data):
@@ -29,30 +41,19 @@ def check_ecg_polarity(data):
         return 1
 
 
-def find_intervals_using_hr(sig):
-    freqs, amps = sig.psd(window_size=10, plot=False)
-    most_dominant_freq = freqs[amps.argmax()]  # HR
-    T_in_samples = int(1 / most_dominant_freq * sig.fs)
-    x = sig.cleaned
-    x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1
-    troughs, _ = find_peaks(x_minmax, height=0.9)
-    intervals = [(troughs[0], troughs[0] + T_in_samples)]
-    while intervals[-1][1] + T_in_samples < sig.n_samples:
-        prev_end = intervals[-1][1]
-        intervals.append((prev_end, prev_end + T_in_samples))
-    return intervals
-
-
 class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
         polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
-        self.cleaned = nk.ecg_clean(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
                 "hrv_features": self.extract_hrv_features,
             }
         )
+
+    @property
+    def cleaned(self):
+        return nk.ecg_clean(self.data, sampling_rate=self.fs)
 
     @property
     def BeatClass(self):

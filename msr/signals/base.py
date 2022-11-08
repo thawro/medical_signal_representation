@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections import ChainMap, OrderedDict
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,9 +39,11 @@ from msr.signals.utils import (
 )
 from msr.utils import create_new_obj, lazy_property
 
+MIN_HR, MAX_HR = 30, 200
+
 
 class BaseSignal:
-    def __init__(self, name, data, fs, start_sec=0):
+    def __init__(self, name: str, data: NDArray[Shape["N"], Float], fs: float, start_sec: float = 0):
         self.name = name
         self.data = data
         self.fs = fs
@@ -52,6 +56,10 @@ class BaseSignal:
         self.feature_extraction_funcs = {
             "basic_features": self.extract_basic_features,
         }
+
+    @property
+    def cleaned(self):
+        return np.copy(self.data)
 
     def find_peaks(self):
         return find_peaks(self.data)[0]
@@ -67,7 +75,7 @@ class BaseSignal:
     def peaks(self):
         return self.find_peaks()
 
-    def interpolate(self, fs, kind="cubic"):
+    def interpolate(self, fs, kind="cubic") -> Type[BaseSignal]:
         if kind == "pchip":
             interp_fn = PchipInterpolator(self.time, self.data)
         else:
@@ -79,14 +87,14 @@ class BaseSignal:
         new_name = self.name + f"_interp({fs:.2f}Hz)"
         return create_new_obj(self, name=new_name, data=interpolated, fs=fs)
 
-    def resample(self, n_samples):
+    def resample(self, n_samples) -> Type[BaseSignal]:
         new_data = resample(self.data, n_samples)
         fs_scaler = len(new_data) / self.n_samples
         new_fs = self.fs * fs_scaler
         new_name = self.name + f"_resampled({n_samples})"
         return create_new_obj(self, name=new_name, data=new_data, fs=new_fs)
 
-    def resample_with_interpolation(self, n_samples, kind="pchip"):
+    def resample_with_interpolation(self, n_samples, kind="pchip") -> Type[BaseSignal]:
         fs_scaler = n_samples / self.n_samples
         new_fs = self.fs * fs_scaler
         if kind == "pchip":
@@ -98,29 +106,29 @@ class BaseSignal:
         new_name = self.name + f"_resampleWithInterp({n_samples})"
         return create_new_obj(self, name=new_name, data=interpolated, fs=new_fs)
 
-    def z_score(self):
+    def z_score(self) -> Type[BaseSignal]:
         new_data = z_score(self.data)
         new_name = self.name + "_z_scored"
         return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
 
-    def min_max(self):
+    def min_max(self) -> Type[BaseSignal]:
         arr = self.data
         new_data = (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
         new_name = self.name + "_min_max"
         return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
 
-    def get_slice(self, start_time, end_time):
+    def get_slice(self, start_time, end_time) -> Type[BaseSignal]:
         mask = (self.time >= start_time) & (self.time < end_time)
         new_name = self.name + f"_slice({start_time}-{end_time})"
         new_data = self.data[mask]
         return create_new_obj(self, name=new_name, data=new_data, fs=self.fs)
 
-    def is_in_time_bounds(self, start_s, end_s):
+    def is_in_time_bounds(self, start_s: float, end_s: float) -> bool:
         return self.start_sec >= start_s and self.end_sec < end_s
 
-    def get_derivative(self, deriv=1, window_length=None, polyorder=4):
+    def get_derivative(self, deriv=1, window_length=None, polyorder=4) -> BaseSignal:
         if window_length is None:
-            window_length = int(np.ceil(5 / 100 * self.fs))
+            window_length = int(np.ceil(15 / 100 * self.fs))
         if window_length % 2 == 0:
             window_length = window_length + 1
         new_name = self.name + f"_derivative({deriv})"
@@ -128,31 +136,31 @@ class BaseSignal:
         return BaseSignal(name=new_name, data=new_data, fs=self.fs, start_sec=self.start_sec)
 
     @lazy_property
-    def fder(self):
+    def fder(self) -> BaseSignal:
         return self.get_derivative(1)
 
     @lazy_property
-    def sder(self):
+    def sder(self) -> BaseSignal:
         return self.get_derivative(2)
 
-    def detrend(self):
+    def detrend(self) -> Type[BaseSignal]:
         detrended = detrend(self.data)
         new_name = self.name + f"_detrended"
         return create_new_obj(self, name=new_name, data=detrended, fs=self.fs)
 
-    def get_cheby2_filtered(self, cutoff, btype="lowpass", order=4, rs=10):
+    def get_cheby2_filtered(self, cutoff, btype="lowpass", order=4, rs=10) -> Type[BaseSignal]:
         sos = cheby2(order, rs, cutoff, btype, output="sos", fs=self.fs)
         filtered = sosfiltfilt(sos, self.data)
         new_name = self.name + f"_{btype}_cheby2_filt({np.round(cutoff, 2)})"
         return create_new_obj(self, name=new_name, data=filtered, fs=self.fs)
 
-    def get_fir_filtered(self, cutoff, btype="lowpass", numtaps=10):
+    def get_fir_filtered(self, cutoff, btype="lowpass", numtaps=10) -> Type[BaseSignal]:
         firf = firwin(numtaps, cutoff, pass_zero=btype, fs=self.fs)
         filtered = filtfilt(firf, 1, self.data)
         new_name = self.name + f"{btype}_fir_filt({np.round(cutoff, 2)})"
         return create_new_obj(self, name=new_name, data=filtered, fs=self.fs)
 
-    def get_notch_filtered(self, cutoff, Q=10):
+    def get_notch_filtered(self, cutoff, Q=10) -> Type[BaseSignal]:
         b, a = iirnotch(cutoff, Q=Q, fs=self.fs)
         filtered = filtfilt(b, a, self.data)
         new_name = self.name + f"_notch_filt({np.round(cutoff, 2)})"
@@ -164,28 +172,32 @@ class BaseSignal:
             res.plot()
         return res
 
-    def fft(self, plot=False, ax=None):
-        mags = rfft(self.data)
+    def fft(self, plot=False, ax=None) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
+        amps = rfft(self.data)
         freqs = rfftfreq(self.n_samples, 1 / self.fs)
         if plot:
             if ax is None:
                 fig, ax = plt.subplots(figsize=(16, 8))
-            ax.plot(freqs[1:], np.abs(mags[1:]))
-        return freqs, mags
+            ax.plot(freqs[1:], np.abs(amps[1:]))
+        return freqs, amps
 
-    def psd(self, window_size, min_hz=0, max_hz=10, plot=False, ax=None):
-        freqs, pxx = welch(self.data, self.fs, nperseg=self.fs * window_size)
+    def psd(
+        self, window_size, min_hz=0, max_hz=10, plot=False, ax=None
+    ) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
+        freqs, amps = welch(self.data, self.fs, nperseg=self.fs * window_size)
         if plot:
             if ax is None:
                 fig, ax = plt.subplots(figsize=(16, 8))
             mask = (freqs >= min_hz) & (freqs <= max_hz)
-            ax.plot(freqs[mask], pxx[mask], lw=2)
+            ax.plot(freqs[mask], amps[mask], lw=2)
             ax.set_xlabel("Frequency [Hz]", fontsize=18)
             ax.set_ylabel("Power Spectral Density", fontsize=18)
 
-        return freqs, pxx
+        return freqs, amps
 
-    def spectrogram(self, NFFT=256, noverlap=128, ax=None):
+    def spectrogram(
+        self, NFFT=256, noverlap=128, ax=None
+    ) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
         if ax is None:
             fig, ax = plt.subplots(figsize=(20, 8))
         spectrum, freqs, t, img = ax.specgram(self.data, Fs=self.fs, NFFT=NFFT, noverlap=noverlap, cmap="viridis")
@@ -195,10 +207,10 @@ class BaseSignal:
         ax.set_xlabel("Time [s]", fontsize=18)
         return spectrum, freqs, t
 
-    def get_whole_signal_waveform(self):
+    def get_whole_signal_waveform(self) -> NDArray[Shape["N"], Float]:
         return self.data
 
-    def extract_basic_features(self, return_arr=True, **kwargs):
+    def extract_basic_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = OrderedDict(
             {
                 "mean": self.data.mean(),
@@ -212,7 +224,7 @@ class BaseSignal:
             return np.array(list(features.values()))
         return features
 
-    def extract_features(self, return_arr=True, plot=False):
+    def extract_features(self, return_arr=True, plot=False) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = OrderedDict(
             {
                 f"{self.name}_{name}": func(return_arr=False, plot=plot)
@@ -320,12 +332,16 @@ class Signal(BaseSignal):
         for window in self.windows:
             window.plot(**kwargs)
 
-    def get_windows_waveforms(self, return_arr=True):
+    def get_windows_waveforms(
+        self, return_arr=True
+    ) -> Union[NDArray[Shape["B, N"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         if return_arr:
             return np.array([window.get_whole_signal_waveform() for window in self.windows])
         return OrderedDict({f"window_{i}": window.get_whole_signal_waveform() for i, window in enumerate(self.windows)})
 
-    def get_windows_features(self, return_arr=True):
+    def get_windows_features(
+        self, return_arr=True
+    ) -> Union[NDArray[Shape["B, F"], Float], Dict[str, Dict[str, float]]]:
         if return_arr:
             return np.array([window.extract_features(return_arr=True) for window in self.windows])
         return OrderedDict(
@@ -337,8 +353,13 @@ class PeriodicSignal(ABC, Signal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
         self.valid_beats_mask = None
-        self.cleaned = np.copy(self.data)
         self.feature_extraction_funcs.update({"agg_beat_features": self.extract_agg_beat_features})
+
+    @property
+    def hr(self):
+        freqs, amps = self.psd(window_size=10, plot=False)
+        most_dominant_freq = freqs[amps.argmax()]
+        return most_dominant_freq
 
     @abstractmethod
     def extract_agg_beat_features(self, return_arr=False, plot=False):
@@ -375,41 +396,40 @@ class PeriodicSignal(ABC, Signal):
         for beat, is_valid in zip(self.beats, self.valid_beats_mask):
             beat.is_valid = is_valid
 
-    def set_windows(self, win_len_s, step_s):
-        # aggregate beats for each window
-        super().set_windows(win_len_s, step_s)
+    def set_agg_beat(self, valid_only=False):
         if hasattr(self, "beats"):
-            for window in self.windows:
-                window.beats = np.array(
-                    [beat for beat in self.beats if beat.is_in_time_bounds(window.start_sec, window.end_sec)]
-                )
-                window.set_agg_beat()
+            beats_to_aggregate_mask = self.valid_beats_mask if valid_only else len(self.beats) * [True]
+            if beats_to_aggregate_mask is None:
+                beats_to_aggregate_mask = len(self.beats) * [True]
+            beats_to_aggregate = self.beats[beats_to_aggregate_mask]
+            beats_data = np.array([beat.data for beat in beats_to_aggregate])
+            beats_times = np.array([beat.time for beat in beats_to_aggregate])
+            agg_beat_data, agg_beat_time = beats_data.mean(axis=0), beats_times.mean(axis=0)
+            agg_fs = len(agg_beat_data) / (agg_beat_time[-1] - agg_beat_time[0])
+            self.agg_beat = self.BeatClass(f"{self.name}_agg_beat", agg_beat_data, agg_fs, start_sec=0)
+            if hasattr(self, "windows"):
+                for window in self.windows:
+                    window.beats = np.array(
+                        [beat for beat in self.beats if beat.is_in_time_bounds(window.start_sec, window.end_sec)]
+                    )
+                    window.set_agg_beat()
 
-    def set_agg_beat(self, valid_only=True):
-        beats_to_aggregate_mask = self.valid_beats_mask if valid_only else len(self.beats) * [True]
-        if beats_to_aggregate_mask is None:
-            beats_to_aggregate_mask = len(self.beats) * [True]
-        beats_to_aggregate = self.beats[beats_to_aggregate_mask]
-        beats_data = np.array([beat.data for beat in beats_to_aggregate])
-        beats_times = np.array([beat.time for beat in beats_to_aggregate])
-        agg_beat_data, agg_beat_time = beats_data.mean(axis=0), beats_times.mean(axis=0)
-        agg_fs = len(agg_beat_data) / (agg_beat_time[-1] - agg_beat_time[0])
-        self.agg_beat = self.BeatClass(f"{self.name}_agg_beat", agg_beat_data, agg_fs, start_sec=0)
-
-    def get_beats_features(self, return_arr=True):
+    def get_beats_features(self, return_arr=True) -> Union[NDArray[Shape["B, F"], Float], Dict[str, Dict[str, float]]]:
         if return_arr:
             return np.array([beat.extract_features(return_arr=True) for beat in self.beats])
         return OrderedDict({f"beat_{beat.beat_num}": beat.extract_features(return_arr=False) for beat in self.beats})
 
-    def get_beats_waveforms(self, return_arr=True):
+    def get_beats_waveforms(
+        self, return_arr=True
+    ) -> Union[NDArray[Shape["B, N"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         if return_arr:
             return np.array([beat.get_whole_signal_waveform() for beat in self.beats])
         return OrderedDict({f"beat_{beat.beat_num}": beat.get_whole_signal_waveform() for beat in self.beats})
 
-    def get_agg_beat_features(self, return_arr=True):
+    def get_agg_beat_features(self, return_arr=True) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         return self.agg_beat.extract_features(return_arr=return_arr)
 
-    def get_agg_beat_waveform(self):
+    def get_agg_beat_waveform(self) -> NDArray[Shape["N"], Float]:
         return self.agg_beat.data
 
     def plot_beats_segmentation(self, use_raw=False, axes=None):
@@ -485,7 +505,7 @@ class BeatSignal(ABC, BaseSignal):
         )
 
     @lazy_property
-    def crit_points(self):
+    def crit_points(self) -> Dict[str, float]:
         return {}
 
     @lazy_property
@@ -512,7 +532,9 @@ class BeatSignal(ABC, BaseSignal):
         """
         return []
 
-    def extract_crit_points_features(self, return_arr=True, plot=False, ax=None):
+    def extract_crit_points_features(
+        self, return_arr=True, plot=False, ax=None
+    ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = OrderedDict()
         for name, loc in self.crit_points.items():
             features[f"{name}_loc"] = loc
@@ -524,7 +546,7 @@ class BeatSignal(ABC, BaseSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_energy_features(self, return_arr=True, **kwargs):
+    def extract_energy_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = OrderedDict(
             {
                 point["name"]: calculate_energy(self.data, point["start"], point["end"])
@@ -535,7 +557,9 @@ class BeatSignal(ABC, BaseSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_area_features(self, return_arr=True, method="trapz", plot=False, **kwargs):
+    def extract_area_features(
+        self, return_arr=True, method="trapz", plot=False, **kwargs
+    ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = OrderedDict(
             {
                 point["name"]: calculate_area(self.data, self.fs, point["start"], point["end"], method=method)
@@ -548,7 +572,9 @@ class BeatSignal(ABC, BaseSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_slope_features(self, return_arr=True, plot=False, ax=None):
+    def extract_slope_features(
+        self, return_arr=True, plot=False, ax=None
+    ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = OrderedDict(
             {
                 point["name"]: calculate_slope(self.time, self.data, point["start"], point["end"])
@@ -626,7 +652,7 @@ class MultiChannelSignal:
     def __getitem__(self, key):
         return self.signals[key]
 
-    def extract_features(self, return_arr=False, plot=False):
+    def extract_features(self, return_arr=False, plot=False) -> Union[NDArray[Shape["FC"], Float], Dict[str, float]]:
         features = OrderedDict(
             {name: func(return_arr=False, plot=plot) for name, func in self.feature_extraction_funcs.items()}
         )
@@ -739,11 +765,6 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
 
         Args:
             source_channel (int, optional): Channel used as source of beat intervals. Defaults to `2`.
-            return_arr (bool, optional): Whether to return beats data as `np.ndarray` or :class:`ECGBeat` objects.
-                Defaults to `True`.
-
-        Returns:
-            _type_: Beats as `np.ndarray` or as :class:`ECGBeat` objects.
         """
         if source_channel is not None:
             source_channels = list(self.signals.keys())
@@ -753,11 +774,19 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             new_source_channel = source_channel
             while not found_good_channel or len(source_channels) == 0:
                 try:
-                    self.signals[new_source_channel].set_beats(**kwargs)
-                    found_good_channel = True
-                    if new_source_channel != source_channel:
-                        print(f"Original source channel was corrupted. Found new source channel: {new_source_channel}")
+                    signal = self.signals[new_source_channel]
+                    signal.set_beats(**kwargs)
+                    min_n_beats, max_n_beats = MIN_HR / 60 * signal.duration, MAX_HR / 60 * signal.duration
+                    if min_n_beats <= len(signal.beats) <= max_n_beats:
+                        found_good_channel = True
+                        if new_source_channel != source_channel:
+                            print(
+                                f"Original source channel was corrupted. Found new source channel: {new_source_channel}"
+                            )
+                    else:
+                        raise Exception("Number of beats indicates that HR bounds werent met. Trying another channel")
                 except Exception as e:
+                    print(e)
                     new_source_channel = source_channels.pop()
             if not found_good_channel:
                 new_source_channel = source_channel
