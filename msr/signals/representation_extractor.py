@@ -40,6 +40,9 @@ class PeriodicRepresentationExtractor(RepresentationExtractor):
                         representations[rep_type] = representations[rep_type][:n_beats]
                     elif n_beats > actual_n_beats:
                         n_more_beats = n_beats - actual_n_beats
-                        pad_width = ((0, n_more_beats), (0, 0), (0, 0))
+                        if rep_type == "beats_waveforms":  # beats waveforms has shape [B, N, C]
+                            pad_width = ((0, n_more_beats), (0, 0), (0, 0))
+                        else:  # beats features has shape [B, F]
+                            pad_width = ((0, n_more_beats), (0, 0))
                         representations[rep_type] = np.pad(representations[rep_type], pad_width)
         return representations

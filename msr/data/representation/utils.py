@@ -27,12 +27,13 @@ def get_periodic_representations(
 ) -> Dict[str, torch.Tensor]:
     rep_extractor = PeriodicRepresentationExtractor(multichannel_signal)
     set_beats, set_windows, set_agg_beat = get_setters_mask(representation_types)
+    if set_windows:
+        rep_extractor.set_windows(**windows_params)
     if set_beats:
         rep_extractor.set_beats(**beats_params)
         if set_agg_beat:
             rep_extractor.set_agg_beat(**agg_beat_params)
-    if set_windows:
-        rep_extractor.set_windows(**windows_params)
+
     return rep_extractor.get_representations(representation_types=representation_types, n_beats=n_beats)
 
 

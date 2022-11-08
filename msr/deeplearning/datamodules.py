@@ -1,13 +1,14 @@
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from functools import partial
 
-from deeplearning.datasets import MimicDataset, PtbXLDataset, SleepEDFDataset
-from deeplearning.utils import StratifiedBatchSampler
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
+from msr.deeplearning.datasets import MimicDataset, PtbXLDataset, SleepEDFDataset
+from msr.deeplearning.utils import StratifiedBatchSampler
 
-class BaseDataModule(LightningDataModule, ABC):
+
+class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def __init__(self, representation_type: str, batch_size: int = 64, num_workers: int = 8):
         super().__init__()
         self.batch_size = batch_size

@@ -23,9 +23,9 @@ create_representations:
   representation_types:
     # - whole_signal_waveforms
     # - windows_waveforms
-    - beats_waveforms
-    - agg_beat_waveforms
-    # - whole_signal_features
-    # - windows_features
-    # - beats_features
-    # - agg_beat_features
+    # - beats_waveforms
+    # - agg_beat_waveforms
+    - whole_signal_features
+    - windows_features
+    - beats_features
+    - agg_beat_features
