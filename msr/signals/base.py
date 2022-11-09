@@ -734,6 +734,19 @@ class MultiChannelSignal:
             )
         return OrderedDict({name: sig.get_windows_features(return_arr=False) for name, sig in self.signals.items()})
 
+    def get_whole_signal_feature_names(self):
+        self.extract_features()
+        return self.feature_names
+
+    def get_windows_feature_names(self):
+        all_feature_names = []
+        for name, sig in self.signals.items():
+            sig.windows[0].extract_features()
+            feature_names = sig.windows[0].feature_names
+            feature_names = [name.replace("window_0_", "") for name in feature_names]
+            all_feature_names.extend(feature_names)
+        return all_feature_names
+
     def plot(self, **kwargs):
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 3 * self.n_signals))
         for ax, (sig_name, sig) in zip(axes, self.signals.items()):
@@ -868,6 +881,22 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         if return_arr:
             return np.concatenate([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()])
         return OrderedDict({name: sig.get_agg_beat_features(return_arr=False) for name, sig in self.signals.items()})
+
+    def get_beats_feature_names(self):
+        all_feature_names = []
+        for name, sig in self.signals.items():
+            sig.beats[0].extract_features()
+            feature_names = sig.beats[0].feature_names
+            feature_names = [name.replace("beat_0_", "") for name in feature_names]
+            all_feature_names.extend(feature_names)
+        return all_feature_names
+
+    def get_agg_beat_feature_names(self):
+        all_feature_names = []
+        for name, sig in self.signals.items():
+            sig.extract_agg_beat_features()
+            all_feature_names.extend(sig.agg_beat.feature_names)
+        return all_feature_names
 
     def plot(self, **kwargs):
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)
