@@ -1,11 +1,13 @@
 from abc import ABCMeta, abstractmethod
 from functools import partial
 
+import matplotlib.pyplot as plt
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
 from msr.deeplearning.datasets import MimicDataset, PtbXLDataset, SleepEDFDataset
 from msr.deeplearning.utils import StratifiedBatchSampler
+from msr.utils import align_left
 
 
 class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
@@ -14,9 +16,20 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.representation_type = representation_type
-        self.train = None
-        self.val = None
-        self.test = None
+        self.datasets = []
+
+    def describe(self, ds_fields=["data_shape", "classes_counts"], dm_fields=["info"]):
+        dm_connector = "\n" if dm_fields else ""
+        ds_connector = "\n\n  " if ds_fields else ""
+        datamodule_str = dm_connector.join(
+            [align_left(f"{name}", self.datasets[0].info_dict[name], n_signs=10) for name in dm_fields]
+        )
+        datasets_str = ds_connector.join([dataset.describe(ds_fields) for dataset in self.datasets])
+        return (
+            f"{self.__class__.__name__} ({self.representation_type})\n  "
+            + f"{datamodule_str}\n{dm_connector}  "
+            + datasets_str
+        )
 
     @property
     @abstractmethod
@@ -27,8 +40,18 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         if stage == "fit" or stage is None:
             self.train = self.DatasetFactory(split="train", representation_type=self.representation_type)
             self.val = self.DatasetFactory(split="val", representation_type=self.representation_type)
+            self.datasets.extend([self.train, self.val])
         if stage == "test" or stage is None:
             self.test = self.DatasetFactory(split="test", representation_type=self.representation_type)
+            self.datasets.append(self.test)
+
+    def plot_targets(self):
+        ncols = len(self.datasets)
+        fig, axes = plt.subplots(1, ncols, figsize=(ncols * 5, 3.5))
+        for dataset, ax in zip(self.datasets, axes):
+            dataset.plot_targets(ax=ax)
+            ax.set_title(dataset.split)
+        plt.tight_layout()
 
     def train_dataloader(self):
         return DataLoader(

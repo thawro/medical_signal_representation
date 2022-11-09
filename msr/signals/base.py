@@ -325,7 +325,10 @@ class Signal(BaseSignal):
             intervals = intervals[:-1]
         intervals = np.array(intervals).astype(int)
         self.windows = np.array(
-            [create_new_obj(self, data=self.data[start:end], start_sec=self.time[start]) for start, end in intervals]
+            [
+                create_new_obj(self, name=f"window_{i}", data=self.data[start:end], start_sec=self.time[start])
+                for i, (start, end) in enumerate(intervals)
+            ]
         )
 
     def plot_windows(self, **kwargs):

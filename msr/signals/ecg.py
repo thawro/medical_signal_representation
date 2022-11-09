@@ -61,7 +61,16 @@ class ECGSignal(PeriodicSignal):
 
     @lazy_property
     def rpeaks(self):
-        return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs)[1]["ECG_R_Peaks"]
+        try:
+            return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="neurokit")[1]["ECG_R_Peaks"]
+        except IndexError:  # Error from neurokit2
+            try:
+                return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="elgendi2010")[1]["ECG_R_Peaks"]
+            except Exception:  # TODO # both methods raise exceptions
+                sig = self.cleaned
+                normalized = (sig - sig.min()) / (sig.max() - sig.min())
+                peaks = find_peaks(normalized, height=0.7)[0]
+                return peaks
 
     def _get_beats_intervals(self, align_to_r=True):
         try:
@@ -96,8 +105,6 @@ class ECGSignal(PeriodicSignal):
         return np.array(intervals)
 
     def extract_hrv_features(self, return_arr=True, **kwargs):
-        if self.rpeaks is None:
-            self.find_rpeaks()
         r_peaks = self.rpeaks
         r_vals = self.data[r_peaks]
         r_times = self.time[r_peaks]

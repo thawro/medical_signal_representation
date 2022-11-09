@@ -12,6 +12,19 @@ class RepresentationExtractor:
     def set_windows(self, win_len_s, step_s):
         self.measurement.set_windows(win_len_s, step_s)
 
+    def get_whole_signal_feature_names(self):
+        self.measurement.extract_features()
+        return self.measurement.feature_names
+
+    def get_windows_feature_names(self):
+        all_feature_names = []
+        for name, sig in self.measurement.signals.items():
+            sig.windows[0].extract_features()
+            feature_names = sig.windows[0].feature_names
+            feature_names = [name.replace("window_0_", "") for name in feature_names]
+            all_feature_names.extend(feature_names)
+        return all_feature_names
+
     def get_representations(self, representation_types: List[str], return_arr: bool = True, **kwargs):
         if representation_types == "all":
             representation_types = list(self.measurement.representations.keys())
@@ -27,6 +40,22 @@ class PeriodicRepresentationExtractor(RepresentationExtractor):
 
     def set_agg_beat(self, **kwargs):
         self.measurement.set_agg_beat(**kwargs)
+
+    def get_beats_feature_names(self):
+        all_feature_names = []
+        for name, sig in self.measurement.signals.items():
+            sig.beats[0].extract_features()
+            feature_names = sig.beats[0].feature_names
+            feature_names = [name.replace("beat_0_", "") for name in feature_names]
+            all_feature_names.extend(feature_names)
+        return all_feature_names
+
+    def get_agg_beat_feature_names(self):
+        all_feature_names = []
+        for name, sig in self.measurement.signals.items():
+            sig.extract_agg_beat_features()
+            all_feature_names.extend(sig.agg_beat.feature_names)
+        return all_feature_names
 
     def get_representations(
         self, representation_types: List[str] = "all", return_arr: bool = True, n_beats=-1, **kwargs

@@ -11,6 +11,7 @@ from torch.utils.data import Dataset
 from msr.data.representation.mimic import load_mimic_split
 from msr.data.representation.ptbxl import load_ptbxl_split
 from msr.data.representation.sleep_edf import load_sleep_edf_split
+from msr.utils import align_left
 
 sns.set(style="whitegrid")
 
@@ -34,6 +35,11 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         """Must return Callable which when called returns dictionary with `data`, `targets` and `info` keys."""
         pass
 
+    @abstractmethod
+    def plot_targets(self):
+        """Plot targets distribution"""
+        pass
+
     def __len__(self):
         return len(self.data)
 
@@ -49,15 +55,15 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
     @property
     def info_dict(self):
         return dict(
-            representation_type=self.representation_type,
-            split=self.split,
+            # representation_type=self.representation_type,
             data_shape=self.data.shape,
             targets=self.targets,
             info=self.info,
         )
 
-    def __repr__(self):
-        return f"{self.__class__ }\n" + "\n".join([f"   {name} = {value}" for name, value in self.info_dict.items()])
+    def describe(self, fields=["data_shape"]):
+        info_dict_str = "\n".join([align_left(f"    {name}", self.info_dict[name], n_signs=25) for name in fields])
+        return f"{self.split.title()} {self.__class__.__name__}:\n" + info_dict_str
 
 
 class ClassificationDataset(BaseDataset):
@@ -66,18 +72,21 @@ class ClassificationDataset(BaseDataset):
         self.classes = np.array([self.info[target] for target in self.targets])
         self.classes_counts = {target: count for target, count in zip(*np.unique(self.classes, return_counts=True))}
         self.classes_counts = dict(sorted(self.classes_counts.items(), key=lambda item: item[1], reverse=True))
+        unique_classes = sorted(self.info.values())
+        self.classes_colors = {class_name: color for class_name, color in zip(unique_classes, sns.color_palette())}
 
     @property
     def info_dict(self):
         return {**super().info_dict, "classes_counts": self.classes_counts}
 
-    def plot_classes_counts(self, ax=None):
-        sns.countplot(x=self.classes, ax=ax, order=list(self.classes_counts.keys()))
+    def plot_targets(self, ax=None):
+        order = list(self.classes_counts.keys())
+        palette = [color[1] for color in sorted(self.classes_colors.items(), key=lambda pair: order.index(pair[0]))]
+        sns.countplot(x=self.classes, ax=ax, order=order, palette=palette)
 
 
 class RegressionDataset(BaseDataset):
-    def plot_classes_counts(self):
-        fig, ax = plt.subplots(figsize=(7, 5))
+    def plot_targets(self, ax=None):
         sns.histplot(self.targets, ax=ax)
 
 

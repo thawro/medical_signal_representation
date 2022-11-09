@@ -149,3 +149,7 @@ def print_config_tree(cfg: DictConfig, keys: List[str], style: str = "dim"):
             branch_content = OmegaConf.to_yaml(group, resolve=True)
             branch.add(rich.syntax.Syntax(branch_content, "yaml"))
     rich.print(tree)
+
+
+def align_left(name, value, n_signs=15, sign=" = "):
+    return f"{f'{name}':<{n_signs}}{sign}{value}"
