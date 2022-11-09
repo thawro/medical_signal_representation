@@ -27,5 +27,9 @@ def get_classification_metrics(
     }
     if auc:
         metrics["auc"] = roc_auc_score(y_true, y_pred_proba, average=average, multi_class="ovr")
-
     return metrics
+
+
+def get_regression_metrics(y_true, y_pred):
+    # TODO
+    pass

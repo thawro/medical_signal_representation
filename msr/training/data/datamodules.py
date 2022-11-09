@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-from msr.deeplearning.datasets import MimicDataset, PtbXLDataset, SleepEDFDataset
-from msr.deeplearning.utils import StratifiedBatchSampler
+from msr.training.data.datasets import MimicDataset, PtbXLDataset, SleepEDFDataset
+from msr.training.data.utils import StratifiedBatchSampler
 from msr.utils import align_left
 
 
