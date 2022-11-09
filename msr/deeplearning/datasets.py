@@ -26,6 +26,7 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         self.transform = transform
         dataset = self._dataset_loader(split=split, representation_type=representation_type)
         self.data = dataset["data"]
+        self.data = torch.nan_to_num(self.data)  # TODO
         self.targets = dataset["targets"]
         self.info = dataset["info"]
         if "feature_names" in dataset:
@@ -74,8 +75,8 @@ class ClassificationDataset(BaseDataset):
         self.classes = np.array([self.info[target] for target in self.targets])
         self.classes_counts = {target: count for target, count in zip(*np.unique(self.classes, return_counts=True))}
         self.classes_counts = dict(sorted(self.classes_counts.items(), key=lambda item: item[1], reverse=True))
-        unique_classes = sorted(self.info.values())
-        self.classes_colors = {class_name: color for class_name, color in zip(unique_classes, sns.color_palette())}
+        self.class_names = sorted(self.info.values())
+        self.classes_colors = {class_name: color for class_name, color in zip(self.class_names, sns.color_palette())}
 
     @property
     def info_dict(self):

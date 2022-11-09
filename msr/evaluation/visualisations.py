@@ -19,7 +19,7 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, class_names: n
     accuracy = accuracy_score(y_true, y_pred)
     fscore = f1_score(y_true, y_pred, average="macro")
     conf_matrix = pd.DataFrame(confusion_matrix(y_true, y_pred), columns=class_names, index=class_names).astype(int)
-    sns.heatmap(conf_matrix, ax=ax, annot=True, fmt=".4g", cmap="Blues")
+    sns.heatmap(conf_matrix, ax=ax, annot=True, fmt=".4g", cmap="Blues", cbar=False)
     ax.set_xlabel("Predicted", fontsize=20)
     ax.set_ylabel("True", fontsize=20)
     ax.set_title(

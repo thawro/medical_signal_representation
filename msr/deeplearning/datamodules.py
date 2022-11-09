@@ -44,6 +44,11 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         if stage == "test" or stage is None:
             self.test = self.DatasetFactory(split="test", representation_type=self.representation_type)
             self.datasets.append(self.test)
+        for dataset in self.datasets:
+            if hasattr(dataset, "feature_names"):
+                self.feature_names = dataset.feature_names
+                self.class_names = dataset.class_names
+                break
 
     def plot_targets(self):
         ncols = len(self.datasets)

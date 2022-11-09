@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 
 
 def get_classification_metrics(
-    y_pred_proba: np.ndarray, y_true: np.ndarray, average: str = "macro", auc: bool = True
+    y_true: np.ndarray, y_pred_proba: np.ndarray, average: str = "macro", auc: bool = True
 ) -> Dict[str, float]:
     """Return classification metrics, i.e. F1-score, accuracy and AUC.
 

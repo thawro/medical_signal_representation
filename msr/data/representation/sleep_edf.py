@@ -25,7 +25,7 @@ def get_sleep_edf_representation(
     representation_types: List[str],
     windows_params: Dict[str, Union[str, float, int]],
     fs: float = 100,
-    return_feature_names: bool = True,
+    return_feature_names: bool = False,
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
