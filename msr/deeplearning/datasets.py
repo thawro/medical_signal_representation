@@ -28,6 +28,8 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         self.data = dataset["data"]
         self.targets = dataset["targets"]
         self.info = dataset["info"]
+        if "feature_names" in dataset:
+            self.feature_names = dataset["feature_names"]
 
     @property
     @abstractmethod

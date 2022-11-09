@@ -25,6 +25,7 @@ def get_sleep_edf_representation(
     representation_types: List[str],
     windows_params: Dict[str, Union[str, float, int]],
     fs: float = 100,
+    return_feature_names: bool = True,
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
@@ -36,7 +37,10 @@ def get_sleep_edf_representation(
     eeg_0, eeg_1, eog = data.numpy()
     multichannel_sleep_edf = SleepEDFMeasurement(eeg_0, eeg_1, eog, fs)
     return get_representations(
-        multichannel_sleep_edf, representation_types=representation_types, windows_params=windows_params
+        multichannel_sleep_edf,
+        representation_types=representation_types,
+        windows_params=windows_params,
+        return_feature_names=return_feature_names,
     )
 
 

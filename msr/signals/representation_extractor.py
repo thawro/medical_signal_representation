@@ -16,9 +16,14 @@ class RepresentationExtractor:
         if representation_types == "all":
             representation_types = list(self.measurement.representations.keys())
         return {
-            rep_type: self.measurement.representations[rep_type](return_arr=return_arr, **kwargs)
+            rep_type: self.measurement.representations_funcs[rep_type](return_arr=return_arr, **kwargs)
             for rep_type in representation_types
         }
+
+    def get_feature_names(self, representation_types: List[str]):
+        if representation_types == "all":
+            representation_types = list(self.measurement.representations.keys())
+        return {rep_type: self.measurement.feature_names_funcs[rep_type]() for rep_type in representation_types}
 
 
 class PeriodicRepresentationExtractor(RepresentationExtractor):

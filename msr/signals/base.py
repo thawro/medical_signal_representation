@@ -642,11 +642,16 @@ class MultiChannelSignal:
         self.signals = signals
         self.n_signals = len(signals)
 
-        self.representations = {
+        self.representations_funcs = {
             "whole_signal_waveforms": self.get_whole_signal_waveforms,
             "whole_signal_features": self.get_whole_signal_features,
             "windows_waveforms": self.get_windows_waveforms,
             "windows_features": self.get_windows_features,
+        }
+
+        self.feature_names_funcs = {
+            "whole_signal_features": self.get_whole_signal_feature_names,
+            "windows_features": self.get_windows_feature_names,
         }
 
         signals_extraction_funcs = [{name: sig.extract_features for name, sig in self.signals.items()}]
@@ -761,12 +766,19 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
     def __init__(self, signals: Dict[str, PeriodicSignal]):
         super().__init__(signals)
 
-        self.representations.update(
+        self.representations_funcs.update(
             {
                 "beats_waveforms": self.get_beats_waveforms,
                 "beats_features": self.get_beats_features,
                 "agg_beat_waveforms": self.get_agg_beat_waveforms,
                 "agg_beat_features": self.get_agg_beat_features,
+            }
+        )
+
+        self.feature_names_funcs.update(
+            {
+                "beats_features": self.get_beats_feature_names,
+                "agg_beat_features": self.get_agg_beat_feature_names,
             }
         )
 

@@ -23,6 +23,7 @@ def get_ptbxl_representation(
     windows_params: Dict[str, Union[str, float, int]] = dict(win_len_s=3, step_s=2),
     representation_types: List[str] = ["whole_signal_waveforms"],
     fs: float = 100,
+    return_feature_names: bool = False,
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
@@ -40,6 +41,7 @@ def get_ptbxl_representation(
         n_beats=n_beats,
         agg_beat_params=agg_beat_params,
         windows_params=windows_params,
+        return_feature_names=return_feature_names,
     )
 
 
