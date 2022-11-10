@@ -22,6 +22,7 @@ def main(cfg: DictConfig):
         create_raw_tensors_dataset(
             fs=cfg.raw_data.fs, target=cfg.raw_data.target, encode_targets=cfg.create_raw_tensors.encode_targets
         )
+    log.info("Finished.")
 
 
 if __name__ == "__main__":

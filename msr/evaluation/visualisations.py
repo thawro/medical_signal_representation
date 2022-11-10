@@ -5,20 +5,20 @@ import seaborn as sns
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
 
 
-def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, class_names: np.ndarray, ax=None):
+def plot_confusion_matrix(target: np.ndarray, preds: np.ndarray, class_names: np.ndarray, ax=None):
     """Plot confustion matric
 
     Args:
-        y_true (np.ndarray): Ground truth labels.
+        targets (np.ndarray): Ground truth labels.
         y_pred (np.ndarray): Predicted labels.
         class_names (np.ndarray): Class names.
         ax (_type_): Axes to plot on. If `None`, new Axes is created. Defaults to `None`.
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=(16, 12))
-    accuracy = accuracy_score(y_true, y_pred)
-    fscore = f1_score(y_true, y_pred, average="macro")
-    conf_matrix = pd.DataFrame(confusion_matrix(y_true, y_pred), columns=class_names, index=class_names).astype(int)
+    accuracy = accuracy_score(target, preds)
+    fscore = f1_score(target, preds, average="macro")
+    conf_matrix = pd.DataFrame(confusion_matrix(target, preds), columns=class_names, index=class_names).astype(int)
     sns.heatmap(conf_matrix, ax=ax, annot=True, fmt=".4g", cmap="Blues", cbar=False)
     ax.set_xlabel("Predicted", fontsize=20)
     ax.set_ylabel("True", fontsize=20)

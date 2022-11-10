@@ -1,7 +1,43 @@
 from typing import Dict, List
 
 import numpy as np
+import torch
+import torchmetrics
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+
+
+class Metrics:
+    def get_metrics(self, preds: torch.Tensor, target: torch.Tensor):
+        preds = torch.from_numpy(preds) if isinstance(preds, np.ndarray) else preds
+        target = torch.from_numpy(target) if isinstance(target, np.ndarray) else target
+        metrics = {}
+        for name, metric in self.metrics.items():
+            if name in ["auc"]:  # AUC requires both tensors to be 1D
+                metrics[name] = metric(preds.argmax(1), target).item()
+            else:
+                metrics[name] = metric(preds, target).item()
+        return metrics
+
+
+class ClafficationMetrics(Metrics):
+    def __init__(self, num_classes: int):
+        self.num_classes = num_classes
+        self.metrics = dict(
+            accuracy=torchmetrics.Accuracy(num_classes=num_classes),
+            fscore=torchmetrics.F1Score(num_classes=num_classes, average="macro"),
+            auroc=torchmetrics.AUROC(num_classes=num_classes),
+            auc=torchmetrics.AUC(reorder=True),
+        )
+
+
+class RegressionMetrics(Metrics):
+    def __init__(self):
+        self.metrics = dict(
+            mae=torchmetrics.MeanAbsoluteError(),
+            mape=torchmetrics.MeanAbsolutePercentageError(),
+            corr=torchmetrics.PearsonCorrCoef(),
+            r2=torchmetrics.R2Score(),
+        )
 
 
 def get_classification_metrics(

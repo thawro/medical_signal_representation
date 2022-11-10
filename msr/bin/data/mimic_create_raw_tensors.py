@@ -38,6 +38,7 @@ def main(cfg: DictConfig):
             fs=cfg.raw_data.fs,
             targets=cfg.create_raw_tensors.split.targets,
         )
+    log.info("Finished.")
 
 
 if __name__ == "__main__":

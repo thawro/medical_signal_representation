@@ -23,6 +23,7 @@ def main(cfg: DictConfig):
         windows_params=cfg.create_representations.windows_params,
         fs=cfg.raw_data.fs,
     )
+    log.info("Finished.")
 
 
 if __name__ == "__main__":

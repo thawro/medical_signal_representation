@@ -45,6 +45,7 @@ def main(cfg: DictConfig):
         )
         splits_info.to_csv(SPLIT_INFO_PATH, index=False)
         create_raw_tensors_dataset()
+    log.info("Finished.")
 
 
 if __name__ == "__main__":
