@@ -14,6 +14,12 @@ class Metrics:
         for name, metric in self.metrics.items():
             if name in ["auc"]:  # AUC requires both tensors to be 1D
                 metrics[name] = metric(preds.argmax(1), target).item()
+            elif name in ["roc"]:
+                fpr, tpr, threshold = metric(preds, target)
+                fpr = [el.numpy() for el in fpr]
+                tpr = [el.numpy() for el in tpr]
+                threshold = [el.numpy() for el in threshold]
+                metrics[name] = fpr, tpr, threshold
             else:
                 metrics[name] = metric(preds, target).item()
         return metrics
@@ -27,6 +33,7 @@ class ClafficationMetrics(Metrics):
             fscore=torchmetrics.F1Score(num_classes=num_classes, average="macro"),
             auroc=torchmetrics.AUROC(num_classes=num_classes),
             auc=torchmetrics.AUC(reorder=True),
+            roc=torchmetrics.ROC(num_classes=num_classes),
         )
 
 

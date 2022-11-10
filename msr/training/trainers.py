@@ -32,7 +32,7 @@ class MLTrainer:
         pass
 
     @abstractmethod
-    def plot_evaluation(self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]]):
+    def plot_evaluation(self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]], metrics: Dict[str, float]):
         pass
 
     def evaluate(self, plot=False):
@@ -42,14 +42,16 @@ class MLTrainer:
             "val": {"preds": y_pred_val, "target": self.datamodule.val.targets},
             "test": {"preds": y_pred_test, "target": self.datamodule.test.targets},
         }
-        val_metrics = self.metrics.get_metrics(**y_values["val"])
-        test_metrics = self.metrics.get_metrics(**y_values["test"])
 
-        print(val_metrics)
-        print(test_metrics)
+        metrics = {
+            "val": self.metrics.get_metrics(**y_values["val"]),
+            "test": self.metrics.get_metrics(**y_values["test"]),
+        }
 
         if plot:
-            self.plot_evaluation(y_values)
+            self.plot_evaluation(y_values, metrics)
+
+        return metrics
 
 
 class MLClassifierTrainer(MLTrainer):
@@ -58,7 +60,8 @@ class MLClassifierTrainer(MLTrainer):
         self.datamodule = datamodule
         self.class_names = datamodule.class_names
         self.feature_names = datamodule.feature_names
-        self.metrics = ClafficationMetrics(num_classes=len(self.class_names))
+        self.num_classes = len(self.class_names)
+        self.metrics = ClafficationMetrics(num_classes=self.num_classes)
 
     def predict_proba(self, X):
         return self.model.predict_proba(X)
@@ -72,15 +75,33 @@ class MLClassifierTrainer(MLTrainer):
     def test(self):
         return self.predict_proba(self.datamodule.test.data.numpy())
 
-    def plot_evaluation(self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]]):
+    def plot_roc(self, fpr, tpr, class_names, axes=None):
+        num_classes = len(class_names)
+        if axes is None:
+            fig, axes = plt.subplots(1, num_classes, figsize=(num_classes * 3, 5))
+        for ax, _fpr, _tpr, class_name in zip(axes, fpr, tpr, class_names):
+            ax.plot(_fpr, _tpr)
+            ax.plot([0, 1], [0, 1], ls="--", color="black", lw=0.6)
+            ax.set_title(class_name)
+
+    def plot_evaluation(self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]], metrics: Dict[str, float]):
         fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-        for ax, (split, y_dict) in zip(axes, y_values.items()):
-            plot_confusion_matrix(y_dict["target"], y_dict["preds"].argmax(axis=1), class_names=self.class_names, ax=ax)
+        for ax, (split, split_y_values) in zip(axes, y_values.items()):
+            plot_confusion_matrix(
+                split_y_values["target"], split_y_values["preds"].argmax(axis=1), class_names=self.class_names, ax=ax
+            )
             ax.set_title(split)
 
-        plot_feature_importance(
-            feat_names=self.feature_names, feat_importances=self.model.feature_importances_, n_best=15
-        )
+        for split, split_metrics in metrics.items():
+            fig, axes = plt.subplots(1, self.num_classes, figsize=(self.num_classes * 3.5, 3))
+            fprs, tprs, thresholds = split_metrics["roc"]
+            self.plot_roc(fprs, tprs, self.class_names, axes)
+            fig.suptitle(split)
+
+        if hasattr(self.model, "feature_importances_"):
+            plot_feature_importance(
+                feat_names=self.feature_names, feat_importances=self.model.feature_importances_, n_best=15
+            )
 
 
 class MLRegressorTrainer(MLTrainer):
