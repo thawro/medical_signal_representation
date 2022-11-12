@@ -4,13 +4,8 @@ from typing import Dict, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
-from msr.evaluation.metrics import (
-    ClafficationMetrics,
-    RegressionMetrics,
-    get_classification_metrics,
-    get_regression_metrics,
-)
-from msr.evaluation.visualisations import plot_confusion_matrix, plot_feature_importance
+from msr.evaluation.metrics import ClafficationMetrics, RegressionMetrics
+from msr.evaluation.visualisations import BasePlotter, MatplotlibPlotter, PlotlyPlotter
 from msr.training.data.datamodules import BaseDataModule
 from msr.training.utils import BasePredictor
 
@@ -32,10 +27,12 @@ class MLTrainer:
         pass
 
     @abstractmethod
-    def plot_evaluation(self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]], metrics: Dict[str, float]):
+    def plot_evaluation(
+        self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]], metrics: Dict[str, float], plotter: BasePlotter
+    ):
         pass
 
-    def evaluate(self, plot=False):
+    def evaluate(self, plotter: BasePlotter = None):
         y_pred_val = self.validate()
         y_pred_test = self.test()
         y_values = {
@@ -48,8 +45,8 @@ class MLTrainer:
             "test": self.metrics.get_metrics(**y_values["test"]),
         }
 
-        if plot:
-            self.plot_evaluation(y_values, metrics)
+        if plotter is not None:
+            self.plot_evaluation(y_values, metrics, plotter)
 
         return metrics
 
@@ -75,33 +72,16 @@ class MLClassifierTrainer(MLTrainer):
     def test(self):
         return self.predict_proba(self.datamodule.test.data.numpy())
 
-    def plot_roc(self, fpr, tpr, class_names, axes=None):
-        num_classes = len(class_names)
-        if axes is None:
-            fig, axes = plt.subplots(1, num_classes, figsize=(num_classes * 3, 5))
-        for ax, _fpr, _tpr, class_name in zip(axes, fpr, tpr, class_names):
-            ax.plot(_fpr, _tpr)
-            ax.plot([0, 1], [0, 1], ls="--", color="black", lw=0.6)
-            ax.set_title(class_name)
-
-    def plot_evaluation(self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]], metrics: Dict[str, float]):
-        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-        for ax, (split, split_y_values) in zip(axes, y_values.items()):
-            plot_confusion_matrix(
-                split_y_values["target"], split_y_values["preds"].argmax(axis=1), class_names=self.class_names, ax=ax
-            )
-            ax.set_title(split)
-
-        for split, split_metrics in metrics.items():
-            fig, axes = plt.subplots(1, self.num_classes, figsize=(self.num_classes * 3.5, 3))
-            fprs, tprs, thresholds = split_metrics["roc"]
-            self.plot_roc(fprs, tprs, self.class_names, axes)
-            fig.suptitle(split)
-
+    def plot_evaluation(
+        self,
+        y_values: Dict[str, Tuple[np.ndarray, np.ndarray]],
+        metrics: Dict[str, float],
+        plotter: BasePlotter = PlotlyPlotter(),
+    ):
+        plotter.confusion_matrix(y_values, self.class_names)
+        plotter.roc_curve(metrics, self.class_names)
         if hasattr(self.model, "feature_importances_"):
-            plot_feature_importance(
-                feat_names=self.feature_names, feat_importances=self.model.feature_importances_, n_best=15
-            )
+            plotter.feature_importances(self.feature_names, self.model.feature_importances_, n_best=15)
 
 
 class MLRegressorTrainer(MLTrainer):
@@ -116,6 +96,6 @@ class MLRegressorTrainer(MLTrainer):
     def test(self):
         return self.model.predict(self.datamodule.test.data.numpy())
 
-    def plot_evaluation(self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]]):
+    def plot_evaluation(self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]], plotter: BasePlotter):
         # TODO
         pass
