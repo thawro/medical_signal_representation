@@ -31,6 +31,7 @@ rich = "^12.6.0"
 pytorch-lightning = "^1.8.0.post1"
 torchmetrics = "^0.10.2"
 sorcery = "^0.2.2"
+wandb = "^0.13.5"
 
 
 [build-system]

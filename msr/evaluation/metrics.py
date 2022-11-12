@@ -10,6 +10,7 @@ class Metrics:
     def get_metrics(self, preds: torch.Tensor, target: torch.Tensor):
         preds = torch.from_numpy(preds) if isinstance(preds, np.ndarray) else preds
         target = torch.from_numpy(target) if isinstance(target, np.ndarray) else target
+        preds, target = preds.float(), target.float()
         metrics = {}
         for name, metric in self.metrics.items():
             if name in ["auc"]:  # AUC requires both tensors to be 1D

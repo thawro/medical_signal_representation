@@ -42,16 +42,11 @@ def matplotlib_scatterplot(x, y, ax=None, marker="o", s=100, color=palette[0], *
     return ax
 
 
-def matplotlib_roc_plot(fprs, tprs, class_names, axes=None):
-    if not isinstance(class_names, (list, np.ndarray)):
-        class_names, fprs, tprs = [class_names], [fprs], [tprs]
-    num_classes = len(class_names)
-    fig, axes = create_fig_if_axes_is_none(1, num_classes, figsize=(num_classes * 3, 5), axes=axes)
-    axes = [axes] if isinstance(axes, plt.Axes) else axes
-    for ax, fpr, tpr, class_name in zip(axes, fprs, tprs, class_names):
-        matplotlib_lineplot(x=fpr, y=tpr, xlabel="FPR", ylabel="TPR", title=class_name, ax=ax)
-        matplotlib_lineplot(x=[0, 1], y=[0, 1], color="black", ls="--", ax=ax)
-    return axes
+def matplotlib_roc_plot(fpr, tpr, class_name, ax=None):
+    fig, ax = create_fig_if_axes_is_none(1, 1, figsize=(3, 5), axes=ax)
+    matplotlib_lineplot(x=fpr, y=tpr, xlabel="FPR", ylabel="TPR", ls="-", title=class_name, ax=ax)
+    matplotlib_lineplot(x=[0, 1], y=[0, 1], color="black", ls="--", ax=ax)
+    return ax
 
 
 def matplotlib_confusion_matrix_plot(target: np.ndarray, preds: np.ndarray, class_names: np.ndarray, ax=None):
@@ -72,6 +67,7 @@ def matplotlib_confusion_matrix_plot(target: np.ndarray, preds: np.ndarray, clas
         ylabel=dict(ylabel="True", fontsize=20),
         title=dict(label="Confusion Matrix", fontsize=22),
     )
+    return fig
 
 
 def matplotlib_feature_importance_plot(
@@ -99,6 +95,7 @@ def matplotlib_feature_importance_plot(
         ylabel=dict(ylabel="Feature", fontsize=20),
         title=dict(label="Feature importance", fontsize=22),
     )
+    return fig
 
 
 def matplotlib_preds_vs_target(preds, target, ax=None):
@@ -146,16 +143,21 @@ def plotly_scatterplot(
     return fig
 
 
-def plotly_roc_plot(fprs, tprs, class_names):
-    if not isinstance(class_names, (list, np.ndarray)):
-        class_names, fprs, tprs = [class_names], [fprs], [tprs]
-    num_classes = len(class_names)
-    fig = make_subplots(rows=1, cols=num_classes, subplot_titles=class_names)
-    for i, (fpr, tpr, class_name) in enumerate(zip(fprs, tprs, class_names)):
-        fig.add_scatter(name=class_name, mode="lines", x=fpr, y=tpr, row=1, col=i + 1)
-        fig.add_scatter(
-            mode="lines", line_dash="dash", x=[0, 1], y=[0, 1], row=1, col=i + 1, marker=dict(color="black")
-        )
+def plotly_roc_plot(fpr, tpr, class_name, fig=None, row=None, col=None):
+    if fig is None:
+        fig = px.line(x=fpr, y=tpr)
+    else:
+        fig.add_scatter(name=class_name, mode="lines", x=fpr, y=tpr, row=row, col=col)
+    fig.add_scatter(
+        showlegend=False,
+        mode="lines",
+        line_dash="dash",
+        x=[0, 1],
+        y=[0, 1],
+        row=row,
+        col=col,
+        marker=dict(color="black"),
+    )
     return fig
 
 
