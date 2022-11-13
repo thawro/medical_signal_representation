@@ -3,7 +3,7 @@ import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from msr.data.representation.ptbxl import (
+from msr.data.create_representations.ptbxl import (
     DATASET_PATH,
     create_ptbxl_representations_dataset,
 )
@@ -26,6 +26,7 @@ def main(cfg: DictConfig):
         agg_beat_params=cfg.agg_beat_params,
         windows_params=cfg.windows_params,
         fs=cfg.raw_data.fs,
+        n_jobs=cfg.n_jobs,
     )
     REPRESENTATIONS_PATH = DATASET_PATH / f"representations_{cfg.raw_data.fs}"
     log.info("Representasions dataset creation finished")

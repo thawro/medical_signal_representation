@@ -4,13 +4,13 @@ from typing import Dict, List, Union
 import numpy as np
 import torch
 
-from msr.data.measurements.mimic import MimicMeasurement
-from msr.data.raw.mimic import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
-from msr.data.representation.utils import (
+from msr.data.create_representations.utils import (
     create_representations_dataset,
     get_periodic_representations,
     load_split,
 )
+from msr.data.download.mimic import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
+from msr.data.measurements.mimic import MimicMeasurement
 
 REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
 
@@ -32,7 +32,7 @@ def get_mimic_representation(
     Returns:
         Dict[str, torch.Tensor]: Dict with representations names as keys and `torch.Tensor` objects as values.
     """
-    ppg, ecg = data.numpy()
+    ppg, ecg = data.T.numpy()
     multichannel_mimic = MimicMeasurement(ppg, ecg, fs=fs)
     return get_periodic_representations(
         multichannel_mimic,
@@ -52,6 +52,7 @@ def create_mimic_representations_dataset(
     agg_beat_params: Dict[str, Union[str, float, int]],
     windows_params: Dict[str, Union[str, float, int]],
     fs: float = 100,
+    n_jobs: int = 1,
 ):
     """Create and save data files (`.pt`) for all representations.
     TODO
@@ -71,6 +72,7 @@ def create_mimic_representations_dataset(
         raw_tensors_path=RAW_TENSORS_DATA_PATH,
         representations_path=REPRESENTATIONS_PATH,
         get_repr_func=get_repr_func,
+        n_jobs=n_jobs,
     )
 
 

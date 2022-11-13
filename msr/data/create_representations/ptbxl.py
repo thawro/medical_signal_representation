@@ -6,13 +6,13 @@ from typing import Dict, List, Union
 import numpy as np
 import torch
 
-from msr.data.measurements.ptbxl import PtbXLMeasurement
-from msr.data.raw.ptbxl import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
-from msr.data.representation.utils import (
+from msr.data.create_representations.utils import (
     create_representations_dataset,
     get_periodic_representations,
     load_split,
 )
+from msr.data.download.ptbxl import DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH
+from msr.data.measurements.ptbxl import PtbXLMeasurement
 
 
 def get_ptbxl_representation(
@@ -52,6 +52,7 @@ def create_ptbxl_representations_dataset(
     agg_beat_params: Dict[str, Union[str, float, int]],
     windows_params: Dict[str, Union[str, float, int]],
     fs: float = 100,
+    n_jobs: int = 1,
 ):
     """Create and save data files (`.pt`) for all representations.
     TODO
@@ -71,6 +72,7 @@ def create_ptbxl_representations_dataset(
         raw_tensors_path=RAW_TENSORS_DATA_PATH,
         representations_path=DATASET_PATH / f"representations_{fs}",
         get_repr_func=get_repr_func,
+        n_jobs=n_jobs,
     )
 
 

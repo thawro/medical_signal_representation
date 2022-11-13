@@ -5,10 +5,9 @@ import plotly.express as px
 import plotly.figure_factory as ff
 import plotly.graph_objects as go
 import seaborn as sns
-from plotly.subplots import make_subplots
 from sklearn.metrics import confusion_matrix
 
-palette = sns.color_palette()
+sns_palette = sns.color_palette()
 
 
 def create_fig_if_axes_is_none(nrows=1, ncols=1, figsize=(7, 5), axes=None):
@@ -28,14 +27,14 @@ def set_ax_params(ax, **kwargs):
             getattr(ax, f"set_{name}")(value)
 
 
-def matplotlib_lineplot(x, y, ax=None, ls="--", lw=1, color=palette[0], **kwargs):
+def matplotlib_lineplot(x, y, ax=None, ls="--", lw=1, color=sns_palette[0], **kwargs):
     fig, ax = create_fig_if_axes_is_none(axes=ax)
     ax.plot(x, y, color=color, ls=ls, lw=lw)
     set_ax_params(ax, **kwargs)
     return ax
 
 
-def matplotlib_scatterplot(x, y, ax=None, marker="o", s=100, color=palette[0], **kwargs):
+def matplotlib_scatterplot(x, y, ax=None, marker="o", s=100, color=sns_palette[0], **kwargs):
     fig, ax = create_fig_if_axes_is_none(axes=ax)
     ax.scatter(x, y, color=color, marker=marker, s=s)
     set_ax_params(ax, **kwargs)
@@ -108,39 +107,6 @@ def matplotlib_preds_vs_target(preds, target, ax=None):
         ylabel=dict(ylabel="Preds", fontsize=20),
         title=dict(label="Target vs Preds", fontsize=22),
     )
-
-
-def plotly_lineplot(
-    x=None,
-    y=None,
-    df=None,
-    color=palette[0],
-    line_dash=None,
-    width=800,
-    height=400,
-    fig=None,
-    row=None,
-    col=None,
-    **kwargs,
-):
-    color = f"rgb({f','.join([str(int(c*255)) for c in color])})" if isinstance(color, (tuple, list)) else color
-    if fig is None:
-        fig = px.line(data_frame=df, x=x, y=y, line_dash=line_dash, width=width, height=height, color=color)
-    else:
-        fig.add_scatter(mode="lines", x=x, y=y, row=row, col=col, line=dict(dash=line_dash), marker=dict(color=color))
-    fig.update_layout(**kwargs)
-    return fig
-
-
-def plotly_scatterplot(
-    x=None, y=None, df=None, color=palette[0], width=800, height=400, fig=None, row=None, col=None, **kwargs
-):
-    if fig is None:
-        fig = px.scatter(data_frame=df, x=x, y=y, width=width, height=height)
-    else:
-        fig.add_scatter(mode="markers", x=x, y=y, row=row, col=col)
-    fig.update_layout(**kwargs)
-    return fig
 
 
 def plotly_roc_plot(fpr, tpr, class_name, fig=None, row=None, col=None):

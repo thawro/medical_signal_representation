@@ -3,7 +3,7 @@ import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from msr.data.raw.ptbxl import (
+from msr.data.download.ptbxl import (
     DATASET_PATH,
     RAW_TENSORS_PATH,
     ZIP_FILE_URL,

@@ -5,7 +5,7 @@ from omegaconf import DictConfig, OmegaConf
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-from msr.data.raw.sleep_edf import (
+from msr.data.download.sleep_edf import (
     DATASET_PATH,
     RAW_TENSORS_PATH,
     SPLIT_INFO_PATH,

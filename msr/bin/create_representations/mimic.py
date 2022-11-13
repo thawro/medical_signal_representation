@@ -3,7 +3,7 @@ import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from msr.data.representation.mimic import (
+from msr.data.create_representations.mimic import (
     REPRESENTATIONS_PATH,
     create_mimic_representations_dataset,
 )
@@ -25,6 +25,7 @@ def main(cfg: DictConfig):
         agg_beat_params=cfg.agg_beat_params,
         windows_params=cfg.windows_params,
         fs=cfg.raw_data.fs,
+        n_jobs=cfg.n_jobs,
     )
     log.info("Representasions dataset creation finished")
     OmegaConf.save(cfg, REPRESENTATIONS_PATH / "config.yaml")

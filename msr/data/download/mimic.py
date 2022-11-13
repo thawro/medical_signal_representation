@@ -16,7 +16,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from tqdm.auto import tqdm
 
-from msr.data.raw.utils import cut_segments_into_samples, validate_signal
+from msr.data.download.utils import cut_segments_into_samples, validate_signal
 from msr.data.utils import create_train_val_test_split_info
 from msr.signals.ecg import ECGSignal, check_ecg_polarity, find_intervals_using_hr
 from msr.signals.utils import resample

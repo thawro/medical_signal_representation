@@ -5,17 +5,17 @@ from typing import Dict, List, Union
 import numpy as np
 import torch
 
-from msr.data.measurements.sleep_edf import SleepEDFMeasurement
-from msr.data.raw.sleep_edf import (
-    DATASET_PATH,
-    RAW_TENSORS_DATA_PATH,
-    RAW_TENSORS_TARGETS_PATH,
-)
-from msr.data.representation.utils import (
+from msr.data.create_representations.utils import (
     create_representations_dataset,
     get_representations,
     load_split,
 )
+from msr.data.download.sleep_edf import (
+    DATASET_PATH,
+    RAW_TENSORS_DATA_PATH,
+    RAW_TENSORS_TARGETS_PATH,
+)
+from msr.data.measurements.sleep_edf import SleepEDFMeasurement
 
 REPRESENTATIONS_PATH = DATASET_PATH / f"representations"
 
@@ -45,9 +45,7 @@ def get_sleep_edf_representation(
 
 
 def create_sleep_edf_representations_dataset(
-    representation_types: List[str],
-    windows_params: Dict[str, Union[str, float, int]],
-    fs: float = 100,
+    representation_types: List[str], windows_params: Dict[str, Union[str, float, int]], fs: float = 100, n_jobs: int = 1
 ):
     """Create and save data files (`.pt`) for all representations.
     TODO
@@ -64,6 +62,7 @@ def create_sleep_edf_representations_dataset(
         raw_tensors_path=RAW_TENSORS_DATA_PATH,
         representations_path=REPRESENTATIONS_PATH,
         get_repr_func=get_repr_func,
+        n_jobs=n_jobs,
     )
 
 

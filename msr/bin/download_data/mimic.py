@@ -6,7 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-from msr.data.raw.mimic import (
+from msr.data.download.mimic import (
     RAW_TENSORS_PATH,
     create_raw_tensors_dataset,
     download_validate_and_segment,

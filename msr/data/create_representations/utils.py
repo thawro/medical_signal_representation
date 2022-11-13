@@ -92,7 +92,7 @@ def save_feature_names(path, representations_feature_names):
         np.save(representation_path / f"feature_names.npy", feature_names)
 
 
-def create_representations_dataset(raw_tensors_path, representations_path, get_repr_func, use_multiprocessing=False):
+def create_representations_dataset(raw_tensors_path, representations_path, get_repr_func, n_jobs=1):
     log.info(f"Creating representation dataset.")
     log.info(f"Data used to create representations is loaded from {raw_tensors_path}")
     log.info(f"Representations will be stored in {representations_path}")
@@ -106,12 +106,12 @@ def create_representations_dataset(raw_tensors_path, representations_path, get_r
         if is_features_in_rep_types and i == 0:  # every split has the same features so no need to run it for all splits
             _, representations_feature_names = get_repr_func(all_data[0], return_feature_names=True)
             save_feature_names(representations_path, representations_feature_names)
-        if use_multiprocessing:
-            reps = Parallel(n_jobs=-1)(
+        if n_jobs == 1:
+            reps = [get_repr_func(data) for data in tqdm(all_data, desc="Extracting representations")]
+        else:
+            reps = Parallel(n_jobs=n_jobs)(
                 delayed(get_repr_func)(data) for data in tqdm(all_data, desc="Extracting representations")
             )
-        else:
-            reps = [get_repr_func(data) for data in tqdm(all_data, desc="Extracting representations")]
         rep_types = reps[0].keys()
         reps = {rep_type: torch.tensor(np.array([rep[rep_type] for rep in reps])) for rep_type in rep_types}
 

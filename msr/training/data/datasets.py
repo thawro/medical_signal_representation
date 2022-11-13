@@ -8,9 +8,9 @@ import seaborn as sns
 import torch
 from torch.utils.data import Dataset
 
-from msr.data.representation.mimic import load_mimic_split
-from msr.data.representation.ptbxl import load_ptbxl_split
-from msr.data.representation.sleep_edf import load_sleep_edf_split
+from msr.data.create_representations.mimic import load_mimic_split
+from msr.data.create_representations.ptbxl import load_ptbxl_split
+from msr.data.create_representations.sleep_edf import load_sleep_edf_split
 from msr.utils import align_left
 
 sns.set(style="whitegrid")

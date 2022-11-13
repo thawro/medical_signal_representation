@@ -3,7 +3,7 @@ import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from msr.data.representation.sleep_edf import (
+from msr.data.create_representations.sleep_edf import (
     REPRESENTATIONS_PATH,
     create_sleep_edf_representations_dataset,
 )
@@ -23,6 +23,7 @@ def main(cfg: DictConfig):
         representation_types=cfg.representation_types,
         windows_params=cfg.windows_params,
         fs=cfg.raw_data.fs,
+        n_jobs=cfg.n_jobs,
     )
     log.info("Representasions dataset creation finished")
     OmegaConf.save(cfg, REPRESENTATIONS_PATH / "config.yaml")
