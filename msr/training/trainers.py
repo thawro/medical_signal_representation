@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 
-from msr.evaluation.loggers import BaseWandbLogger
+from msr.evaluation.loggers import MLWandbLogger
 from msr.evaluation.metrics import ClafficationMetrics, RegressionMetrics
 from msr.evaluation.plotters import BasePlotter, MatplotlibPlotter, PlotlyPlotter
 from msr.training.data.datamodules import BaseDataModule
@@ -37,7 +37,7 @@ class MLTrainer:
     ):
         pass
 
-    def evaluate(self, plotter: BasePlotter = None, logger: BaseWandbLogger = None):
+    def evaluate(self, plotter: BasePlotter = None, logger: MLWandbLogger = None):
         all_y_values = {
             # "train": {"preds": self.train(), "target": self.datamodule.train.targets},
             "val": {"preds": self.validate(), "target": self.datamodule.val.targets},

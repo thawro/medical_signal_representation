@@ -10,18 +10,16 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 
-@hydra.main(version_base=None, config_path="../../configs/data", config_name="ptbxl")
+@hydra.main(version_base=None, config_path="../../configs/download_data", config_name="ptbxl")
 def main(cfg: DictConfig):
-    log.info("Creating PTB-XL raw tensors dataset")
-    print_config_tree(cfg, keys=["raw_data", "create_raw_tensors"])
+    log.info("Downloading PTB-XL data and saving raw tensors")
+    print_config_tree(cfg, keys=["raw_data", "download", "create_splits", "encode_targets"])
 
-    if cfg.create_raw_tensors.download:
+    if cfg.download:
         download_zip_and_extract(zip_file_url=ZIP_FILE_URL, dest_path=DATASET_PATH)
 
-    if cfg.create_raw_tensors.create_splits:
-        create_raw_tensors_dataset(
-            fs=cfg.raw_data.fs, target=cfg.raw_data.target, encode_targets=cfg.create_raw_tensors.encode_targets
-        )
+    if cfg.create_splits:
+        create_raw_tensors_dataset(fs=cfg.raw_data.fs, target=cfg.raw_data.target, encode_targets=cfg.encode_targets)
     log.info("Finished.")
 
 

@@ -1,0 +1,11 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+raw_data:
+  fs: 100                    # sampling frequency of PTB-XL signals
+  target: diagnostic_class        # target used for predictions
+
+download: true
+create_splits: true
+encode_targets: true

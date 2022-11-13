@@ -1,0 +1,25 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+raw_data:
+  fs: 100                    # sampling frequency of PTB-XL signals
+  target: diagnostic_class        # target used for predictions
+
+beats_params:
+  source_channel: ecg_2
+n_beats: 7
+agg_beat_params:
+  valid_only: false
+windows_params:
+  win_len_s: 6
+  step_s: 2
+representation_types:
+  # - whole_signal_waveforms
+  # - windows_waveforms
+  # - beats_waveforms
+  # - agg_beat_waveforms
+  - whole_signal_features
+  - windows_features
+  - beats_features
+  - agg_beat_features

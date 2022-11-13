@@ -9,6 +9,7 @@ from typing import Callable, List, Union
 
 import numpy as np
 import pandas as pd
+import pyrootutils
 import rich
 import rich.syntax
 import rich.tree
@@ -18,7 +19,14 @@ from joblib import Parallel, delayed
 from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 
-ROOT = Path(__file__).parent.parent
+ROOT = pyrootutils.setup_root(
+    search_from=__file__,
+    indicator=[".git", "pyproject.toml"],
+    pythonpath=True,
+    dotenv=True,
+)
+
+ROOT = Path(ROOT)
 DATA_PATH = ROOT / "data"
 
 import logging
@@ -141,7 +149,7 @@ def ordered_dict_to_dict(dct):
         return dict(dct)
 
 
-def print_config_tree(cfg: DictConfig, keys: List[str], style: str = "dim"):
+def print_config_tree(cfg: DictConfig, keys: List[str] = "all", style: str = "dim"):
     tree = rich.tree.Tree("CONFIG", style=style, guide_style=style)
     for key, group in cfg.items():
         if key in keys:

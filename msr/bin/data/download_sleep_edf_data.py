@@ -17,31 +17,43 @@ from msr.data.utils import create_train_val_test_split_info
 from msr.utils import download_zip_and_extract, print_config_tree
 
 
-@hydra.main(version_base=None, config_path="../../configs/data", config_name=f"sleep_edf")
+@hydra.main(version_base=None, config_path="../../configs/download_data", config_name="sleep_edf")
 def main(cfg: DictConfig):
-    log.info("Creating Sleep-EDF raw tensors dataset")
-    print_config_tree(cfg, keys=["raw_data", "create_raw_tensors"])
+    log.info("Downloading Sleep-EDF data and saving raw tensors")
+    print_config_tree(
+        cfg,
+        keys=[
+            "raw_data",
+            "download",
+            "create_raw_csv",
+            "create_splits",
+            "sig_names",
+            "sample_len_sec",
+            "verbose",
+            "split",
+        ],
+    )
 
-    if cfg.create_raw_tensors.download:
+    if cfg.download:
         download_zip_and_extract(zip_file_url=ZIP_FILE_URL, dest_path=DATASET_PATH)
 
-    if cfg.create_raw_tensors.create_raw_csv:
+    if cfg.create_raw_csv:
         get_sleep_edf_raw_data_info()
         create_raw_csv_dataset(
-            sig_names=cfg.create_raw_tensors.sig_names,
-            sample_len_sec=cfg.create_raw_tensors.sample_len_sec,
-            verbose=cfg.create_raw_tensors.verbose,
+            sig_names=cfg.sig_names,
+            sample_len_sec=cfg.sample_len_sec,
+            verbose=cfg.verbose,
         )
 
-    if cfg.create_raw_tensors.create_splits:
+    if cfg.create_splits:
         info = get_sleep_edf_raw_data_info()
         splits_info = create_train_val_test_split_info(
             groups=info["subject"].values,
             info=info,
-            train_size=cfg.create_raw_tensors.split.train_size,
-            val_size=cfg.create_raw_tensors.split.val_size,
-            test_size=cfg.create_raw_tensors.split.test_size,
-            random_state=cfg.create_raw_tensors.split.random_state,
+            train_size=cfg.split.train_size,
+            val_size=cfg.split.val_size,
+            test_size=cfg.split.test_size,
+            random_state=cfg.split.random_state,
         )
         splits_info.to_csv(SPLIT_INFO_PATH, index=False)
         create_raw_tensors_dataset()

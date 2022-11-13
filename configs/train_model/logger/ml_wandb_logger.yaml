@@ -1,0 +1,4 @@
+_target_: msr.evaluation.loggers.MLWandbLogger
+project: "medical-signals-representation"
+entity: null
+run_name: ${datamodule.representation_type}_${model._target_}

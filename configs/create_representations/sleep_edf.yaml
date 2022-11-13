@@ -1,0 +1,15 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+raw_data:
+  fs: 100
+
+windows_params:
+  win_len_s: 10
+  step_s: 8
+representation_types:
+  # - whole_signal_waveforms
+  # - windows_waveforms
+  - windows_features
+  - whole_signal_features
