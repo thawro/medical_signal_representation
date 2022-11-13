@@ -1,23 +1,24 @@
 import logging
 
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 from msr.data.raw.mimic import (
+    RAW_TENSORS_PATH,
     create_raw_tensors_dataset,
     download_validate_and_segment,
     prepare_txt_files,
 )
-from msr.utils import print_config_tree
+from msr.utils import CONFIG_PATH, print_config_tree
 
 
-@hydra.main(version_base=None, config_path="../../configs/download_data", config_name="mimic")
+@hydra.main(version_base=None, config_path=CONFIG_PATH / "download_data", config_name="mimic")
 def main(cfg: DictConfig):
     log.info("Downloading MIMIC data and saving raw tensors")
-    print_config_tree(cfg, keys=["raw_data", "create_raw_tensors"])
+    print_config_tree(cfg, keys="all")
 
     if cfg.download:
         prepare_txt_files()
@@ -38,7 +39,10 @@ def main(cfg: DictConfig):
             fs=cfg.raw_data.fs,
             targets=cfg.split.targets,
         )
-    log.info("Finished.")
+    log.info("Data downloaded and saved as tensors")
+    OmegaConf.save(cfg, RAW_TENSORS_PATH / "config.yaml")
+    log.info("Config file saved in representations directory")
+    log.info("Finished")
 
 
 if __name__ == "__main__":

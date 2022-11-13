@@ -23,6 +23,7 @@ def get_mimic_representation(
     agg_beat_params: Dict[str, Union[str, float, int]],
     windows_params: Dict[str, Union[str, float, int]],
     fs: float = 125,
+    return_feature_names: bool = False,
 ):
     """Get all types of representations (returned by ECGSignal objects).
     Args:
@@ -40,6 +41,7 @@ def get_mimic_representation(
         n_beats=n_beats,
         agg_beat_params=agg_beat_params,
         windows_params=windows_params,
+        return_feature_names=return_feature_names,
     )
 
 
