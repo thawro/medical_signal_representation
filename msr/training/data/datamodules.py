@@ -48,6 +48,7 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
             if hasattr(dataset, "feature_names"):
                 self.feature_names = dataset.feature_names
                 self.class_names = dataset.class_names
+                self.num_classes = len(self.class_names)
                 break
 
     def plot_targets(self):
@@ -61,21 +62,21 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def train_dataloader(self):
         return DataLoader(
             self.train,
-            batch_sampler=StratifiedBatchSampler(self.train[:, 1], batch_size=self.batch_size, shuffle=True),
+            batch_sampler=StratifiedBatchSampler(self.train[:][1], batch_size=self.batch_size, shuffle=True),
             num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
         return DataLoader(
             self.val,
-            batch_sampler=StratifiedBatchSampler(self.val[:, 1], batch_size=10 * self.batch_size, shuffle=False),
+            batch_sampler=StratifiedBatchSampler(self.val[:][1], batch_size=10 * self.batch_size, shuffle=False),
             num_workers=self.num_workers,
         )
 
     def test_dataloader(self):
         return DataLoader(
             self.test,
-            batch_sampler=StratifiedBatchSampler(self.test[:, 1], batch_size=10 * self.batch_size, shuffle=False),
+            batch_sampler=StratifiedBatchSampler(self.test[:][1], batch_size=10 * self.batch_size, shuffle=False),
             num_workers=self.num_workers,
         )
 

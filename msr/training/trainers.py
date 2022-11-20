@@ -1,12 +1,19 @@
 from abc import abstractmethod
+from functools import partial
 from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
 
 from msr.evaluation.loggers import MLWandbLogger
-from msr.evaluation.metrics import ClafficationMetrics, RegressionMetrics
-from msr.evaluation.plotters import BasePlotter, MatplotlibPlotter, PlotlyPlotter
+from msr.evaluation.metrics import get_classification_metrics, get_regression_metrics
+from msr.evaluation.plotters import (
+    BasePlotter,
+    MatplotlibPlotter,
+    PlotlyPlotter,
+    plot_classifier_evaluation,
+    plot_regressor_evaluation,
+)
 from msr.training.data.datamodules import BaseDataModule
 from msr.training.utils import BasePredictor
 
@@ -22,15 +29,6 @@ class MLTrainer:
     def predict(self, X):
         return self.model.predict(X)
 
-    def train(self):
-        return self.predict(self.datamodule.train.data.numpy())
-
-    def validate(self):
-        return self.predict(self.datamodule.val.data.numpy())
-
-    def test(self):
-        return self.predict(self.datamodule.test.data.numpy())
-
     @abstractmethod
     def plot_evaluation(
         self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]], metrics: Dict[str, float], plotter: BasePlotter
@@ -38,13 +36,19 @@ class MLTrainer:
         pass
 
     def evaluate(self, plotter: BasePlotter = None, logger: MLWandbLogger = None):
+        val_data = self.datamodule.val.data.numpy()
+        val_targets = self.datamodule.val.targets
+
+        test_data = self.datamodule.test.data.numpy()
+        test_targets = self.datamodule.test.targets
+
         all_y_values = {
             # "train": {"preds": self.train(), "target": self.datamodule.train.targets},
-            "val": {"preds": self.validate(), "target": self.datamodule.val.targets},
-            "test": {"preds": self.test(), "target": self.datamodule.test.targets},
+            "val": {"preds": self.predict(val_data), "target": val_targets},
+            "test": {"preds": self.predict(test_data), "target": test_targets},
         }
 
-        metrics = {split: self.metrics.get_metrics(**y_values) for split, y_values in all_y_values.items()}
+        metrics = {split: self.get_metrics(**y_values) for split, y_values in all_y_values.items()}
         evaluation_results = {
             "metrics": pd.json_normalize(metrics, sep="/").to_dict(orient="records")[0]  # flattened dict
         }
@@ -68,39 +72,25 @@ class MLClassifierTrainer(MLTrainer):
         self.class_names = datamodule.class_names
         self.feature_names = datamodule.feature_names
         self.num_classes = len(self.class_names)
-        self.metrics = ClafficationMetrics(num_classes=self.num_classes)
+        self.get_metrics = partial(get_classification_metrics, num_classes=self.num_classes)
 
-    def predict_proba(self, X):
+    def predict(self, X):
         return self.model.predict_proba(X)
-
-    def train(self):
-        return self.predict_proba(self.datamodule.train.data.numpy())
-
-    def validate(self):
-        return self.predict_proba(self.datamodule.val.data.numpy())
-
-    def test(self):
-        return self.predict_proba(self.datamodule.test.data.numpy())
 
     def plot_evaluation(
         self,
-        y_values: Dict[str, Tuple[np.ndarray, np.ndarray]],
-        metrics: Dict[str, float],
+        y_values: Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]],
+        metrics: Dict[str, Dict[str, float]],
         plotter: BasePlotter = PlotlyPlotter(),
     ):
-        filtered_metrics = {
-            split: {metric: value for metric, value in split_metrics.items() if metric not in ["roc"]}
-            for split, split_metrics in metrics.items()
-        }
-        figs = {
-            "confusion_matrix": plotter.confusion_matrix(y_values, self.class_names),
-            "roc": plotter.roc_curve(metrics, self.class_names),
-            "metrics": plotter.metrics_comparison(filtered_metrics),
-        }
-        if hasattr(self.model, "feature_importances_"):
-            figs["feature_importances"] = plotter.feature_importances(
-                self.feature_names, self.model.feature_importances_, n_best=15
-            )
+        figs = plot_classifier_evaluation(
+            y_values=y_values,
+            metrics=metrics,
+            class_names=self.class_names,
+            feature_names=self.feature_names,
+            feature_importances=self.model.feature_importances_,
+            plotter=plotter,
+        )
         return figs
 
 
@@ -109,16 +99,7 @@ class MLRegressorTrainer(MLTrainer):
         self.model = model
         self.datamodule = datamodule
         self.feature_names = datamodule.feature_names
-        self.metrics = RegressionMetrics()
-
-    def train(self):
-        return self.predict(self.datamodule.train.data.numpy())
-
-    def validate(self):
-        return self.predict(self.datamodule.val.data.numpy())
-
-    def test(self):
-        return self.predict(self.datamodule.test.data.numpy())
+        self.get_metrics = get_regression_metrics
 
     def plot_evaluation(
         self,
@@ -126,9 +107,11 @@ class MLRegressorTrainer(MLTrainer):
         metrics: Dict[str, float],
         plotter: BasePlotter = PlotlyPlotter(),
     ):
-        figs = {"target_vs_preds": plotter.target_vs_preds(y_values), "metrics": plotter.metrics_comparison(metrics)}
-        if hasattr(self.model, "feature_importances_"):
-            figs["feature_importances"] = plotter.feature_importances(
-                self.feature_names, self.model.feature_importances_, n_best=15
-            )
+        figs = plot_classifier_evaluation(
+            y_values=y_values,
+            metrics=metrics,
+            feature_names=self.feature_names,
+            feature_importances=self.model.feature_importances_,
+            plotter=plotter,
+        )
         return figs

@@ -800,7 +800,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             source_channels.reverse()
             found_good_channel = False
             new_source_channel = source_channel
-            while not found_good_channel or len(source_channels) == 0:
+            while not found_good_channel and len(source_channels) > 0:
                 try:
                     signal = self.signals[new_source_channel]
                     signal.set_beats(**kwargs)

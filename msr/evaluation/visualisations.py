@@ -130,7 +130,7 @@ def plotly_roc_plot(fpr, tpr, class_name, fig=None, row=None, col=None):
 def plotly_confusion_matrix_plot(
     target: np.ndarray, preds: np.ndarray, class_names: np.ndarray, fig=None, row=None, col=None
 ):
-    conf_matrix = confusion_matrix(target, preds)
+    conf_matrix = confusion_matrix(target, preds, normalize=True)
     subfig = ff.create_annotated_heatmap(
         conf_matrix, annotation_text=conf_matrix, colorscale="Blues", hoverinfo="z", x=class_names, y=class_names
     )

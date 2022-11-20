@@ -1,6 +1,8 @@
 from abc import abstractmethod
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import seaborn as sns
@@ -154,3 +156,38 @@ class PlotlyPlotter(BasePlotter):
             )
         fig.show()
         return fig
+
+
+def plot_classifier_evaluation(
+    y_values: Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]],
+    metrics: Dict[str, Dict[str, float]],
+    class_names: List[str],
+    feature_names: List[str],
+    feature_importances: List[float],
+    plotter: BasePlotter = PlotlyPlotter(),
+):
+    filtered_metrics = {
+        split: {metric: value for metric, value in split_metrics.items() if metric not in ["roc"]}
+        for split, split_metrics in metrics.items()
+    }
+    figs = {
+        "confusion_matrix": plotter.confusion_matrix(y_values, class_names),
+        "roc": plotter.roc_curve(metrics, class_names),
+        "metrics": plotter.metrics_comparison(filtered_metrics),
+    }
+    if feature_importances is not None and feature_names is not None:
+        figs["feature_importances"] = plotter.feature_importances(feature_names, feature_importances, n_best=15)
+    return figs
+
+
+def plot_regressor_evaluation(
+    y_values: Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]],
+    metrics: Dict[str, Dict[str, float]],
+    feature_names: List[str],
+    feature_importances: List[float],
+    plotter: BasePlotter = PlotlyPlotter(),
+):
+    figs = {"metrics": plotter.metrics_comparison(metrics), "target_vs_preds": plotter.target_vs_preds(y_values)}
+    if feature_importances is not None and feature_names is not None:
+        figs["feature_importances"] = plotter.feature_importances(feature_names, feature_importances, n_best=15)
+    return figs
