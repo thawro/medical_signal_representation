@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Dict, List
 
 import numpy as np
@@ -32,20 +33,20 @@ def get_metrics(metrics_funcs, preds: torch.Tensor, target: torch.Tensor):
 
 def get_classification_metrics(num_classes, preds, target):
     classification_metrics = dict(
-        accuracy=accuracy(num_classes=num_classes),
-        fscore=f1_score(num_classes=num_classes, average="macro"),
-        auroc=auroc(num_classes=num_classes),
-        auc=auc(reorder=True),
-        roc=roc(num_classes=num_classes),
+        accuracy=partial(accuracy, num_classes=num_classes),
+        fscore=partial(f1_score, num_classes=num_classes, average="macro"),
+        auroc=partial(auroc, num_classes=num_classes),
+        auc=partial(auc, reorder=True),
+        roc=partial(roc, num_classes=num_classes),
     )
     return get_metrics(metrics_funcs=classification_metrics, preds=preds, target=target)
 
 
 def get_regression_metrics(preds, target):
     regression_metrics = dict(
-        mae=mean_absolute_error(),
-        mape=mean_absolute_percentage_error(),
-        corr=pearson_corrcoef(),
-        r2=r2_score(),
+        mae=mean_absolute_error,
+        mape=mean_absolute_percentage_error,
+        corr=pearson_corrcoef,
+        r2=r2_score,
     )
     return get_metrics(metrics_funcs=regression_metrics, preds=preds, target=target)

@@ -6,17 +6,21 @@ PROJECT = "medical-signals-representation"
 
 
 class MLWandbLogger:
-    def __init__(self, project: str, run_name: str = None, entity: str = None):
+    def __init__(self, project: str, run_name: str = None):
         self.project = project
         self.run_name = run_name
-        self.entity = entity
 
     def init(self, config: omegaconf.DictConfig = None):
+        cfg = (
+            omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+            if config is not None
+            else config
+        )
+
         wandb.init(
             name=self.run_name,
-            entity=self.entity,
             project=self.project,
-            config=omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True),
+            config=cfg,
         )
 
     def log(self, data, commit=False):

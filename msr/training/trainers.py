@@ -1,16 +1,16 @@
 from abc import abstractmethod
 from functools import partial
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+import pytorch_lightning as pl
+from torch import nn
 
 from msr.evaluation.loggers import MLWandbLogger
 from msr.evaluation.metrics import get_classification_metrics, get_regression_metrics
 from msr.evaluation.plotters import (
     BasePlotter,
-    MatplotlibPlotter,
-    PlotlyPlotter,
     plot_classifier_evaluation,
     plot_regressor_evaluation,
 )
@@ -18,34 +18,83 @@ from msr.training.data.datamodules import BaseDataModule
 from msr.training.utils import BasePredictor
 
 
-class MLTrainer:
-    def __init__(self, model: BasePredictor, datamodule: BaseDataModule):
-        self.model = model
-        self.datamodule = datamodule
-
-    def fit(self):
-        self.model.fit(X=self.datamodule.train.data.numpy(), y=self.datamodule.train.targets)
-
-    def predict(self, X):
-        return self.model.predict(X)
+class BaseTask:
+    @abstractmethod
+    def get_metrics(self):
+        pass
 
     @abstractmethod
     def plot_evaluation(
-        self, y_values: Dict[str, Tuple[np.ndarray, np.ndarray]], metrics: Dict[str, float], plotter: BasePlotter
+        self,
+        y_values: Dict[str, Tuple[np.ndarray, np.ndarray]],
+        metrics: Dict[str, float],
+        plotter: BasePlotter,
+        feature_importances: List[float] = None,
     ):
         pass
 
+
+class Classifier:
+    def get_metrics(self, preds, target):
+        return get_classification_metrics(num_classes=self.datamodule.num_classes, preds=preds, target=target)
+
+    def plot_evaluation(
+        self,
+        y_values: Dict[str, Tuple[np.ndarray, np.ndarray]],
+        metrics: Dict[str, float],
+        plotter: BasePlotter,
+        feature_importances: List[float] = None,
+    ):
+        return plot_classifier_evaluation(
+            y_values=y_values,
+            metrics=metrics,
+            class_names=self.datamodule.class_names,
+            feature_names=self.feature_names,
+            feature_importances=feature_importances,
+            plotter=plotter,
+        )
+
+
+class Regressor:
+    def get_metrics(self, preds, target):
+        return get_regression_metrics(preds=preds, target=target)
+
+    def plot_evaluation(
+        self,
+        y_values: Dict[str, Tuple[np.ndarray, np.ndarray]],
+        metrics: Dict[str, float],
+        plotter: BasePlotter,
+        feature_importances: List[float] = None,
+    ):
+        return plot_regressor_evaluation(
+            y_values=y_values,
+            metrics=metrics,
+            feature_names=self.feature_names,
+            feature_importances=feature_importances,
+            plotter=plotter,
+        )
+
+
+class BaseTrainer:
+    def __init__(self, model, datamodule):
+        self.model = model
+        self.datamodule = datamodule
+        self.feature_names = datamodule.feature_names
+
+    @abstractmethod
+    def fit(self):
+        pass
+
+    @abstractmethod
+    def predict(self, data):
+        pass
+
+    @abstractmethod
     def evaluate(self, plotter: BasePlotter = None, logger: MLWandbLogger = None):
-        val_data = self.datamodule.val.data.numpy()
-        val_targets = self.datamodule.val.targets
-
-        test_data = self.datamodule.test.data.numpy()
-        test_targets = self.datamodule.test.targets
-
         all_y_values = {
             # "train": {"preds": self.train(), "target": self.datamodule.train.targets},
-            "val": {"preds": self.predict(val_data), "target": val_targets},
-            "test": {"preds": self.predict(test_data), "target": test_targets},
+            "val": {"preds": self.predict(self.datamodule.val.data), "target": self.datamodule.val.targets},
+            "test": {"preds": self.predict(self.datamodule.test.data), "target": self.datamodule.test.targets},
         }
 
         metrics = {split: self.get_metrics(**y_values) for split, y_values in all_y_values.items()}
@@ -65,53 +114,44 @@ class MLTrainer:
         return evaluation_results
 
 
-class MLClassifierTrainer(MLTrainer):
-    def __init__(self, model: BasePredictor, datamodule: BaseDataModule):
-        self.model = model
-        self.datamodule = datamodule
-        self.class_names = datamodule.class_names
-        self.feature_names = datamodule.feature_names
-        self.num_classes = len(self.class_names)
-        self.get_metrics = partial(get_classification_metrics, num_classes=self.num_classes)
+class DLTrainer(BaseTrainer):
+    def __init__(self, trainer: pl.Trainer, model: nn.Module, datamodule: pl.LightningDataModule):
+        self.trainer = trainer
+        super().__init__(model, datamodule)
+
+    def fit(self):
+        self.trainer.fit(self.model, self.datamodule)
+
+    def predict(self, data):
+        return self.model(data)
+
+
+class DLClassifierTrainer(DLTrainer, Classifier):
+    def __init__(self, trainer: pl.Trainer, model: nn.Module, datamodule: pl.LightningDataModule):
+        super().__init__(trainer, model, datamodule)
+
+
+class DLRegressorTrainer(DLTrainer, Regressor):
+    def __init__(self, trainer: pl.Trainer, model: nn.Module, datamodule: pl.LightningDataModule):
+        super().__init__(trainer, model, datamodule)
+
+
+class MLTrainer(BaseTrainer):
+    def fit(self):
+        self.model.fit(X=self.datamodule.train.data.numpy(), y=self.datamodule.train.targets)
+
+    def predict(self, X):
+        return self.model.predict(X)
+
+
+class MLClassifierTrainer(MLTrainer, Classifier):
+    def __init__(self, model, datamodule: pl.LightningDataModule):
+        super().__init__(model, datamodule)
 
     def predict(self, X):
         return self.model.predict_proba(X)
 
-    def plot_evaluation(
-        self,
-        y_values: Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]],
-        metrics: Dict[str, Dict[str, float]],
-        plotter: BasePlotter = PlotlyPlotter(),
-    ):
-        figs = plot_classifier_evaluation(
-            y_values=y_values,
-            metrics=metrics,
-            class_names=self.class_names,
-            feature_names=self.feature_names,
-            feature_importances=self.model.feature_importances_,
-            plotter=plotter,
-        )
-        return figs
 
-
-class MLRegressorTrainer(MLTrainer):
-    def __init__(self, model: BasePredictor, datamodule: BaseDataModule):
-        self.model = model
-        self.datamodule = datamodule
-        self.feature_names = datamodule.feature_names
-        self.get_metrics = get_regression_metrics
-
-    def plot_evaluation(
-        self,
-        y_values: Dict[str, Tuple[np.ndarray, np.ndarray]],
-        metrics: Dict[str, float],
-        plotter: BasePlotter = PlotlyPlotter(),
-    ):
-        figs = plot_classifier_evaluation(
-            y_values=y_values,
-            metrics=metrics,
-            feature_names=self.feature_names,
-            feature_importances=self.model.feature_importances_,
-            plotter=plotter,
-        )
-        return figs
+class MLRegressorTrainer(MLTrainer, Regressor):
+    def __init__(self, model: nn.Module, datamodule: pl.LightningDataModule):
+        super().__init__(model, datamodule)
