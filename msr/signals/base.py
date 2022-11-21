@@ -42,6 +42,18 @@ from msr.utils import create_new_obj, lazy_property
 MIN_HR, MAX_HR = 30, 200
 
 
+def find_intervals_using_hr(signal: Type[PeriodicSignal]):
+    T_in_samples = int(1 / signal.hr * signal.fs)
+    x = signal.cleaned
+    neg_x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1
+    troughs, _ = find_peaks(neg_x_minmax, height=0.9)
+    intervals = [(troughs[0], troughs[0] + T_in_samples)]
+    while intervals[-1][1] + T_in_samples < signal.n_samples:
+        prev_end = intervals[-1][1]
+        intervals.append((prev_end, prev_end + T_in_samples))
+    return np.array(intervals)
+
+
 class BaseSignal:
     def __init__(self, name: str, data: NDArray[Shape["N"], Float], fs: float, start_sec: float = 0):
         self.name = name
@@ -435,7 +447,7 @@ class PeriodicSignal(ABC, Signal):
     def get_agg_beat_waveform(self) -> NDArray[Shape["N"], Float]:
         return self.agg_beat.data
 
-    def plot_beats_segmentation(self, use_raw=False, axes=None):
+    def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, axes=None):
         if axes is None:
             fig, axes = plt.subplots(1, 2, figsize=(24, 4), gridspec_kw={"width_ratios": [8, 2]})
         if use_raw:
@@ -449,7 +461,7 @@ class PeriodicSignal(ABC, Signal):
             axes[0].fill_between(bounds, self.data.min(), self.data.max(), alpha=0.15, color=color)
             beats_bounds.extend(bounds)
         axes[0].vlines(beats_bounds, self.data.min(), self.data.max(), lw=1.5, ec="black", ls="--")
-        self.plot_beats(ax=axes[1])
+        self.plot_beats(valid=valid, invalid=invalid, ax=axes[1])
         axes[0].set_xlim([self.time.min(), self.time.max()])
         axes[0].set_ylim([self.data.min(), self.data.max()])
         for ax in axes:
@@ -800,8 +812,9 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             source_channels.reverse()
             found_good_channel = False
             new_source_channel = source_channel
-            while not found_good_channel and len(source_channels) > 0:
+            while not found_good_channel and len(source_channels) >= 0:
                 try:
+                    print(new_source_channel)
                     signal = self.signals[new_source_channel]
                     signal.set_beats(**kwargs)
                     min_n_beats, max_n_beats = MIN_HR / 60 * signal.duration, MAX_HR / 60 * signal.duration
@@ -917,3 +930,13 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             ax.set(xlabel="", ylabel="", title="")
             ax.grid(False)
             ax.get_legend().remove()
+
+    def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, **kwargs):
+        fig, axes = plt.subplots(
+            self.n_signals, 2, figsize=(24, 1.3 * self.n_signals), sharex="col", gridspec_kw={"width_ratios": [9, 2]}
+        )
+        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
+            sig.plot_beats_segmentation(valid=valid, invalid=invalid, use_raw=use_raw, axes=ax)
+            sig.agg_beat.plot_crit_points(ax=ax[1])
+            ax[1].set_title("")
+        plt.tight_layout()

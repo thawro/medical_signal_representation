@@ -10,6 +10,10 @@ class MLWandbLogger:
         self.project = project
         self.run_name = run_name
 
+    @property
+    def id(self):
+        return wandb.run.id
+
     def init(self, config: omegaconf.DictConfig = None):
         cfg = (
             omegaconf.OmegaConf.to_container(config, resolve=True, throw_on_missing=True)

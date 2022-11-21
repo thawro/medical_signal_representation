@@ -102,7 +102,7 @@ def create_representations_dataset(raw_tensors_path, representations_path, get_r
     is_features_in_rep_types = any(["features" in rep_type for rep_type in rep_types])
 
     for i, split in enumerate(tqdm(splits, "Creating representations for all splits")):
-        all_data = torch.load(raw_tensors_path / f"{split}.pt")
+        all_data = torch.load(raw_tensors_path / f"{split}.pt")[13800:]
         if is_features_in_rep_types and i == 0:  # every split has the same features so no need to run it for all splits
             _, representations_feature_names = get_repr_func(all_data[0], return_feature_names=True)
             save_feature_names(representations_path, representations_feature_names)

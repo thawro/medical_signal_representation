@@ -6,23 +6,16 @@ import neurokit2 as nk
 import numpy as np
 from scipy.signal import find_peaks
 
-from msr.signals.base import BeatSignal, MultiChannelPeriodicSignal, PeriodicSignal
+from msr.signals.base import (
+    BeatSignal,
+    MultiChannelPeriodicSignal,
+    PeriodicSignal,
+    find_intervals_using_hr,
+)
 from msr.signals.utils import parse_feats_to_array
 from msr.utils import lazy_property
 
 CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
-
-
-def find_intervals_using_hr(signal: Type[PeriodicSignal]):
-    T_in_samples = int(1 / signal.hr * signal.fs)
-    x = signal.cleaned
-    neg_x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1
-    troughs, _ = find_peaks(neg_x_minmax, height=0.9)
-    intervals = [(troughs[0], troughs[0] + T_in_samples)]
-    while intervals[-1][1] + T_in_samples < signal.n_samples:
-        prev_end = intervals[-1][1]
-        intervals.append((prev_end, prev_end + T_in_samples))
-    return intervals
 
 
 def check_ecg_polarity(data):
@@ -100,9 +93,10 @@ class ECGSignal(PeriodicSignal):
                 intervals[-1][1] = self.n_samples - 1
             if intervals[0][0] < 0:
                 intervals[0][0] = 0
+            intervals = np.array(intervals)
         except ZeroDivisionError:
             intervals = find_intervals_using_hr(self)
-        return np.array(intervals)
+        return intervals
 
     def extract_hrv_features(self, return_arr=True, **kwargs):
         r_peaks = self.rpeaks

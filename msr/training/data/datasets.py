@@ -25,12 +25,14 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         self.representation_type = representation_type
         self.transform = transform
         dataset = self._dataset_loader(split=split, representation_type=representation_type)
-        self.data = dataset["data"]
+        self.data = dataset["data"].float()
         self.data = torch.nan_to_num(self.data)  # TODO
         self.targets = dataset["targets"]
         self.info = dataset["info"]
         if "feature_names" in dataset:
             self.feature_names = dataset["feature_names"]
+        else:
+            self.feature_names = np.arange(self.data.shape[1])
 
     @property
     @abstractmethod

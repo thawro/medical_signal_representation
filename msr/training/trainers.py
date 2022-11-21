@@ -92,9 +92,9 @@ class BaseTrainer:
     @abstractmethod
     def evaluate(self, plotter: BasePlotter = None, logger: MLWandbLogger = None):
         all_y_values = {
-            # "train": {"preds": self.train(), "target": self.datamodule.train.targets},
-            "val": {"preds": self.predict(self.datamodule.val.data), "target": self.datamodule.val.targets},
-            "test": {"preds": self.predict(self.datamodule.test.data), "target": self.datamodule.test.targets},
+            # "train": {"preds": self.predict(self.datamodule.train.data), "target": self.datamodule.train.targets},
+            "val": {"preds": self.predict(self.datamodule.val_data), "target": self.datamodule.val.targets},
+            "test": {"preds": self.predict(self.datamodule.test_data), "target": self.datamodule.test.targets},
         }
 
         metrics = {split: self.get_metrics(**y_values) for split, y_values in all_y_values.items()}
@@ -138,7 +138,7 @@ class DLRegressorTrainer(DLTrainer, Regressor):
 
 class MLTrainer(BaseTrainer):
     def fit(self):
-        self.model.fit(X=self.datamodule.train.data.numpy(), y=self.datamodule.train.targets)
+        self.model.fit(X=self.datamodule.train_data.numpy(), y=self.datamodule.train.targets)
 
     def predict(self, X):
         return self.model.predict(X)

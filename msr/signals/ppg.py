@@ -7,7 +7,7 @@ import seaborn as sns
 from scipy import integrate
 from scipy.signal import butter, filtfilt
 
-from msr.signals.base import BeatSignal, PeriodicSignal
+from msr.signals.base import BeatSignal, PeriodicSignal, find_intervals_using_hr
 from msr.signals.utils import moving_average, parse_feats_to_array
 from msr.utils import lazy_property
 
@@ -71,7 +71,10 @@ class PPGSignal(PeriodicSignal):
         return peaks
 
     def _get_beats_intervals(self):
-        intervals = np.vstack((self.troughs[:-1], self.troughs[1:])).T
+        try:
+            intervals = np.vstack((self.troughs[:-1], self.troughs[1:])).T
+        except Exception:
+            intervals = find_intervals_using_hr(self)
         return intervals
 
     def extract_hrv_features(self, return_arr=False, plot=False):

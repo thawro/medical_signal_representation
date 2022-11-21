@@ -1,7 +1,9 @@
 from abc import ABCMeta, abstractmethod
 from functools import partial
+from typing import Callable
 
 import matplotlib.pyplot as plt
+import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
@@ -11,11 +13,15 @@ from msr.utils import align_left
 
 
 class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
-    def __init__(self, representation_type: str, batch_size: int = 64, num_workers: int = 8):
+    def __init__(
+        self, representation_type: str, batch_size: int = 64, num_workers: int = 8, transform: Callable = None
+    ):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.representation_type = representation_type
+        self.transform = transform
+        self.dataset_params = dict(representation_type=representation_type, transform=transform)
         self.datasets = []
 
     def describe(self, ds_fields=["data_shape", "classes_counts"], dm_fields=["info"]):
@@ -38,11 +44,11 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train = self.DatasetFactory(split="train", representation_type=self.representation_type)
-            self.val = self.DatasetFactory(split="val", representation_type=self.representation_type)
+            self.train = self.DatasetFactory(split="train", **self.dataset_params)
+            self.val = self.DatasetFactory(split="val", **self.dataset_params)
             self.datasets.extend([self.train, self.val])
         if stage == "test" or stage is None:
-            self.test = self.DatasetFactory(split="test", representation_type=self.representation_type)
+            self.test = self.DatasetFactory(split="test", **self.dataset_params)
             self.datasets.append(self.test)
         for dataset in self.datasets:
             if hasattr(dataset, "feature_names"):
@@ -50,6 +56,25 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
                 self.class_names = dataset.class_names
                 self.num_classes = len(self.class_names)
                 break
+
+    def get_transformed_data(self, split):
+        split_data = getattr(self, split).data
+        if self.transform is not None:
+            return torch.stack([self.transform(sample) for sample in split_data])
+        else:
+            return split_data
+
+    @property
+    def train_data(self):
+        return self.get_transformed_data("train")
+
+    @property
+    def val_data(self):
+        return self.get_transformed_data("val")
+
+    @property
+    def test_data(self):
+        return self.get_transformed_data("test")
 
     def plot_targets(self):
         ncols = len(self.datasets)
@@ -91,8 +116,9 @@ class PtbXLDataModule(BaseDataModule):
         target: str = "diagnostic_class",
         batch_size: int = 64,
         num_workers=8,
+        transform: Callable = None,
     ):
-        super().__init__(representation_type, batch_size, num_workers)
+        super().__init__(representation_type, batch_size, num_workers, transform)
         self.fs = fs
         self.target = target
 
