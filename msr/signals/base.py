@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from collections import ChainMap, OrderedDict
 from typing import Dict, List, Tuple, Type, Union
@@ -38,6 +39,8 @@ from msr.signals.utils import (
     z_score,
 )
 from msr.utils import create_new_obj, lazy_property
+
+log = logging.getLogger(__name__)
 
 MIN_HR, MAX_HR = 30, 200
 
@@ -814,20 +817,19 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             new_source_channel = source_channel
             while not found_good_channel and len(source_channels) >= 0:
                 try:
-                    print(new_source_channel)
                     signal = self.signals[new_source_channel]
                     signal.set_beats(**kwargs)
                     min_n_beats, max_n_beats = MIN_HR / 60 * signal.duration, MAX_HR / 60 * signal.duration
                     if min_n_beats <= len(signal.beats) <= max_n_beats:
                         found_good_channel = True
                         if new_source_channel != source_channel:
-                            print(
+                            log.info(
                                 f"Original source channel was corrupted. Found new source channel: {new_source_channel}"
                             )
                     else:
+                        log.error("Number of beats indicates that HR bounds werent met. Trying another channel")
                         raise Exception("Number of beats indicates that HR bounds werent met. Trying another channel")
                 except Exception as e:
-                    print(e)
                     new_source_channel = source_channels.pop()
             if not found_good_channel:
                 new_source_channel = source_channel

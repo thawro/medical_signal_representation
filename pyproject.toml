@@ -7,6 +7,8 @@ readme = "README.md"
 packages = [
     { include = "msr" },
 ]
+
+
 [tool.poetry.dependencies]
 python = "^3.8"
 jupyterlab = "^3.5.0"
@@ -34,6 +36,9 @@ sorcery = "^0.2.2"
 wandb = "^0.13.5"
 pyrootutils = "^1.0.4"
 lightgbm = "^3.3.3"
+
+[tool.black]
+experimental-string-processing = true
 
 
 [build-system]
