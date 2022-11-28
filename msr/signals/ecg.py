@@ -40,7 +40,7 @@ class ECGSignal(PeriodicSignal):
         super().__init__(name, polarity * data, fs, start_sec)
         self.feature_extraction_funcs.update(
             {
-                "hrv_features": self.extract_hrv_features,
+                "hrv": self.extract_hrv_features,
             }
         )
 
@@ -117,10 +117,10 @@ class ECGBeat(BeatSignal):
         super().__init__(name, data, fs, start_sec, beat_num)
         self.feature_extraction_funcs.update(
             {
-                "area_features": self.extract_area_features,
-                "energy_features": self.extract_energy_features,
-                "slope_features": self.extract_slope_features,
-                "energy_features": self.extract_energy_features,
+                "area": self.extract_area_features,
+                "energy": self.extract_energy_features,
+                "slope": self.extract_slope_features,
+                "energy": self.extract_energy_features,
             }
         )
 

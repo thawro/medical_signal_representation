@@ -69,7 +69,7 @@ class BaseSignal:
         self.end_sec = self.start_sec + self.time[-1]
         self.fig_params = SIGNAL_FIG_PARAMS
         self.feature_extraction_funcs = {
-            "basic_features": self.extract_basic_features,
+            "basic": self.extract_basic_features,
         }
 
     @property
@@ -118,7 +118,7 @@ class BaseSignal:
             interp_fn = interp1d(self.time, self.data, kind=kind, fill_value="extrapolate")
         new_time = np.arange(0, n_samples) / new_fs
         interpolated = interp_fn(new_time)
-        new_name = self.name + f"_resampleWithInterp({n_samples})"
+        new_name = self.name + f"_interp({n_samples})"
         return create_new_obj(self, name=new_name, data=interpolated, fs=new_fs)
 
     def z_score(self) -> Type[BaseSignal]:
@@ -241,10 +241,7 @@ class BaseSignal:
 
     def extract_features(self, return_arr=True, plot=False) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = OrderedDict(
-            {
-                f"{self.name}_{name}": func(return_arr=False, plot=plot)
-                for name, func in self.feature_extraction_funcs.items()
-            }
+            {name: func(return_arr=False, plot=plot) for name, func in self.feature_extraction_funcs.items()}
         )
         features = parse_nested_feats(features)
         self.feature_names = list(features.keys())
@@ -341,7 +338,9 @@ class Signal(BaseSignal):
         intervals = np.array(intervals).astype(int)
         self.windows = np.array(
             [
-                create_new_obj(self, name=f"window_{i}", data=self.data[start:end], start_sec=self.time[start])
+                create_new_obj(
+                    self, name=f"{self.name}_window_{i}", data=self.data[start:end], start_sec=self.time[start]
+                )
                 for i, (start, end) in enumerate(intervals)
             ]
         )
@@ -371,7 +370,7 @@ class PeriodicSignal(ABC, Signal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
         self.valid_beats_mask = None
-        self.feature_extraction_funcs.update({"agg_beat_features": self.extract_agg_beat_features})
+        self.feature_extraction_funcs.update({"agg_beat": self.extract_agg_beat_features})
 
     @property
     def hr(self):
@@ -400,7 +399,9 @@ class PeriodicSignal(ABC, Signal):
         beats = []
         for i, (start, end) in enumerate(intervals):
             start_sec = start / self.fs
-            beat = self.BeatClass(name=f"beat_{i}", data=data[start:end], fs=self.fs, start_sec=start_sec, beat_num=i)
+            beat = self.BeatClass(
+                name=f"{self.name}_beat_{i}", data=data[start:end], fs=self.fs, start_sec=start_sec, beat_num=i
+            )
             if resample:
                 beat = beat.resample_with_interpolation(n_samples=100, kind="pchip")
             beats.append(beat)
@@ -756,16 +757,22 @@ class MultiChannelSignal:
 
     def get_whole_signal_feature_names(self):
         self.extract_features()
-        return self.feature_names
+        return np.array(self.feature_names)
 
     def get_windows_feature_names(self):
+        n_windows = len(list(self.signals.values())[0].windows)
         all_feature_names = []
         for name, sig in self.signals.items():
             sig.windows[0].extract_features()
-            feature_names = sig.windows[0].feature_names
-            feature_names = [name.replace("window_0_", "") for name in feature_names]
-            all_feature_names.extend(feature_names)
-        return all_feature_names
+        for i in range(n_windows):
+            sig_feature_names = []
+            for name, sig in self.signals.items():
+                window_sig = sig.windows[i]
+                feature_names = sig.windows[0].feature_names
+                feature_names = [f"{window_sig.name}__{feature_name}" for feature_name in feature_names]
+                sig_feature_names.extend(feature_names)
+            all_feature_names.append(sig_feature_names)
+        return np.array(all_feature_names)
 
     def plot(self, **kwargs):
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 3 * self.n_signals))
@@ -910,20 +917,28 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         return OrderedDict({name: sig.get_agg_beat_features(return_arr=False) for name, sig in self.signals.items()})
 
     def get_beats_feature_names(self):
+        n_beats = len(list(self.signals.values())[0].beats)
         all_feature_names = []
         for name, sig in self.signals.items():
             sig.beats[0].extract_features()
-            feature_names = sig.beats[0].feature_names
-            feature_names = [name.replace("beat_0_", "") for name in feature_names]
-            all_feature_names.extend(feature_names)
-        return all_feature_names
+        for i in range(n_beats):
+            sig_feature_names = []
+            for name, sig in self.signals.items():
+                beat_sig = sig.beats[i]
+                feature_names = sig.beats[0].feature_names
+                feature_names = [f"{beat_sig.name}__{feature_name}" for feature_name in feature_names]
+                sig_feature_names.extend(feature_names)
+            all_feature_names.append(sig_feature_names)
+        return np.array(all_feature_names)
 
     def get_agg_beat_feature_names(self):
         all_feature_names = []
         for name, sig in self.signals.items():
             sig.extract_agg_beat_features()
-            all_feature_names.extend(sig.agg_beat.feature_names)
-        return all_feature_names
+            feature_names = sig.agg_beat.feature_names
+            feature_names = [f"{sig.agg_beat.name}__{feature_name}" for feature_name in feature_names]
+            all_feature_names.extend(feature_names)
+        return np.array(all_feature_names)
 
     def plot(self, **kwargs):
         fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)

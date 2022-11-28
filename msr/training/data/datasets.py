@@ -1,8 +1,8 @@
+import itertools
 from abc import ABCMeta, abstractmethod
 from functools import partial
 from typing import Callable, Literal, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import torch
@@ -31,8 +31,12 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         self.info = dataset["info"]
         if "feature_names" in dataset:
             self.feature_names = dataset["feature_names"]
+            if len(self.feature_names.shape) > 1:
+                self.feature_names = self.feature_names.flatten()
         else:
-            self.feature_names = np.arange(self.data.shape[1])
+            shape_dims = [np.arange(_shape) for _shape in self.data.shape[1:]]
+            feature_idxs = np.array(list(itertools.product(*shape_dims)))
+            self.feature_names = np.array(["_".join(idxs.astype(str)) for idxs in feature_idxs])
 
     @property
     @abstractmethod

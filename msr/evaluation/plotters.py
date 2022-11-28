@@ -97,7 +97,6 @@ class PlotlyPlotter(BasePlotter):
                     col=col,
                     marker=dict(color="black"),
                 )
-        fig.show()
         return fig
 
     def confusion_matrix(self, y_values, class_names):
@@ -112,12 +111,10 @@ class PlotlyPlotter(BasePlotter):
                 row=1,
                 col=i + 1,
             )
-        fig.show()
         return fig
 
     def feature_importances(self, feat_names, feat_importances, n_best=15, normalize=True):
         fig = plotly_feature_importance_plot(feat_names, feat_importances, n_best, normalize)
-        fig.show()
         return fig
 
     @abstractmethod
@@ -135,7 +132,6 @@ class PlotlyPlotter(BasePlotter):
                     col=col,
                 )
         fig.update_layout(barmode="group")
-        fig.show()
         return fig
 
     def target_vs_preds(self, y_values):
@@ -154,7 +150,6 @@ class PlotlyPlotter(BasePlotter):
                 row=1,
                 col=col,
             )
-        fig.show()
         return fig
 
 
@@ -176,7 +171,7 @@ def plot_classifier_evaluation(
         "metrics": plotter.metrics_comparison(filtered_metrics),
     }
     if feature_importances is not None and feature_names is not None:
-        figs["feature_importances"] = plotter.feature_importances(feature_names, feature_importances, n_best=15)
+        figs["feature_importances"] = plotter.feature_importances(feature_names, feature_importances, n_best=10)
     return figs
 
 
@@ -189,5 +184,5 @@ def plot_regressor_evaluation(
 ):
     figs = {"metrics": plotter.metrics_comparison(metrics), "target_vs_preds": plotter.target_vs_preds(y_values)}
     if feature_importances is not None and feature_names is not None:
-        figs["feature_importances"] = plotter.feature_importances(feature_names, feature_importances, n_best=15)
+        figs["feature_importances"] = plotter.feature_importances(feature_names, feature_importances, n_best=10)
     return figs

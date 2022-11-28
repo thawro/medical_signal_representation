@@ -1,0 +1,10 @@
+_target_: msr.training.trainers.DLClassifierTrainer
+_partial_: true
+trainer:
+  _target_: pytorch_lightning.Trainer
+  accelerator: auto
+  devices: 1
+  max_epochs: 50
+  deterministic: true
+# model
+# datamodule

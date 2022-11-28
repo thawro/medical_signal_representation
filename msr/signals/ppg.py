@@ -54,7 +54,7 @@ class PPGSignal(PeriodicSignal):
         super().__init__(name, data, fs, start_sec)
         self.feature_extraction_funcs.update(
             {
-                "hrv_features": self.extract_hrv_features,
+                "hrv": self.extract_hrv_features,
             }
         )
 
@@ -96,7 +96,7 @@ class PPGBeat(BeatSignal):
         super().__init__(name, data, fs, start_sec, beat_num)
         self.feature_extraction_funcs.update(
             {
-                "sppg_features": self.extract_sppg_features,
+                "sppg": self.extract_sppg_features,
             }
         )
 

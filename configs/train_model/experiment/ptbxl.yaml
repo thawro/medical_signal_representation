@@ -1,28 +1,12 @@
 # @package _global_
 
-# to execute this experiment run:
-# python train.py experiment=example
-
 defaults:
   - override /datamodule: ptbxl.yaml
   - override /model: random_forest_classifier.yaml
-  - override /callbacks: none.yaml
-  - override /trainer: ml_classification_trainer.yaml
+  - override /callbacks: default.yaml
+  - override /trainer: ml_classifier_trainer.yaml
   - override /logger: ml_wandb_logger.yaml
   - override /plotter: plotly.yaml
 
-# all parameters below will be merged with parameters from default configurations set above
-# this allows you to overwrite only specified parameters
-
-tags: ["ptbxl", "random_forest"]
-
-# trainer:
-
 # model:
 #   # TODO model params
-
-datamodule:
-  representation_type: whole_signal_features
-
-logger:
-  project: 'ptbxl'

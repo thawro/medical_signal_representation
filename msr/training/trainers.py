@@ -102,7 +102,12 @@ class BaseTrainer:
             "metrics": pd.json_normalize(metrics, sep="/").to_dict(orient="records")[0]  # flattened dict
         }
         if plotter is not None:
-            evaluation_results["figs"] = self.plot_evaluation(all_y_values, metrics, plotter)
+            evaluation_results["figs"] = self.plot_evaluation(
+                y_values=all_y_values,
+                metrics=metrics,
+                plotter=plotter,
+                feature_importances=getattr(self.model, "feature_importances_", None),
+            )
         if logger is not None:
             for name, results in evaluation_results.items():
                 blacklist = ["/roc"]
@@ -153,5 +158,5 @@ class MLClassifierTrainer(MLTrainer, Classifier):
 
 
 class MLRegressorTrainer(MLTrainer, Regressor):
-    def __init__(self, model: nn.Module, datamodule: pl.LightningDataModule):
+    def __init__(self, model, datamodule: pl.LightningDataModule):
         super().__init__(model, datamodule)

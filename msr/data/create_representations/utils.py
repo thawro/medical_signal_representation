@@ -105,6 +105,7 @@ def create_representations_dataset(raw_tensors_path, representations_path, get_r
         if is_features_in_rep_types and i == 0:  # every split has the same features so no need to run it for all splits
             _, representations_feature_names = get_repr_func(all_data[0], return_feature_names=True)
             save_feature_names(representations_path, representations_feature_names)
+            log.info("Feature names saved")
         if n_jobs == 1:
             reps = [get_repr_func(data) for data in tqdm(all_data, desc="Extracting representations")]
         else:

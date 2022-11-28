@@ -7,6 +7,7 @@ from itertools import groupby
 from pathlib import Path
 from typing import Callable, List, Union
 
+import hydra
 import numpy as np
 import pandas as pd
 import pyrootutils
@@ -36,6 +37,23 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 EPSILON = np.finfo(float).eps
+
+datamodule2str = {  # dm
+    "PtbXLDataModule": "ptbxl",
+    "MimicDataModule": "mimic",
+    "SleepEDFDataModule": "sleep_edf",
+}
+
+
+def logger_project_to_str(project):
+    datamodule = project.split(".")[-1]
+    return datamodule2str[datamodule]
+
+
+def logger_name_to_str(name):
+    rep_type, model_target = name.split("__")
+    model_classname = model_target.split(".")[-1]
+    return f"{rep_type}__{model_classname}"
 
 
 def get_corr_matrix(df: pd.DataFrame):

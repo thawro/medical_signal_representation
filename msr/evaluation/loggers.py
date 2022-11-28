@@ -6,9 +6,10 @@ PROJECT = "medical-signals-representation"
 
 
 class MLWandbLogger:
-    def __init__(self, project: str, run_name: str = None):
+    def __init__(self, project: str, name: str = None, **kwargs):
         self.project = project
-        self.run_name = run_name
+        self.name = name
+        self.kwargs = kwargs
 
     @property
     def id(self):
@@ -21,11 +22,7 @@ class MLWandbLogger:
             else config
         )
 
-        wandb.init(
-            name=self.run_name,
-            project=self.project,
-            config=cfg,
-        )
+        wandb.init(name=self.name, project=self.project, config=cfg, **self.kwargs)
 
     def log(self, data, commit=False):
         wandb.log(data, commit=commit)
