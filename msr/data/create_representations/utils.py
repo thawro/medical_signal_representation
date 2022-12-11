@@ -1,5 +1,8 @@
+import glob
 import inspect
 import logging
+import math
+import os
 from typing import Dict, List, Type
 
 import numpy as np
@@ -13,6 +16,7 @@ from msr.signals.representation_extractor import (
     PeriodicRepresentationExtractor,
     RepresentationExtractor,
 )
+from msr.utils import run_in_parallel_with_joblib
 
 log = logging.getLogger(__name__)
 
@@ -91,45 +95,77 @@ def save_feature_names(path, representations_feature_names):
         np.save(representation_path / f"feature_names.npy", feature_names)
 
 
-def create_representations_dataset(raw_tensors_path, representations_path, get_repr_func, n_jobs=1):
+def create_representations_dataset(raw_tensors_path, representations_path, get_repr_func, n_jobs=1, batch_size=-1):
     log.info(f"Creating representation dataset.")
     log.info(f"Data used to create representations is loaded from {raw_tensors_path}")
     log.info(f"Representations will be stored in {representations_path}")
     representations_path.mkdir(parents=True, exist_ok=True)
     splits = ["train", "val", "test"]
+    # splits = ["test"]
     rep_types = inspect.signature(get_repr_func).parameters["representation_types"].default
     is_features_in_rep_types = any(["features" in rep_type for rep_type in rep_types])
 
     for i, split in enumerate(tqdm(splits, "Creating representations for all splits")):
         all_data = torch.load(raw_tensors_path / f"{split}.pt")
+        n_samples = len(all_data)
         if is_features_in_rep_types and i == 0:  # every split has the same features so no need to run it for all splits
             _, representations_feature_names = get_repr_func(all_data[0], return_feature_names=True)
             save_feature_names(representations_path, representations_feature_names)
             log.info("Feature names saved")
-        if n_jobs == 1:
-            reps = [get_repr_func(data) for data in tqdm(all_data, desc="Extracting representations")]
-        else:
-            reps = Parallel(n_jobs=n_jobs)(
-                delayed(get_repr_func)(data) for data in tqdm(all_data, desc="Extracting representations")
-            )
-        rep_types = reps[0].keys()
-        reps = {rep_type: torch.tensor(np.array([rep[rep_type] for rep in reps])) for rep_type in rep_types}
 
-        for rep_type, data in reps.items():
-            representation_path = representations_path / rep_type
-            representation_path.mkdir(parents=True, exist_ok=True)
-            path = representation_path / f"{split}.pt"
-            torch.save(data, path)
+        _batch_size = n_samples if batch_size == -1 else batch_size
+        start_idx = 0
+        n_batches = math.ceil(n_samples / _batch_size)
+        log.info(f"Exctracting representations using batch_size={_batch_size} ({n_batches} batches)")
+        while start_idx < n_samples:
+            end_idx = start_idx + _batch_size
+            batch_idx = math.ceil((start_idx + 1) / _batch_size) - 1
+            batch_data = all_data[start_idx:end_idx]
+            desc = (
+                f"Extracting representations for batch {batch_idx + 1} / {n_batches} (samples {start_idx} to {end_idx})"
+            )
+            if n_jobs == 1:
+                reps = [get_repr_func(data) for data in tqdm(batch_data, desc=desc)]
+            else:
+                reps = Parallel(n_jobs=n_jobs)(delayed(get_repr_func)(data) for data in tqdm(batch_data, desc=desc))
+            reps = {rep_type: torch.tensor(np.array([rep[rep_type] for rep in reps])) for rep_type in rep_types}
+
+            for rep_type, data in reps.items():
+                representation_path = representations_path / rep_type
+                representation_path.mkdir(parents=True, exist_ok=True)
+                suffix = f"_{batch_idx}" if n_batches > 1 else ""
+                path = representation_path / f"{split}{suffix}.pt"
+                torch.save(data, path)
+            start_idx = end_idx
         log.info(f"{split} split finished")
     log.info("Representation dataset creation finished.")
+
+
+def concat_data_files(representations_path, representation_types):
+    log.info("Concatenating data files.")
+    for split in tqdm(["train", "val", "test"], desc="Splits"):
+        for rep_type in tqdm(representation_types, desc=f"{split} representations"):
+            representation_path = representations_path / rep_type
+            rep_split_files = sorted(glob.glob(f"{str(representation_path)}/{split}_*.pt"))
+            if len(rep_split_files) > 0:
+                torch.save(
+                    torch.concatenate([torch.load(file) for file in rep_split_files]),
+                    representation_path / f"{split}.pt",
+                )
+                for filepath in rep_split_files:
+                    os.remove(filepath)
 
 
 def load_split(split, representations_path, targets_path, representation_type):
     representation_path = representations_path / representation_type
     data = torch.load(representation_path / f"{split}.pt")
-    targets = np.load(targets_path / f"{split}.npy")
-    info = np.load(targets_path / "info.npy", allow_pickle=True)
-    info = {i: info[i] for i in range(len(info))}
+    targets = torch.load(targets_path / f"{split}.pt")
+    try:
+        info = np.load(targets_path / "info.npy", allow_pickle=True)
+        info = {i: info[i] for i in range(len(info))}
+    except FileNotFoundError:
+        log.warning("No info file for that split")
+        info = {}
     split_data = {"data": data, "targets": targets, "info": info}
     try:
         feature_names = np.load(representation_path / "feature_names.npy")

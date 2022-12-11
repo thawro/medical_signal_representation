@@ -9,8 +9,9 @@ windows_params:
   win_len_s: 10
   step_s: 8
 n_jobs: 1
+batch_size: 20000
 representation_types:
-  # - whole_signal_waveforms
-  # - windows_waveforms
-  - windows_features
-  - whole_signal_features
+  - whole_signal_waveforms
+  - windows_waveforms
+  # - windows_features
+  # - whole_signal_features

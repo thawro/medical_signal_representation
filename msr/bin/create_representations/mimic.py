@@ -26,6 +26,7 @@ def main(cfg: DictConfig):
         windows_params=cfg.windows_params,
         fs=cfg.raw_data.fs,
         n_jobs=cfg.n_jobs,
+        batch_size=cfg.batch_size,
     )
     log.info("Representasions dataset creation finished")
     OmegaConf.save(cfg, REPRESENTATIONS_PATH / "config.yaml")

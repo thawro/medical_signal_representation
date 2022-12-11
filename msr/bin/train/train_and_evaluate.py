@@ -23,7 +23,7 @@ def main(cfg: omegaconf.DictConfig):
 
     log.info(f"Logger set config and initialized")
 
-    log.info("PTB-XL training + evaluation started")
+    log.info("Training + evaluation started")
     print_config_tree(cfg, keys=["datamodule", "model", "callbacks", "logger", "plotter"])
 
     datamodule = hydra.utils.instantiate(cfg.datamodule)

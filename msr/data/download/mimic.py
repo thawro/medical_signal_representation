@@ -586,6 +586,7 @@ def create_raw_tensors_dataset(
     val_size: float,
     test_size: float,
     max_samples_per_subject: int,
+    sample_len_sec: float,
     random_state: int,
     fs: float,
     targets: Literal["abp", "sbp_dbp", "sbp_dbp_avg"],
@@ -603,11 +604,12 @@ def create_raw_tensors_dataset(
     """
     log.info("Creating train/val/test tensors")
 
-    def concat_samples(paths: List[str]):
+    def concat_samples(paths: List[str], sample_len_samples: int):
         """Concatenate numpy arrays loaded from paths"""
         numpy_files = [RAW_DATASET_PATH / path for path in paths]
-        return np.stack([np.load(f) for f in numpy_files])
+        return np.stack([np.load(f)[:sample_len_samples] for f in tqdm(numpy_files, desc="Loading numpy files")])
 
+    sample_len_samples = int(fs * sample_len_sec)
     info = get_all_samples_paths()
     info["sample_num"] = [int(sample_id.split("_")[1].split(".")[0]) for sample_id in info["sample_id"].values]
     info = info.query(f"sample_num < {max_samples_per_subject}")
@@ -623,7 +625,9 @@ def create_raw_tensors_dataset(
     splits = splits_info["split"].unique()
     for split in splits:
         current_split_info = splits_info.query(f"split == '{split}'")
-        all_data = concat_samples(paths=current_split_info["path"].values)  # shape [batch, n_samples, n_signals]
+        all_data = concat_samples(
+            current_split_info["path"].values, sample_len_samples
+        )  # shape [batch, n_samples, n_signals]
         all_data = torch.from_numpy(all_data)  # signals order: ABP, PPG, ECG
         abp_data = all_data[..., 0]  # ABP
         data = all_data[..., 1:]  # PPG and ECG
@@ -633,7 +637,7 @@ def create_raw_tensors_dataset(
         bp_values = [
             get_abp_targets(abp, ecg, ecg_fs=fs, targets=targets)
             for abp, ecg in tqdm(
-                zip(abp_data, ecg_data), total=len(ecg_data), desc=f"Gethering MIMIC targets for {split} split"
+                zip(abp_data, ecg_data), total=len(ecg_data), desc=f"Gathering MIMIC targets for {split} split"
             )
         ]
         bp_values = {

@@ -1,0 +1,19 @@
+# @package _global_
+
+defaults:
+  - override /datamodule: mimic.yaml
+  - override /model: random_forest_regressor.yaml
+  - override /callbacks: default.yaml
+  - override /trainer: ml_regressor_trainer.yaml
+  - override /logger: ml_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+
+
+datamodule:
+  target: "sbp_dbp_avg"
+  bp_targets: ["sbp"]
+  representation_type: agg_beat_waveforms
+  # transform: null
+
+# model:
+#   # TODO model params

@@ -1,7 +1,7 @@
 import itertools
 from abc import ABCMeta, abstractmethod
 from functools import partial
-from typing import Callable, Literal, Tuple
+from typing import Callable, List, Literal, Tuple
 
 import numpy as np
 import seaborn as sns
@@ -122,9 +122,26 @@ class PtbXLDataset(ClassificationDataset):
 class MimicDataset(RegressionDataset):
     """Dataset class used for Mimic representations"""
 
+    def __init__(
+        self,
+        split: Literal["train", "val", "test"],
+        representation_type: str,
+        target: str,
+        bp_targets: List[Literal["sbp", "dbp"]] = ["sbp"],
+        transform: Callable = None,
+    ):
+        self.target = target
+        self.bp_targets = bp_targets
+        super().__init__(split, representation_type, transform)
+        bp_targets_idxs = {"sbp": 0, "dbp": 1}
+        bp_targets_idxs = [bp_targets_idxs[target] for target in bp_targets]
+        if len(bp_targets) == 1:
+            bp_targets_idxs = bp_targets_idxs[0]
+        self.targets = self.targets[:, bp_targets_idxs]
+
     @property
     def _dataset_loader(self) -> Callable:
-        return load_mimic_split
+        return partial(load_mimic_split, target=self.target)
 
 
 class SleepEDFDataset(ClassificationDataset):

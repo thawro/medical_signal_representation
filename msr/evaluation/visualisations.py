@@ -158,6 +158,11 @@ def plotly_feature_importance_plot(feat_names: list, feat_importances: list, n_b
     best_feat_importanes = np.array(sorted_importances[-n_best:]) / normalize_factor
     df = pd.DataFrame({"Feature name": best_feat_names, "Importance": best_feat_importanes})
     fig = px.bar(
-        data_frame=df, x="Importance", y="Feature name", orientation="h", height=n_best * 50, title="Feature importance"
+        data_frame=df,
+        x="Importance",
+        y="Feature name",
+        orientation="h",
+        height=n_best * 100,
+        title="Feature importance",
     )
     return fig

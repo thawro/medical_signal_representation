@@ -7,7 +7,6 @@ import pandas as pd
 import pytorch_lightning as pl
 from torch import nn
 
-from msr.evaluation.loggers import MLWandbLogger
 from msr.evaluation.metrics import get_classification_metrics, get_regression_metrics
 from msr.evaluation.plotters import (
     BasePlotter,
@@ -15,6 +14,7 @@ from msr.evaluation.plotters import (
     plot_regressor_evaluation,
 )
 from msr.training.data.datamodules import BaseDataModule
+from msr.training.loggers import MLWandbLogger
 from msr.training.utils import BasePredictor
 
 

@@ -19,6 +19,7 @@ split:
   val_size: 0.15
   test_size: 0.15
   random_state: 42
-  max_samples_per_subject_for_split: 10
+  max_samples_per_subject_for_split: 8
+  sample_len_sec: 60
   targets:
     - sbp_dbp_avg

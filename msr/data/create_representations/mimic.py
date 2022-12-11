@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 from msr.data.create_representations.utils import (
+    concat_data_files,
     create_representations_dataset,
     get_periodic_representations,
     load_split,
@@ -53,6 +54,7 @@ def create_mimic_representations_dataset(
     windows_params: Dict[str, Union[str, float, int]],
     fs: float = 100,
     n_jobs: int = 1,
+    batch_size: int = -1,
 ):
     """Create and save data files (`.pt`) for all representations.
     TODO
@@ -73,14 +75,16 @@ def create_mimic_representations_dataset(
         representations_path=REPRESENTATIONS_PATH,
         get_repr_func=get_repr_func,
         n_jobs=n_jobs,
+        batch_size=batch_size,
     )
+    concat_data_files(REPRESENTATIONS_PATH, representation_types)
 
 
-def load_mimic_split(split: str, representation_type: str) -> Dict[str, np.ndarray]:
+def load_mimic_split(split: str, representation_type: str, target: str = "sbp_dbp_avg") -> Dict[str, np.ndarray]:
     return load_split(
         split=split,
         representations_path=REPRESENTATIONS_PATH,
-        targets_path=TARGETS_PATH,
+        targets_path=TARGETS_PATH / target,
         representation_type=representation_type,
     )
 

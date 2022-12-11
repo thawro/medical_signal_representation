@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from functools import partial
-from typing import Callable
+from typing import Callable, List, Literal
 
 import matplotlib.pyplot as plt
 import torch
@@ -53,9 +53,9 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         for dataset in self.datasets:
             if hasattr(dataset, "feature_names"):
                 self.feature_names = dataset.feature_names
+            if hasattr(dataset, "class_names"):
                 self.class_names = dataset.class_names
                 self.num_classes = len(self.class_names)
-                break
 
     def get_transformed_data(self, split):
         split_data = getattr(self, split).data
@@ -130,9 +130,22 @@ class PtbXLDataModule(BaseDataModule):
 class MimicDataModule(BaseDataModule):
     """Datamodule used for MIMIC dataset"""
 
+    def __init__(
+        self,
+        representation_type: str,
+        target: str = "sbp_dbp_avg",
+        bp_targets: List[Literal["sbp", "dbp"]] = ["sbp"],
+        batch_size: int = 64,
+        num_workers=8,
+        transform: Callable = None,
+    ):
+        super().__init__(representation_type, batch_size, num_workers, transform)
+        self.target = target
+        self.bp_targets = bp_targets
+
     @property
     def DatasetFactory(self):
-        return MimicDataset
+        return partial(MimicDataset, target=self.target, bp_targets=self.bp_targets)
 
 
 class SleepEDFDataModule(BaseDataModule):

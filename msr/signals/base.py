@@ -146,6 +146,8 @@ class BaseSignal:
             window_length = int(np.ceil(15 / 100 * self.fs))
         if window_length % 2 == 0:
             window_length = window_length + 1
+        if window_length <= polyorder:
+            window_length = polyorder + 1
         new_name = self.name + f"_derivative({deriv})"
         new_data = savgol_filter(self.data, window_length, polyorder, deriv, delta=1 / self.fs)
         return BaseSignal(name=new_name, data=new_data, fs=self.fs, start_sec=self.start_sec)

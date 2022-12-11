@@ -27,6 +27,7 @@ def main(cfg: DictConfig):
         windows_params=cfg.windows_params,
         fs=cfg.raw_data.fs,
         n_jobs=cfg.n_jobs,
+        batch_size=cfg.batch_size,
     )
     REPRESENTATIONS_PATH = DATASET_PATH / f"representations_{cfg.raw_data.fs}"
     log.info("Representasions dataset creation finished")

@@ -35,6 +35,7 @@ def main(cfg: DictConfig):
             val_size=cfg.split.val_size,
             test_size=cfg.split.test_size,
             max_samples_per_subject=cfg.split.max_samples_per_subject_for_split,
+            sample_len_sec=cfg.split.sample_len_sec,
             random_state=cfg.split.random_state,
             fs=cfg.raw_data.fs,
             targets=cfg.split.targets,
