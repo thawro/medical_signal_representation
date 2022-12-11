@@ -1,6 +1,5 @@
 import itertools
 from abc import ABCMeta, abstractmethod
-from functools import partial
 from typing import Callable, List, Literal, Tuple
 
 import numpy as np
@@ -8,9 +7,11 @@ import seaborn as sns
 import torch
 from torch.utils.data import Dataset
 
-from msr.data.create_representations.mimic import load_mimic_split
-from msr.data.create_representations.ptbxl import load_ptbxl_split
-from msr.data.create_representations.sleep_edf import load_sleep_edf_split
+from msr.data.dataset_providers import (
+    MimicDatasetProvider,
+    PtbXLDatasetProvider,
+    SleepEDFDatasetProvider,
+)
 from msr.utils import align_left
 
 sns.set(style="whitegrid")
@@ -111,7 +112,7 @@ class PtbXLDataset(ClassificationDataset):
         split: Literal["train", "val", "test"],
         representation_type: str,
         fs: float,
-        target: str,
+        target: Literal["diagnostic_class", "diagnostic_subclass"],
         transform: Callable = None,
     ):
         self.fs = fs
@@ -120,7 +121,8 @@ class PtbXLDataset(ClassificationDataset):
 
     @property
     def _dataset_loader(self) -> Callable:
-        return partial(load_ptbxl_split, fs=self.fs, target=self.target)
+        ds_provider = PtbXLDatasetProvider(None, None, None, None, None, target=self.target)
+        return ds_provider.load_split
 
 
 class MimicDataset(RegressionDataset):
@@ -145,7 +147,8 @@ class MimicDataset(RegressionDataset):
 
     @property
     def _dataset_loader(self) -> Callable:
-        return partial(load_mimic_split, target=self.target)
+        ds_provider = MimicDatasetProvider(None, None, None, None, None, target=self.target)
+        return ds_provider.load_split
 
 
 class SleepEDFDataset(ClassificationDataset):
@@ -153,4 +156,5 @@ class SleepEDFDataset(ClassificationDataset):
 
     @property
     def _dataset_loader(self) -> Callable:
-        return load_sleep_edf_split
+        ds_provider = SleepEDFDatasetProvider(None, None)
+        return ds_provider.load_split

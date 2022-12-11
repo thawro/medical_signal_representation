@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict, List
+from typing import Callable, Dict, List
 
 import numpy as np
 import torch
@@ -16,7 +16,7 @@ from torchmetrics.functional import (
 )
 
 
-def get_metrics(metrics_funcs, preds: torch.Tensor, target: torch.Tensor):
+def get_metrics(metrics_funcs: Dict[str, Callable], preds: torch.Tensor, target: torch.Tensor):
     preds = torch.from_numpy(preds) if isinstance(preds, np.ndarray) else preds
     target = torch.from_numpy(target) if isinstance(target, np.ndarray) else target
     metrics = {}

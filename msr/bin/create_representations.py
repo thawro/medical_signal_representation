@@ -15,7 +15,7 @@ def main(cfg: DictConfig):
     print_config_tree(cfg, keys="all")
 
     dataset_provider = hydra.utils.instantiate(cfg.dataset_provider)
-    dataset_provider.create_dataset(cfg.n_jobs, cfg.batch_size, cfg.splits)
+    dataset_provider.create_dataset(n_jobs=cfg.n_jobs, batch_size=cfg.batch_size, splits=cfg.splits)
     dataset_provider.concat_data_files()
 
     log.info("Representasions dataset creation finished")

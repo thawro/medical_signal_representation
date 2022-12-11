@@ -75,7 +75,7 @@ class DatasetProvider:
         is_features_in_rep_types = any(["features" in rep_type for rep_type in self.representation_types])
 
         for i, split in enumerate(tqdm(splits, "Creating representations for all splits")):
-            all_data = torch.load(self.raw_tensors_data_path / f"{split}.pt")[:5]
+            all_data = torch.load(self.raw_tensors_data_path / f"{split}.pt")
             n_samples = len(all_data)
             if (
                 is_features_in_rep_types and i == 0
@@ -87,7 +87,7 @@ class DatasetProvider:
             _batch_size = n_samples if batch_size == -1 else batch_size
             start_idx = 0
             n_batches = math.ceil(n_samples / _batch_size)
-            log.info(f"Exctracting representations using batch_size={_batch_size} ({n_batches} batches)")
+            log.info(f"{split} split. Exctracting representations using batch_size={_batch_size} ({n_batches} batches)")
             while start_idx < n_samples:
                 end_idx = start_idx + _batch_size
                 batch_idx = math.ceil((start_idx + 1) / _batch_size) - 1
@@ -111,7 +111,7 @@ class DatasetProvider:
                     representation_path = self.representations_path / rep_type
                     representation_path.mkdir(parents=True, exist_ok=True)
                     suffix = f"_{batch_idx}" if n_batches > 1 else ""
-                    path = representation_path / f"_{split}{suffix}.pt"
+                    path = representation_path / f"{split}{suffix}.pt"
                     torch.save(data, path)
                 start_idx = end_idx
             log.info(f"{split} split finished")

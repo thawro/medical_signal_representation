@@ -1,0 +1,9 @@
+_target_: sklearn.svm.SVR
+C: 1.0
+kernel: rbf
+degree: 3
+gamma: scale
+coef0: 0.0
+shrinking: true
+tol: 0.001
+cache_size: 200
