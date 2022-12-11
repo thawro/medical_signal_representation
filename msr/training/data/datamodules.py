@@ -50,6 +50,7 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         if stage == "test" or stage is None:
             self.test = self.DatasetFactory(split="test", **self.dataset_params)
             self.datasets.append(self.test)
+
         for dataset in self.datasets:
             if hasattr(dataset, "feature_names"):
                 self.feature_names = dataset.feature_names

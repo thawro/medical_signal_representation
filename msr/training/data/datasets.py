@@ -78,10 +78,13 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
 class ClassificationDataset(BaseDataset):
     def __init__(self, split: Literal["train", "val", "test"], representation_type: str, transform: Callable = None):
         super().__init__(split, representation_type, transform)
-        self.classes = np.array([self.info[target] for target in self.targets])
-        self.classes_counts = {target: count for target, count in zip(*np.unique(self.classes, return_counts=True))}
+        self.classes = np.array([self.info[target.item()] for target in self.targets])
+        self.classes_counts = {k: 0 for k in self.info.values()}
+        self.classes_counts.update(
+            {target: count for target, count in zip(*np.unique(self.classes, return_counts=True))}
+        )
         self.classes_counts = dict(sorted(self.classes_counts.items(), key=lambda item: item[1], reverse=True))
-        self.class_names = sorted(self.info.values())
+        self.class_names = sorted([class_name for class_name, count in self.classes_counts.items() if count > 0])
         self.classes_colors = {class_name: color for class_name, color in zip(self.class_names, sns.color_palette())}
 
     @property
@@ -92,6 +95,7 @@ class ClassificationDataset(BaseDataset):
         order = list(self.classes_counts.keys())
         palette = [color[1] for color in sorted(self.classes_colors.items(), key=lambda pair: order.index(pair[0]))]
         sns.countplot(x=self.classes, ax=ax, order=order, palette=palette)
+        ax.tick_params(axis="x", labelrotation=75)
 
 
 class RegressionDataset(BaseDataset):

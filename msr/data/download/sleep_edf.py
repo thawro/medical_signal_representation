@@ -227,5 +227,7 @@ def create_raw_tensors_dataset():
 
 
 def load_sleep_edf_raw_tensors_for_split(split):
-    data, targets = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt"), load_tensor(TARGETS_PATH / f"{split}.pt")
+    data, targets = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt"), load_tensor(
+        RAW_TENSORS_TARGETS_PATH / f"{split}.pt"
+    )
     return data, targets

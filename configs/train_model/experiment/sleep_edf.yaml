@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - override /datamodule: sleep_edf.yaml
+  - override /model: random_forest_classifier.yaml
+  - override /callbacks: default.yaml
+  - override /trainer: ml_classifier_trainer.yaml
+  - override /logger: ml_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+
+
+datamodule:
+  representation_type: whole_signal_features
+  # transform: null
+
+# model:
+#   # TODO model params
