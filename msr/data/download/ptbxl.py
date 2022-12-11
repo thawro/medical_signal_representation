@@ -20,11 +20,11 @@ DATASET_PATH = DATA_PATH / DATASET_NAME
 RAW_DATASET_PATH = DATASET_PATH / "raw"
 RAW_TENSORS_PATH = DATASET_PATH / "raw_tensors"
 RAW_TENSORS_DATA_PATH = RAW_TENSORS_PATH / "data"
-TARGETS_PATH = RAW_TENSORS_PATH / "targets"
+RAW_TENSORS_TARGETS_PATH = RAW_TENSORS_PATH / "targets"
 TARGET_PATH = None
 FS = 100
 
-for path in [RAW_DATASET_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH]:
+for path in [RAW_DATASET_PATH, RAW_TENSORS_DATA_PATH, RAW_TENSORS_TARGETS_PATH]:
     path.mkdir(parents=True, exist_ok=True)
 
 
@@ -103,7 +103,7 @@ def create_raw_tensors_dataset(fs: float, target: str, encode_targets: bool):
         encode_targets (bool): Whether to use `LabelEncoder` to encode labels. Defaults to `True`.
     """
     splits = ["train", "val", "test"]
-    TARGET_PATH = TARGETS_PATH / target
+    TARGET_PATH = RAW_TENSORS_TARGETS_PATH / target
     TARGET_PATH.mkdir(parents=True, exist_ok=True)
     log.info(f"Using {target} target.")
     ptbxl_data = load_raw_ptbxl_data(fs, target)
@@ -126,6 +126,6 @@ def create_raw_tensors_dataset(fs: float, target: str, encode_targets: bool):
 
 def load_ptbxl_raw_tensors_for_split(split, target):
     data, targets = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt"), load_tensor(
-        TARGETS_PATH / target / f"{split}.pt"
+        RAW_TENSORS_TARGETS_PATH / target / f"{split}.pt"
     )
     return data, targets

@@ -1,0 +1,19 @@
+_target_: msr.data.dataset_providers.PtbXLDatasetProvider
+representation_types:
+  - whole_signal_waveforms
+  - whole_signal_features
+  - windows_waveforms
+  - windows_features
+  - beats_waveforms
+  - beats_features
+  - agg_beat_waveforms
+  - agg_beat_features
+windows_params:
+  win_len_s: 6
+  step_s: 2
+beats_params:
+  source_channel: ecg_2
+agg_beat_params:
+  valid_only: False
+n_beats: 7
+target: diagnostic_class

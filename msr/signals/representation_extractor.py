@@ -1,8 +1,8 @@
-from typing import List, Type
+from typing import List, Type, Union
 
 import numpy as np
 
-from msr.signals.base import MultiChannelSignal
+from msr.signals.base import MultiChannelPeriodicSignal, MultiChannelSignal
 
 
 class RepresentationExtractor:
@@ -23,7 +23,11 @@ class RepresentationExtractor:
     def get_feature_names(self, representation_types: List[str]):
         if representation_types == "all":
             representation_types = list(self.measurement.representations.keys())
-        return {rep_type: self.measurement.feature_names_funcs[rep_type]() for rep_type in representation_types}
+        feature_names = {}
+        for rep_type in representation_types:
+            if rep_type in self.measurement.feature_names_funcs:
+                feature_names[rep_type] = self.measurement.feature_names_funcs[rep_type]()
+        return feature_names
 
 
 class PeriodicRepresentationExtractor(RepresentationExtractor):
@@ -51,3 +55,21 @@ class PeriodicRepresentationExtractor(RepresentationExtractor):
                             pad_width = ((0, n_more_beats), (0, 0))
                         representations[rep_type] = np.pad(representations[rep_type], pad_width)
         return representations
+
+
+def create_representation_extractor(
+    multichannel_signal: Type[Union[MultiChannelPeriodicSignal, MultiChannelSignal]],
+    windows_params: dict,
+    beats_params: dict = {},
+    agg_beat_params: dict = {},
+):
+    is_periodic = isinstance(multichannel_signal, MultiChannelPeriodicSignal)
+    RepExtractorClass = PeriodicRepresentationExtractor if is_periodic else RepresentationExtractor
+    rep_extractor = RepExtractorClass(multichannel_signal)
+    if windows_params:
+        rep_extractor.set_windows(**windows_params)
+    if beats_params and is_periodic:
+        rep_extractor.set_beats(**beats_params)
+        if agg_beat_params:
+            rep_extractor.set_agg_beat(**agg_beat_params)
+    return rep_extractor

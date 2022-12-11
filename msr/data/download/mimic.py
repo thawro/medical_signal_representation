@@ -41,8 +41,8 @@ VALID_SEGMENTS_PATH = LOGS_PATH / "valid_segments.txt"
 RAW_DATASET_PATH = DATASET_PATH / "raw"
 RAW_TENSORS_PATH = DATASET_PATH / "raw_tensors"
 RAW_TENSORS_DATA_PATH = RAW_TENSORS_PATH / "data"
-TARGETS_PATH = RAW_TENSORS_PATH / "targets"
-for path in [RAW_DATASET_PATH, LOGS_PATH, RAW_TENSORS_DATA_PATH, TARGETS_PATH]:
+RAW_TENSORS_TARGETS_PATH = RAW_TENSORS_PATH / "targets"
+for path in [RAW_DATASET_PATH, LOGS_PATH, RAW_TENSORS_DATA_PATH, RAW_TENSORS_TARGETS_PATH]:
     path.mkdir(parents=True, exist_ok=True)
 SESSION = None
 
@@ -646,11 +646,13 @@ def create_raw_tensors_dataset(
         if "abp" in targets:
             bp_values["abp"] = abp_data
         for name, target_data in bp_values.items():
-            target_path = TARGETS_PATH / name
+            target_path = RAW_TENSORS_TARGETS_PATH / name
             target_path.mkdir(parents=True, exist_ok=True)
             torch.save(target_data, target_path / f"{split}.pt")
 
 
 def load_mimic_raw_tensors_for_split(split):
-    data, targets = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt"), load_tensor(TARGETS_PATH / f"{split}.pt")
+    data, targets = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt"), load_tensor(
+        RAW_TENSORS_TARGETS_PATH / f"{split}.pt"
+    )
     return data, targets

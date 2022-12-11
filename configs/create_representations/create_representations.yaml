@@ -1,0 +1,10 @@
+defaults:
+  - _self_
+  - hydra: default.yaml
+  - paths: default.yaml
+  - dataset_provider: ptbxl.yaml
+  - experiment: null
+
+n_jobs: 1
+batch_size: -1  # 20000 for sleep_edf
+splits: [train, val, test]

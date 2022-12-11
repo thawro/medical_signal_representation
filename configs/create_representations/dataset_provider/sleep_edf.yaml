@@ -1,0 +1,5 @@
+_target_: msr.data.dataset_providers.SleepEDFProviders
+representation_types: [whole_signal_waveforms, whole_signal_features, windows_waveforms, windows_features]
+windows_params:
+  win_len_s: 10
+  step_s: 8

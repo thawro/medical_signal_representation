@@ -1,0 +1,8 @@
+1. Refactor modulu create_representations - da sie to zrobic tak, zeby bylo odpalane z jednego maina dla wszystkich datasetow (odpowiednia konfiguracja)
+2. Rozszerzenie ekstrakcji cech dla sygnalow:
+    * PPG
+    * EOG
+    * EMG
+3. Rozszerzenie modulu sieci glebokich
+4. Dopisanie reszty configow do modeli
+5. Przetestowanie wszystkich mozliwych polaczen dataset_repType_model

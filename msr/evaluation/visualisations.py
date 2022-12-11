@@ -162,7 +162,7 @@ def plotly_feature_importance_plot(feat_names: list, feat_importances: list, n_b
         x="Importance",
         y="Feature name",
         orientation="h",
-        height=n_best * 150,
+        height=n_best * 120,
         title="Feature importance",
     )
     return fig
