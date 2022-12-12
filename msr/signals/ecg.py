@@ -15,8 +15,6 @@ from msr.signals.base import (
 from msr.signals.utils import parse_feats_to_array
 from msr.utils import lazy_property
 
-CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
-
 
 def check_ecg_polarity(data):
     try:

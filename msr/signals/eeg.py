@@ -14,6 +14,7 @@ class EEGSignal(Signal):
         self.feature_extraction_funcs.update(
             {
                 "relative_power_frequency": self.extract_relative_power_frequency_features,
+                # TODO
             }
         )
 
@@ -29,7 +30,13 @@ class EEGSignal(Signal):
             return parse_feats_to_array(features)
         return features
 
-    # TODO: Add another features
+    # TODO
+    def extract_xyz_features(self, return_arr=False, **kwargs):
+        features = OrderedDict({})
+        # TODO
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
 
 
 class MultiChannelEEGSignal(MultiChannelSignal):

@@ -1,6 +1,6 @@
 2. Rozszerzenie ekstrakcji cech dla sygnalow:
     * PPG
     * EOG
-    * EMG
+    * EEG
 3. Rozszerzenie modulu sieci glebokich
 4. Przetestowanie wszystkich mozliwych polaczen dataset_repType_model

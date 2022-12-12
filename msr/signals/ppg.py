@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import List, Type
+from typing import Dict, List, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -55,6 +55,7 @@ class PPGSignal(PeriodicSignal):
         self.feature_extraction_funcs.update(
             {
                 "hrv": self.extract_hrv_features,
+                # TODO
             }
         )
 
@@ -87,6 +88,14 @@ class PPGSignal(PeriodicSignal):
     def extract_agg_beat_features(self, return_arr=True, plot=False):
         return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
 
+    # TODO
+    def extract_xyz_features(self, return_arr=False, **kwargs):
+        features = OrderedDict({})
+        # TODO
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)
 
@@ -97,6 +106,7 @@ class PPGBeat(BeatSignal):
         self.feature_extraction_funcs.update(
             {
                 "sppg": self.extract_sppg_features,
+                # TODO
             }
         )
 
@@ -114,6 +124,35 @@ class PPGBeat(BeatSignal):
         return {
             "systolic_peak": self.systolic_peak_loc,
         }
+
+    @lazy_property
+    def energy_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        return [
+            {"name": "ZeroSysE", "start": 0, "end": self.systolic_peak_loc},
+            {"name": "SysEndE", "start": self.systolic_peak_loc, "end": self.n_samples},
+        ]
+
+    @lazy_property
+    def area_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        """Must return list of dicts with `name`, `start` and `end` keys
+
+        Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
+        """
+        return [
+            {"name": "ZeroSysA", "start": 0, "end": self.systolic_peak_loc},
+            {"name": "SysEndA", "start": self.systolic_peak_loc, "end": self.n_samples},
+        ]
+
+    @lazy_property
+    def slope_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        """Must return list of dicts with `name`, `start` and `end` keys
+
+        Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
+        """
+        return [
+            {"name": "SysOnsetSlope", "start": 0, "end": self.systolic_peak_loc},
+            {"name": "SysOffsetSlope", "start": self.systolic_peak_loc, "end": self.n_samples},
+        ]
 
     def extract_sppg_features(self, return_arr=False, plot=True):
         systolic_onset_slope = (self.systolic_peak_val - self.data[0]) / self.systolic_peak_time
