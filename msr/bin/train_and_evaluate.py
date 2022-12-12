@@ -9,7 +9,7 @@ log.setLevel(logging.INFO)
 from msr.utils import logger_name_to_str, logger_project_to_str, print_config_tree
 
 
-@hydra.main(version_base=None, config_path="../../../configs/train_model", config_name="train")
+@hydra.main(version_base=None, config_path="../../configs/train_model", config_name="train")
 def main(cfg: omegaconf.DictConfig):
 
     cfg.logger.project = logger_project_to_str(cfg.logger.project)
