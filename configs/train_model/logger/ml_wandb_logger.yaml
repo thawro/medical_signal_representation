@@ -1,0 +1,4 @@
+_target_: msr.training.loggers.MLWandbLogger
+dir: ${hydra:run.dir}
+project: ${logger_project}
+name: ${logger_run_name}

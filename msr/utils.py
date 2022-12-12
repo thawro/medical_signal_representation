@@ -1,4 +1,5 @@
 import inspect
+import json
 import os
 import zipfile
 from collections.abc import Iterable
@@ -6,20 +7,53 @@ from itertools import groupby
 from pathlib import Path
 from typing import Callable, List, Union
 
+import hydra
 import numpy as np
 import pandas as pd
+import pyrootutils
+import rich
+import rich.syntax
+import rich.tree
 import torch
 import wget
 from joblib import Parallel, delayed
+from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 
-ROOT = Path(__file__).parent.parent
+ROOT = pyrootutils.setup_root(
+    search_from=__file__,
+    indicator=[".git", "pyproject.toml"],
+    pythonpath=True,
+    dotenv=True,
+)
+
+ROOT = Path(ROOT)
+CONFIG_PATH = ROOT / "configs"
 DATA_PATH = ROOT / "data"
 
 import logging
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
+
+EPSILON = np.finfo(float).eps
+
+datamodule2str = {  # dm
+    "PtbXLDataModule": "ptbxl",
+    "MimicDataModule": "mimic",
+    "SleepEDFDataModule": "sleep_edf",
+}
+
+
+def logger_project_to_str(project):
+    datamodule = project.split(".")[-1]
+    return datamodule2str[datamodule]
+
+
+def logger_name_to_str(name):
+    rep_type, model_target = name.split("__")
+    model_classname = model_target.split(".")[-1]
+    return f"{rep_type}__{model_classname}"
 
 
 def get_corr_matrix(df: pd.DataFrame):
@@ -124,3 +158,30 @@ def lazy_property(fn: Callable) -> Callable:
 
 def load_tensor(path):
     return torch.load(path)
+
+
+def ordered_dict_to_dict(dct):
+    """Parse nested OrderedDict to dict"""
+    try:
+        return json.loads(json.dumps(dct))
+    except TypeError:
+        return dict(dct)
+
+
+def print_config_tree(cfg: DictConfig, keys: List[str] = "all", style: str = "dim"):
+    tree = rich.tree.Tree("CONFIG", style=style, guide_style=style)
+    if keys == "all":
+        branch = tree.add("config", style=style, guide_style=style)
+        branch_content = OmegaConf.to_yaml(cfg, resolve=True)
+        branch.add(rich.syntax.Syntax(branch_content, "yaml"))
+    else:
+        for key, group in cfg.items():
+            if key in keys:
+                branch = tree.add(key, style=style, guide_style=style)
+                branch_content = OmegaConf.to_yaml(group, resolve=True)
+                branch.add(rich.syntax.Syntax(branch_content, "yaml"))
+    rich.print(tree)
+
+
+def align_left(name, value, n_signs=15, sign=" = "):
+    return f"{f'{name}':<{n_signs}}{sign}{value}"

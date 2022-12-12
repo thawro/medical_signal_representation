@@ -57,20 +57,16 @@
         * **classification**: *diagnostic_subclass*
 
 
+2. MIMIC-III Waveform
 
-
-
-2. MIMIC
-
-    * [source URL](https://physionet.org/content/mimicdb/1.0.0/055/#files-panel)
+    * [source URL](https://physionet.org/content/mimic3wdb/1.0/)
     * papers:
         * [Hypertension Assessment via ECG and PPG Signals: An Evaluation Using MIMIC Database](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6163274/)
         *
-
     * interesting urls:
         * [Subjects list](https://physionet.org/files/mimicdb/1.0.0/mimic-index.shtml)
         * [Cuff-Free Blood Pressure Estimation Using Pulse Transit Time and Heart Rate](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4512231/)
-
+        * [The MIMIC-III Waveform Database](https://archive.physionet.org/physiobank/database/mimic3wdb/)
     * description:
         * 72 recordings (multiple recordings for some of the subjects)
         * Average recording time ~40hours
@@ -96,23 +92,25 @@
             * aggregated for 10 seconds of signal
 
 
-
-
-
-3. MIMIC-III Waveform
-
-    * [source URL](https://physionet.org/content/mimic3wdb/1.0/)
-    * preprocessing:
-        1.
-        2.
-    * papers:
-        *
-        *
-    * interesting urls:
-        * [The MIMIC-III Waveform Database](https://archive.physionet.org/physiobank/database/mimic3wdb/)
-
 4. Sleep-EDF
+    * [source URL](TODO)
+    * papers:
+        * TODO
 
+    * interesting urls:
+        * TODO
+
+    * description:
+        TODO
+
+    * preprocessing:
+        TODO
+
+    * After preprocessing:
+        TODO
+
+    * tasks:
+        * **classification**: *sleep_stage*
 
 
 
@@ -120,8 +118,10 @@
 
 1. Raw signal
 
-    * whole sequence (10 sec)
-    * sequence aggregated to a single PPG / PQRS episode
+    * whole signal sequence
+    * signal split into windows
+    * signal split into beats (for periodic signals like ECG, PPG)
+    * signal split into beats and aggregated into single episode (sPPG, sPQRS)
 
 2. Signal embedded with neural networks
 
@@ -140,8 +140,10 @@
 
 3. Features extracted from signal as tabular data
 
-    * Features for each PPG / PQRS episode
-    * Features for aggregated PPG / PQRS episode
+    * features extracted for whole signal
+    * features extracted for each window
+    * features extracted for each beat (for periodic signals, like PPG, ECG)
+    * features extracted for aggregated episode (for periodic signals), sPPG, sPQRS
 
 
 
@@ -265,9 +267,22 @@
 # Models
 
 * Support Vector Machine
+* Decision Tree
+* Random Forest
 * LGBM
-* RNN (+ attn)
-* CNN + RNN (+ attn)
+* MLP
 * CNN
-* Transformer
-* CNN + Transformer
+* LSTM
+
+Maybe:
+    * RNN (+ attn)
+    * CNN + RNN (+ attn)
+    * Transformer
+    * CNN + Transformer
+
+
+# In total:
+
+* 3 datasets
+* 8 representation types for 2 datasets (mimic, ptbxl) and 4 representation types for 1 dataset (sleep_edf)
+* 6 models

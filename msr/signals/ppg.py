@@ -7,7 +7,7 @@ import seaborn as sns
 from scipy import integrate
 from scipy.signal import butter, filtfilt
 
-from msr.signals.base import BeatSignal, PeriodicSignal
+from msr.signals.base import BeatSignal, PeriodicSignal, find_intervals_using_hr
 from msr.signals.utils import moving_average, parse_feats_to_array
 from msr.utils import lazy_property
 
@@ -54,7 +54,7 @@ class PPGSignal(PeriodicSignal):
         super().__init__(name, data, fs, start_sec)
         self.feature_extraction_funcs.update(
             {
-                "hrv_features": self.extract_hrv_features,
+                "hrv": self.extract_hrv_features,
             }
         )
 
@@ -71,7 +71,10 @@ class PPGSignal(PeriodicSignal):
         return peaks
 
     def _get_beats_intervals(self):
-        intervals = np.vstack((self.troughs[:-1], self.troughs[1:])).T
+        try:
+            intervals = np.vstack((self.troughs[:-1], self.troughs[1:])).T
+        except Exception:
+            intervals = find_intervals_using_hr(self)
         return intervals
 
     def extract_hrv_features(self, return_arr=False, plot=False):
@@ -93,7 +96,7 @@ class PPGBeat(BeatSignal):
         super().__init__(name, data, fs, start_sec, beat_num)
         self.feature_extraction_funcs.update(
             {
-                "sppg_features": self.extract_sppg_features,
+                "sppg": self.extract_sppg_features,
             }
         )
 
@@ -101,6 +104,8 @@ class PPGBeat(BeatSignal):
 
     def find_systolic_peak(self):
         self.systolic_peak_loc = self.data.argmax()
+        if self.systolic_peak_loc == 0:
+            self.systolic_peak_loc = self.n_samples // 2
         self.systolic_peak_time = self.time[self.systolic_peak_loc]
         self.systolic_peak_val = self.data[self.systolic_peak_loc]
 

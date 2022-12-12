@@ -13,7 +13,7 @@ class EEGSignal(Signal):
         super().__init__(name, data, fs, start_sec)
         self.feature_extraction_funcs.update(
             {
-                "relative_power_frequency_features": self.extract_relative_power_frequency_features,
+                "relative_power_frequency": self.extract_relative_power_frequency_features,
             }
         )
 

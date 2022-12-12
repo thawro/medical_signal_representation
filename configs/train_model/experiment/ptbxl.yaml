@@ -1,0 +1,12 @@
+# @package _global_
+
+defaults:
+  - override /datamodule: ptbxl.yaml
+  - override /model: random_forest_classifier.yaml
+  - override /callbacks: default.yaml
+  - override /trainer: ml_classifier_trainer.yaml
+  - override /logger: ml_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+
+# model:
+#   # TODO model params

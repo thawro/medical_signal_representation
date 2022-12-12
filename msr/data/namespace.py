@@ -34,10 +34,6 @@ class PeriodicRepresentation(BaseNamespace):
 
 
 def get_setters_mask(representation_types: List[str]):
-    set_beats = (
-        PeriodicRepresentation.BEATS_WAVEFORMS in representation_types
-        or PeriodicRepresentation.BEATS_FEATURES in representation_types
-    )
     set_windows = (
         PeriodicRepresentation.WINDOWS_WAVEFORMS in representation_types
         or PeriodicRepresentation.WINDOWS_FEATURES in representation_types
@@ -45,5 +41,10 @@ def get_setters_mask(representation_types: List[str]):
     set_agg_beat = (
         PeriodicRepresentation.AGG_BEAT_WAVEFORMS in representation_types
         or PeriodicRepresentation.AGG_BEAT_FEATURES in representation_types
+    )
+    set_beats = (
+        PeriodicRepresentation.BEATS_WAVEFORMS in representation_types
+        or PeriodicRepresentation.BEATS_FEATURES in representation_types
+        or set_agg_beat
     )
     return set_beats, set_windows, set_agg_beat

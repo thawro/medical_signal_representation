@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+  - _self_
+  - datamodule: ptbxl.yaml
+  - model: random_forest_classifier.yaml
+  - callbacks: default.yaml
+  - logger: ml_wandb_logger.yaml
+  - trainer: ml_classifier_trainer.yaml
+  - hydra: default.yaml
+  - paths: default.yaml
+  - plotter: plotly.yaml
+
+  - experiment: null
+  - debug: null
+
+datamodule:
+  representation_type: whole_signal_features
+
+logger_project: ${datamodule._target_}
+logger_run_name: ${datamodule.representation_type}__${model._target_}
+task_name: train_model/${datamodule._target_}/${datamodule.representation_type}/${model._target_}
+
+seed: 420

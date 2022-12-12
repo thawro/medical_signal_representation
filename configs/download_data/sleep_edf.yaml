@@ -1,0 +1,21 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+raw_data:
+  fs: 100
+
+download: true
+create_raw_csv: true
+create_splits: true
+sig_names:
+  - EEG Fpz-Cz
+  - EEG Pz-Oz
+  - EOG horizontal
+sample_len_sec: 30              # Length (in seconds) of single epoch taken from data
+verbose: false                  # Whether to show additional info from MNE
+split:
+  train_size: 0.7
+  val_size: 0.15
+  test_size: 0.15
+  random_state: 42

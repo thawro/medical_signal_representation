@@ -1,0 +1,4 @@
+_target_: msr.training.trainers.MLRegressorTrainer
+_partial_: true
+# model
+# datamodule

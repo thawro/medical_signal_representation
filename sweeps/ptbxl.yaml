@@ -1,0 +1,22 @@
+---
+program: msr/bin/train/ptbxl_train.py
+method: bayes
+metric:
+  goal: maximize
+  name: val/auroc
+
+parameters:
+  model.criterion:
+    values: [gini, entropy, log_loss]
+
+  model.max_depth:
+    values: [2, 4, 8, 16, 32]
+
+  datamodule:
+    values: [ptbxl]
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}

@@ -1,39 +1,76 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.express as px
+import plotly.figure_factory as ff
+import plotly.graph_objects as go
 import seaborn as sns
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
+from sklearn.metrics import confusion_matrix
+
+sns_palette = sns.color_palette()
 
 
-def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, class_names: np.ndarray, ax=None):
+def create_fig_if_axes_is_none(nrows=1, ncols=1, figsize=(7, 5), axes=None):
+    if axes is None:
+        return plt.subplots(nrows, ncols, figsize=figsize)
+    else:
+        return None, axes
+
+
+def set_ax_params(ax, **kwargs):
+    for name, value in kwargs.items():
+        if value is None:
+            pass
+        elif isinstance(value, dict):
+            getattr(ax, f"set_{name}")(**value)
+        else:
+            getattr(ax, f"set_{name}")(value)
+
+
+def matplotlib_lineplot(x, y, ax=None, ls="--", lw=1, color=sns_palette[0], **kwargs):
+    fig, ax = create_fig_if_axes_is_none(axes=ax)
+    ax.plot(x, y, color=color, ls=ls, lw=lw)
+    set_ax_params(ax, **kwargs)
+    return ax
+
+
+def matplotlib_scatterplot(x, y, ax=None, marker="o", s=100, color=sns_palette[0], **kwargs):
+    fig, ax = create_fig_if_axes_is_none(axes=ax)
+    ax.scatter(x, y, color=color, marker=marker, s=s)
+    set_ax_params(ax, **kwargs)
+    return ax
+
+
+def matplotlib_roc_plot(fpr, tpr, class_name, ax=None):
+    fig, ax = create_fig_if_axes_is_none(1, 1, figsize=(3, 5), axes=ax)
+    matplotlib_lineplot(x=fpr, y=tpr, xlabel="FPR", ylabel="TPR", ls="-", title=class_name, ax=ax)
+    matplotlib_lineplot(x=[0, 1], y=[0, 1], color="black", ls="--", ax=ax)
+    return ax
+
+
+def matplotlib_confusion_matrix_plot(target: np.ndarray, preds: np.ndarray, class_names: np.ndarray, ax=None):
     """Plot confustion matric
 
     Args:
-        y_true (np.ndarray): Ground truth labels.
+        targets (np.ndarray): Ground truth labels.
         y_pred (np.ndarray): Predicted labels.
         class_names (np.ndarray): Class names.
         ax (_type_): Axes to plot on. If `None`, new Axes is created. Defaults to `None`.
     """
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(16, 12))
-    accuracy = accuracy_score(y_true, y_pred)
-    fscore = f1_score(y_true, y_pred, average="macro")
-    conf_matrix = pd.DataFrame(confusion_matrix(y_true, y_pred), columns=class_names, index=class_names).astype(int)
-    sns.heatmap(conf_matrix, ax=ax, annot=True, fmt=".4g", cmap="Blues")
-    ax.set_xlabel("Predicted", fontsize=20)
-    ax.set_ylabel("True", fontsize=20)
-    ax.set_title(
-        f"Confusion Matrix (accuracy = {accuracy:.2f}, fscore = {fscore:.2f})",
-        fontsize=22,
+    fig, ax = create_fig_if_axes_is_none(1, 1, figsize=(16, 12), axes=ax)
+    conf_matrix = pd.DataFrame(confusion_matrix(target, preds), columns=class_names, index=class_names).astype(int)
+    sns.heatmap(conf_matrix, ax=ax, annot=True, fmt=".4g", cmap="Blues", cbar=False)
+    set_ax_params(
+        ax,
+        xlabel=dict(xlabel="Predicted", fontsize=20),
+        ylabel=dict(ylabel="True", fontsize=20),
+        title=dict(label="Confusion Matrix", fontsize=22),
     )
+    return fig
 
 
-def plot_feature_importance(
-    feat_names: list,
-    feat_importances: list,
-    n_best: int = 10,
-    normalize: bool = True,
-    ax=None,
+def matplotlib_feature_importance_plot(
+    feat_names: list, feat_importances: list, n_best: int = 10, normalize: bool = True, ax=None
 ):
     """Plot feature importance
 
@@ -44,12 +81,88 @@ def plot_feature_importance(
         normalize (bool): Whether to normalize the importances. Defaults to `True`.
         ax (_type_): Axes to plot on. If `None`, new Axes is created. Defaults to `None`.
     """
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(8, n_best / 1.8))
+    fig, ax = create_fig_if_axes_is_none(1, 1, figsize=(8, n_best / 1.8), axes=ax)
     sorted_importances = sorted(feat_importances, reverse=False)
     sorted_feat_names = [feat_name for _, feat_name in sorted(zip(feat_importances, feat_names), reverse=False)]
     best_feat_names = np.array(sorted_feat_names[-n_best:])
     normalize_factor = sum(feat_importances) if normalize else 1
     best_feat_importanes = np.array(sorted_importances[-n_best:]) / normalize_factor
     ax.barh(best_feat_names, best_feat_importanes)
-    ax.set_title("Feature importance", fontsize=22)
+    set_ax_params(
+        ax,
+        xlabel=dict(xlabel="Importance", fontsize=20),
+        ylabel=dict(ylabel="Feature", fontsize=20),
+        title=dict(label="Feature importance", fontsize=22),
+    )
+    return fig
+
+
+def matplotlib_preds_vs_target(preds, target, ax=None):
+    fig, ax = create_fig_if_axes_is_none(1, 1, figsize=(8, 8), axes=ax)
+    matplotlib_scatterplot(target, preds, ax=ax)
+    matplotlib_lineplot([min(target), max(target)], [min(target), max(target)], ls="--", color="black", ax=ax)
+    set_ax_params(
+        ax,
+        xlabel=dict(xlabel="Target", fontsize=20),
+        ylabel=dict(ylabel="Preds", fontsize=20),
+        title=dict(label="Target vs Preds", fontsize=22),
+    )
+
+
+def plotly_roc_plot(fpr, tpr, class_name, fig=None, row=None, col=None):
+    if fig is None:
+        fig = px.line(x=fpr, y=tpr)
+    else:
+        fig.add_scatter(name=class_name, mode="lines", x=fpr, y=tpr, row=row, col=col)
+    fig.add_scatter(
+        showlegend=False,
+        mode="lines",
+        line_dash="dash",
+        x=[0, 1],
+        y=[0, 1],
+        row=row,
+        col=col,
+        marker=dict(color="black"),
+    )
+    return fig
+
+
+def plotly_confusion_matrix_plot(
+    target: np.ndarray, preds: np.ndarray, class_names: np.ndarray, fig=None, row=None, col=None
+):
+    conf_matrix = confusion_matrix(target, preds, normalize="true")  # normalize over the True values
+    subfig = ff.create_annotated_heatmap(
+        conf_matrix,
+        annotation_text=conf_matrix.round(2),
+        colorscale="Blues",
+        hoverinfo="z",
+        x=class_names,
+        y=class_names,
+    )
+    subfig.update_yaxes(autorange="reversed")
+    if fig is None:
+        fig = subfig
+    else:
+        fig.add_trace(trace=go.Heatmap(subfig["data"][0]), row=row, col=col)
+        for annotation in subfig.layout.annotations:
+            fig.add_annotation(annotation, row=row, col=col)
+        fig.update_yaxes(autorange="reversed")
+    return fig
+
+
+def plotly_feature_importance_plot(feat_names: list, feat_importances: list, n_best: int = 10, normalize: bool = True):
+    sorted_importances = sorted(feat_importances, reverse=False)
+    sorted_feat_names = [feat_name for _, feat_name in sorted(zip(feat_importances, feat_names), reverse=False)]
+    best_feat_names = np.array(sorted_feat_names[-n_best:])
+    normalize_factor = sum(feat_importances) if normalize else 1
+    best_feat_importanes = np.array(sorted_importances[-n_best:]) / normalize_factor
+    df = pd.DataFrame({"Feature name": best_feat_names, "Importance": best_feat_importanes})
+    fig = px.bar(
+        data_frame=df,
+        x="Importance",
+        y="Feature name",
+        orientation="h",
+        height=n_best * 120,
+        title="Feature importance",
+    )
+    return fig

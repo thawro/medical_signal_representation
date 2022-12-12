@@ -1,12 +1,17 @@
 from collections import OrderedDict
-from typing import Dict, List, Union
+from typing import Dict, List, Type, Union
 
 import matplotlib.pyplot as plt
 import neurokit2 as nk
 import numpy as np
 from scipy.signal import find_peaks
 
-from msr.signals.base import BeatSignal, MultiChannelPeriodicSignal, PeriodicSignal
+from msr.signals.base import (
+    BeatSignal,
+    MultiChannelPeriodicSignal,
+    PeriodicSignal,
+    find_intervals_using_hr,
+)
 from msr.signals.utils import parse_feats_to_array
 from msr.utils import lazy_property
 
@@ -29,30 +34,19 @@ def check_ecg_polarity(data):
         return 1
 
 
-def find_intervals_using_hr(sig):
-    freqs, amps = sig.psd(window_size=10, plot=False)
-    most_dominant_freq = freqs[amps.argmax()]  # HR
-    T_in_samples = int(1 / most_dominant_freq * sig.fs)
-    x = sig.cleaned
-    x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1
-    troughs, _ = find_peaks(x_minmax, height=0.9)
-    intervals = [(troughs[0], troughs[0] + T_in_samples)]
-    while intervals[-1][1] + T_in_samples < sig.n_samples:
-        prev_end = intervals[-1][1]
-        intervals.append((prev_end, prev_end + T_in_samples))
-    return intervals
-
-
 class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
         polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
-        self.cleaned = nk.ecg_clean(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
-                "hrv_features": self.extract_hrv_features,
+                "hrv": self.extract_hrv_features,
             }
         )
+
+    @property
+    def cleaned(self):
+        return nk.ecg_clean(self.data, sampling_rate=self.fs)
 
     @property
     def BeatClass(self):
@@ -60,7 +54,16 @@ class ECGSignal(PeriodicSignal):
 
     @lazy_property
     def rpeaks(self):
-        return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs)[1]["ECG_R_Peaks"]
+        try:
+            return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="neurokit")[1]["ECG_R_Peaks"]
+        except IndexError:  # Error from neurokit2
+            try:
+                return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="elgendi2010")[1]["ECG_R_Peaks"]
+            except Exception:  # TODO # both methods raise exceptions
+                sig = self.cleaned
+                normalized = (sig - sig.min()) / (sig.max() - sig.min())
+                peaks = find_peaks(normalized, height=0.7)[0]
+                return peaks
 
     def _get_beats_intervals(self, align_to_r=True):
         try:
@@ -90,13 +93,12 @@ class ECGSignal(PeriodicSignal):
                 intervals[-1][1] = self.n_samples - 1
             if intervals[0][0] < 0:
                 intervals[0][0] = 0
+            intervals = np.array(intervals)
         except ZeroDivisionError:
             intervals = find_intervals_using_hr(self)
-        return np.array(intervals)
+        return intervals
 
     def extract_hrv_features(self, return_arr=True, **kwargs):
-        if self.rpeaks is None:
-            self.find_rpeaks()
         r_peaks = self.rpeaks
         r_vals = self.data[r_peaks]
         r_times = self.time[r_peaks]
@@ -115,10 +117,10 @@ class ECGBeat(BeatSignal):
         super().__init__(name, data, fs, start_sec, beat_num)
         self.feature_extraction_funcs.update(
             {
-                "area_features": self.extract_area_features,
-                "energy_features": self.extract_energy_features,
-                "slope_features": self.extract_slope_features,
-                "energy_features": self.extract_energy_features,
+                "area": self.extract_area_features,
+                "energy": self.extract_energy_features,
+                "slope": self.extract_slope_features,
+                "energy": self.extract_energy_features,
             }
         )
 
@@ -284,46 +286,3 @@ class MultiChannelECGSignal(MultiChannelPeriodicSignal):
             sig.agg_beat.plot_crit_points(points=["p", "q", "r", "s", "t"], ax=ax[1])
             ax[1].set_title("")
         plt.tight_layout()
-
-    def set_beats(self, source_channel="ecg_2", **kwargs):
-        """Return beats from all channels.
-
-        If `source_channel` is specified, it will be used as source of beat intervals
-        for other channels. If `ZeroDivisionError` occurs (from `neurokit2`) for specified source_channel,
-        other channels are tested.
-        If `source_channel` is `None`, beats are extracter for every channel separately. In that case, there
-        is no guarantee, that number of beats and their alignment is preserved across all channels.
-
-        Args:
-            source_channel (int, optional): Channel used as source of beat intervals. Defaults to `2`.
-            return_arr (bool, optional): Whether to return beats data as `np.ndarray` or :class:`ECGBeat` objects.
-                Defaults to `True`.
-
-        Returns:
-            _type_: Beats as `np.ndarray` or as :class:`ECGBeat` objects.
-        """
-        if source_channel is not None:
-            source_channels = list(self.signals.keys())
-            source_channels.remove(source_channel)
-            source_channels.reverse()
-            found_good_channel = False
-            new_source_channel = source_channel
-            while not found_good_channel or len(source_channels) == 0:
-                try:
-                    self.signals[new_source_channel].set_beats(**kwargs)
-                    found_good_channel = True
-                    if new_source_channel != source_channel:
-                        print(f"Original source channel was corrupted. Found new source channel: {new_source_channel}")
-                except ZeroDivisionError:
-                    new_source_channel = source_channels.pop()
-            if not found_good_channel:
-                new_source_channel = source_channel
-                self.signals[new_source_channel].set_beats(**kwargs)  # use Heart Rate (most dominant frequency)
-            source_channel_intervals = self.signals[new_source_channel]._get_beats_intervals()
-        else:
-            source_channel_intervals = None
-        for _, signal in self.signals.items():
-            signal.set_beats(source_channel_intervals, **kwargs)
-        all_channels_beats = [signal.beats for _, signal in self.signals.items()]
-        self.beats = np.array(all_channels_beats)
-        self.beats_times = np.array([beat.time for beat in all_channels_beats[0]])

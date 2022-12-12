@@ -6,6 +6,8 @@ import pandas as pd
 from scipy.integrate import simps
 from scipy.interpolate import interp1d
 
+from msr.utils import EPSILON
+
 SIGNAL_FIG_PARAMS = dict(fig_size=(24, 4), label_size=12, annot_size=10)
 BEAT_FIG_PARAMS = dict(
     fig_size=(6, 3), label_size=12, title_size=14, annot_size=10, marker_size=120, fill_alpha=0.2, legend_size=12
@@ -66,7 +68,7 @@ def calculate_energy(sig, start, end):
 
 
 def calculate_slope(t, sig, start, end):
-    return (sig[end] - sig[start]) / (t[end] - t[start])
+    return (sig[end] - sig[start]) / (t[end] - t[start] + EPSILON)
 
 
 def get_windows(start, max_len, win_len, step):

@@ -136,3 +136,5 @@ writing_tips
 
 *lightning_logs/
 outputs/
+wandb/
+logs/
