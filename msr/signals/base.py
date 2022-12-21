@@ -24,6 +24,7 @@ from scipy.signal import (
     welch,
 )
 from scipy.stats import kurtosis, skew
+from sorcery import dict_of
 from statsmodels.tsa.seasonal import STL
 
 from msr.signals.utils import (
@@ -61,6 +62,9 @@ class BaseSignal:
     def __init__(self, name: str, data: NDArray[Shape["N"], Float], fs: float, start_sec: float = 0):
         self.name = name
         self.data = data
+        self.min = self.data.min()
+        self.max = self.data.max()
+        self.range = self.max - self.min
         self.fs = fs
         self.start_sec = start_sec
         self.n_samples = len(data)
@@ -386,12 +390,22 @@ class PeriodicSignal(ABC, Signal):
     def BeatClass(self):
         return BeatSignal
 
-    def set_beats(self, intervals=None, resample=True, n_samples=100, plot=False, use_raw=False, **kwargs):
+    def set_beats(
+        self, intervals=None, align_peaks_loc=None, resample=True, n_samples=100, plot=False, use_raw=False, **kwargs
+    ):
         if intervals is None:
             intervals = self._get_beats_intervals(**kwargs)
         if not resample:
             intervals[:, 1] = intervals[:, 0] + n_samples
         data = self.data if use_raw else self.cleaned
+        if align_peaks_loc is not None:
+            for i in range(len(intervals)):
+                start, end = intervals[i]
+                peak_loc = align_peaks_loc[i]
+                peak_diff = start + data[start:end].argmax() - peak_loc
+                intervals[i][0] = max(0, start + peak_diff)
+                intervals[i][1] = min(self.n_samples, end + peak_diff)
+
         beats = []
         for i, (start, end) in enumerate(intervals):
             start_sec = start / self.fs
@@ -452,18 +466,20 @@ class PeriodicSignal(ABC, Signal):
             fig, axes = plt.subplots(1, 2, figsize=(24, 4), gridspec_kw={"width_ratios": [8, 2]})
         if use_raw:
             self.plot(ax=axes[0], title="beats segmentation")
+            data = self.data
         else:
             axes[0].plot(self.time, self.cleaned, lw=3, label=self.name)
+            data = self.cleaned
         beats_bounds = []
         for beat in self.beats:
             bounds = [beat.start_sec, beat.end_sec]
             color = "green" if beat.is_valid else "red"
-            axes[0].fill_between(bounds, self.data.min(), self.data.max(), alpha=0.15, color=color)
+            axes[0].fill_between(bounds, data.min(), data.max(), alpha=0.15, color=color)
             beats_bounds.extend(bounds)
-        axes[0].vlines(beats_bounds, self.data.min(), self.data.max(), lw=1.5, ec="black", ls="--")
+        axes[0].vlines(beats_bounds, data.min(), data.max(), lw=1.5, ec="black", ls="--")
         self.plot_beats(valid=valid, invalid=invalid, ax=axes[1])
         axes[0].set_xlim([self.time.min(), self.time.max()])
-        axes[0].set_ylim([self.data.min(), self.data.max()])
+        # axes[0].set_ylim([self.data.min(), self.data.max()])
         for ax in axes:
             ax.grid(False)
             ax.set_xlabel("")
@@ -762,14 +778,26 @@ class MultiChannelSignal:
             all_feature_names.append(sig_feature_names)
         return np.array(all_feature_names)
 
-    def plot(self, **kwargs):
-        fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 3 * self.n_signals))
+    def plot(
+        self,
+        start_time=0,
+        width=10,
+        scatter=False,
+        line=True,
+        first_der=False,
+        label=None,
+        use_samples=False,
+        axes=None,
+        title="",
+    ):
+        kwargs = dict_of(start_time, width, scatter, line, first_der, label, use_samples, title)
+        if axes is None:
+            fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)
         for ax, (sig_name, sig) in zip(axes, self.signals.items()):
             sig.plot(ax=ax, **kwargs)
-            ax.set_xlabel("")
-            ax.set_ylabel("")
-            ax.set_title("")
-        # TODO: Add windows plotting func
+            ax.set(xlabel="", ylabel="", title="")
+            ax.grid(False)
+            ax.get_legend().remove()
 
 
 class MultiChannelPeriodicSignal(MultiChannelSignal):
@@ -792,7 +820,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             }
         )
 
-    def set_beats(self, source_channel=None, **kwargs):
+    def set_beats(self, source_channel=None, align_to_peak=False, **kwargs):
         """Return beats from all channels.
 
         If `source_channel` is specified, it will be used as source of beat intervals
@@ -812,10 +840,13 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             new_source_channel = source_channel
             while not found_good_channel and len(source_channels) >= 0:
                 try:
-                    signal = self.signals[new_source_channel]
-                    signal.set_beats(**kwargs)
-                    min_n_beats, max_n_beats = MIN_HR / 60 * signal.duration, MAX_HR / 60 * signal.duration
-                    if min_n_beats <= len(signal.beats) <= max_n_beats:
+                    source_signal = self.signals[new_source_channel]
+                    source_signal.set_beats(**kwargs)
+                    min_n_beats, max_n_beats = (
+                        MIN_HR / 60 * source_signal.duration,
+                        MAX_HR / 60 * source_signal.duration,
+                    )
+                    if min_n_beats <= len(source_signal.beats) <= max_n_beats:
                         found_good_channel = True
                         if new_source_channel != source_channel:
                             log.info(
@@ -832,8 +863,11 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             intervals = self.signals[new_source_channel]._get_beats_intervals()
         else:
             intervals = None
-        for _, signal in self.signals.items():
-            signal.set_beats(intervals, **kwargs)
+        for name, signal in self.signals.items():
+            if name == new_source_channel:
+                continue
+            align_peaks_loc = source_signal.peaks if align_to_peak else None
+            signal.set_beats(intervals, align_peaks_loc=align_peaks_loc, **kwargs)
 
     def set_agg_beat(self, **kwargs):
         for _, signal in self.signals.items():
@@ -927,14 +961,6 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             feature_names = [f"{sig.agg_beat.name}__{feature_name}" for feature_name in feature_names]
             all_feature_names.extend(feature_names)
         return np.array(all_feature_names)
-
-    def plot(self, **kwargs):
-        fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)
-        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
-            sig.plot(ax=ax, **kwargs)
-            ax.set(xlabel="", ylabel="", title="")
-            ax.grid(False)
-            ax.get_legend().remove()
 
     def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, **kwargs):
         fig, axes = plt.subplots(

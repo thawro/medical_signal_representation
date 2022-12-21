@@ -49,8 +49,7 @@ class ECGSignal(PeriodicSignal):
     def BeatClass(self):
         return ECGBeat
 
-    @lazy_property
-    def rpeaks(self):
+    def find_peaks(self):
         try:
             return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="neurokit")[1]["ECG_R_Peaks"]
         except IndexError:  # Error from neurokit2
@@ -62,9 +61,9 @@ class ECGSignal(PeriodicSignal):
                 peaks = find_peaks(normalized, height=0.7)[0]
                 return peaks
 
-    def _get_beats_intervals(self, align_to_r=True):
+    def _get_beats_intervals(self, align_to_peak=True):
         try:
-            qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=None, sampling_rate=self.fs, show=False)
+            qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=self.peaks, sampling_rate=self.fs, show=False)
             beats_times = []
             intervals = []
             prev_end_idx = qrs_epochs["1"].Index.values[-1]
@@ -72,7 +71,7 @@ class ECGSignal(PeriodicSignal):
                 if int(idx) == 1:
                     beats_times.append(beat.index.values)
                 else:
-                    if not align_to_r:
+                    if not align_to_peak:
                         start_idx = np.where(beat.Index.values == prev_end_idx)[0]
                         start_idx = start_idx[0] if len(start_idx) == 1 else 0
                         beat = beat.iloc[start_idx:]
@@ -96,7 +95,7 @@ class ECGSignal(PeriodicSignal):
         return intervals
 
     def extract_hrv_features(self, return_arr=True, **kwargs):
-        r_peaks = self.rpeaks
+        r_peaks = self.peaks
         r_vals = self.data[r_peaks]
         r_times = self.time[r_peaks]
         ibi = np.diff(r_times)

@@ -225,7 +225,6 @@
     * [A Deep Learning Approach to Predict Blood Pressure from PPG Signals](https://arxiv.org/abs/2108.00099)
     * [A Comparison of Deep Learning Techniques for Arterial Blood Pressure Prediction ](https://link.springer.com/article/10.1007/s12559-021-09910-0)
     * [BP-Net: Efficient Deep Learning for Continuous Arterial Blood Pressure Estimation using Photoplethysmogram](https://arxiv.org/abs/2111.14558)
-    * [Assessment of Non-Invasive Blood Pressure Prediction from PPG and rPPG Signals Using Deep Learning](https://www.mdpi.com/1424-8220/21/18/6022)
     * [PPG2ABP: Translating Photoplethysmogram (PPG) Signals to Arterial Blood Pressure (ABP) Waveforms using Fully Convolutional Neural Networks](https://arxiv.org/abs/2005.01669)
     * [Beat-to-Beat Continuous Blood Pressure Estimation Using Bidirectional Long Short-Term Memory Network](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7795062/)
     * [Cuffless Blood Pressure Estimation Algorithms for Continuous Health-Care Monitoring](https://pubmed.ncbi.nlm.nih.gov/27323356/)
@@ -234,7 +233,12 @@
 
 
 2. Features
-    *
+    * [A Benchmark Study of Machine Learning for Analysis of Signal Feature Extraction Techniques for Blood Pressure Estimation Using Photoplethysmography (PPG)](https://ieeexplore.ieee.org/document/9558767)
+        * pulse width features
+        * pulse height features
+    * [On a Feature Extraction and Classification Study for PPG Signal Analysis](https://www.scirp.org/journal/paperinformation.aspx?paperid=112523)
+    * [Study on conditioning and feature extraction algorithm of photoplethysmography signal for physiological parameters detection](https://ieeexplore.ieee.org/document/6100581)
+    * [Essential Feature Extraction of Photoplethysmography Signal of Men and Women in Their 20s](https://www.researchgate.net/publication/319217053_Essential_Feature_Extraction_of_Photoplethysmography_Signal_of_Men_and_Women_in_Their_20s)
 
 ## EEG (Encephalogram)
 

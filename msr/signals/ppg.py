@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
+import neurokit2 as nk
 import numpy as np
 import seaborn as sns
 from scipy import integrate
@@ -51,12 +52,17 @@ def find_systolic_peaks_ELGENDI(
 class PPGSignal(PeriodicSignal):
     def __init__(self, name: str, data: np.ndarray, fs: float, start_sec: float = 0):
         super().__init__(name, data, fs, start_sec)
+        self.nk_signals_df, self.nk_info = nk.ppg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
                 "hrv": self.extract_hrv_features,
                 # TODO
             }
         )
+
+    @property
+    def cleaned(self):
+        return self.nk_signals_df["PPG_Clean"].values
 
     @property
     def BeatClass(self):
@@ -68,6 +74,7 @@ class PPGSignal(PeriodicSignal):
 
     def find_peaks(self):
         peaks = find_systolic_peaks_ELGENDI(self.data, self.fs)
+        # peaks = self.nk_info['PPG_Peaks'].values
         return peaks
 
     def _get_beats_intervals(self):
@@ -78,8 +85,11 @@ class PPGSignal(PeriodicSignal):
         return intervals
 
     def extract_hrv_features(self, return_arr=False, plot=False):
-        ibi = np.diff(self.time[self.peaks])
-        features = {"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi)}
+        """
+        source: https://neuropsychology.github.io/NeuroKit/functions/ppg.html#ppg-intervalrelated
+        """
+        df = nk.ppg_intervalrelated(self.nk_signals_df, sampling_rate=self.fs)
+        features = df.to_dict(orient="records")[0]
         if return_arr:
             return parse_feats_to_array(features)
         return features
@@ -105,7 +115,8 @@ class PPGBeat(BeatSignal):
         self.feature_extraction_funcs.update(
             {
                 "sppg": self.extract_sppg_features,
-                # TODO
+                "pulse_width": self.extract_pulse_width_features,
+                "pulse_height": self.extract_pulse_height_features,
             }
         )
 
@@ -178,7 +189,7 @@ class PPGBeat(BeatSignal):
             ax.fill_between(
                 self.time,
                 self.data,
-                self.data.min(),
+                self.min,
                 where=self.time <= self.time[self.systolic_peak_loc],
                 color="g",
                 alpha=self.fig_params["fill_alpha"],
@@ -186,7 +197,7 @@ class PPGBeat(BeatSignal):
             ax.fill_between(
                 self.time,
                 self.data,
-                self.data.min(),
+                self.min,
                 where=self.time >= self.time[self.systolic_peak_loc],
                 color="r",
                 alpha=self.fig_params["fill_alpha"],
@@ -209,6 +220,47 @@ class PPGBeat(BeatSignal):
         if return_arr:
             return parse_feats_to_array(features)
         return features
+
+    def extract_pulse_width_features(self, return_arr=False, height_pcts=[10, 25, 33, 50, 66, 75], plot=False):
+        """https://ieeexplore.ieee.org/document/9558767"""
+        heights = np.array([pct / 100 * (self.range) + self.min for pct in height_pcts])
+        idxs = [np.argwhere(np.diff(np.sign(height - self.data))).flatten() for height in heights]
+        widths = np.array([idx[-1] - idx[0] for idx in idxs])
+        times = {height_pcts[i]: [self.time[idxs[i][0]], self.time[idxs[i][-1]]] for i in range(len(heights))}
+        features = {f"pulse_width_{height_pct}%": width / self.fs for height_pct, width in zip(height_pcts, widths)}
+        if plot:
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.plot(self.time, self.data, "-", lw=3)
+            for height in height_pcts:
+                label = f"pw at {height}%"
+                start, end = times[height]
+                height_val = height / 100 * self.range + self.min
+                ax.hlines(height_val, start, end, ls="--", color="black")
+                ax.annotate(label, (end, height_val), size=14)
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_pulse_height_features(self, return_arr=False, width_pcts=[10, 25, 33, 50, 66, 75], plot=False):
+        """https://ieeexplore.ieee.org/document/9558767"""
+        width_sample_locs = [int(self.n_samples * pct / 100) for pct in width_pcts]
+        height_vals = [self.data[loc] - self.min for loc in width_sample_locs]
+        features = {f"pulse_height_{width_pct}%": height_val for width_pct, height_val in zip(width_pcts, height_vals)}
+        height_vals = {
+            width_sample_loc: [self.min, self.data[width_sample_loc]] for width_sample_loc in width_sample_locs
+        }
+
+        if plot:
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.plot(self.time, self.data, "-", lw=3)
+            for i, (width_loc, height_bounds) in enumerate(height_vals.items()):
+                label = f"ph at {width_pcts[i]}%"
+                lower, upper = height_bounds
+                ax.vlines(width_loc / self.fs, lower, upper, ls="--", color="black")
+                ax.annotate(label, (width_loc / self.fs, upper), size=14)
+            if return_arr:
+                return parse_feats_to_array(features)
+            return features
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)
