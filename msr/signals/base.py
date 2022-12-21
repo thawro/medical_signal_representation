@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections import ChainMap, OrderedDict
+from collections import ChainMap
 from typing import Dict, List, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
@@ -228,23 +228,19 @@ class BaseSignal:
         return self.data
 
     def extract_basic_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = OrderedDict(
-            {
-                "mean": self.data.mean(),
-                "std": self.data.std(),
-                "median": np.median(self.data),
-                "skewness": skew(self.data),
-                "kurtosis": kurtosis(self.data),
-            }
-        )
+        features = {
+            "mean": self.data.mean(),
+            "std": self.data.std(),
+            "median": np.median(self.data),
+            "skewness": skew(self.data),
+            "kurtosis": kurtosis(self.data),
+        }
         if return_arr:
             return np.array(list(features.values()))
         return features
 
     def extract_features(self, return_arr=True, plot=False) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = OrderedDict(
-            {name: func(return_arr=False, plot=plot) for name, func in self.feature_extraction_funcs.items()}
-        )
+        features = {name: func(return_arr=False, plot=plot) for name, func in self.feature_extraction_funcs.items()}
         features = parse_nested_feats(features)
         self.feature_names = list(features.keys())
         if return_arr:
@@ -356,16 +352,14 @@ class Signal(BaseSignal):
     ) -> Union[NDArray[Shape["B, N"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         if return_arr:
             return np.array([window.get_whole_signal_waveform() for window in self.windows])
-        return OrderedDict({f"window_{i}": window.get_whole_signal_waveform() for i, window in enumerate(self.windows)})
+        return {f"window_{i}": window.get_whole_signal_waveform() for i, window in enumerate(self.windows)}
 
     def get_windows_features(
         self, return_arr=True
     ) -> Union[NDArray[Shape["B, F"], Float], Dict[str, Dict[str, float]]]:
         if return_arr:
             return np.array([window.extract_features(return_arr=True) for window in self.windows])
-        return OrderedDict(
-            {f"window_{i}": window.extract_features(return_arr=False) for i, window in enumerate(self.windows)}
-        )
+        return {f"window_{i}": window.extract_features(return_arr=False) for i, window in enumerate(self.windows)}
 
 
 class PeriodicSignal(ABC, Signal):
@@ -438,14 +432,14 @@ class PeriodicSignal(ABC, Signal):
     def get_beats_features(self, return_arr=True) -> Union[NDArray[Shape["B, F"], Float], Dict[str, Dict[str, float]]]:
         if return_arr:
             return np.array([beat.extract_features(return_arr=True) for beat in self.beats])
-        return OrderedDict({f"beat_{beat.beat_num}": beat.extract_features(return_arr=False) for beat in self.beats})
+        return {f"beat_{beat.beat_num}": beat.extract_features(return_arr=False) for beat in self.beats}
 
     def get_beats_waveforms(
         self, return_arr=True
     ) -> Union[NDArray[Shape["B, N"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         if return_arr:
             return np.array([beat.get_whole_signal_waveform() for beat in self.beats])
-        return OrderedDict({f"beat_{beat.beat_num}": beat.get_whole_signal_waveform() for beat in self.beats})
+        return {f"beat_{beat.beat_num}": beat.get_whole_signal_waveform() for beat in self.beats}
 
     def get_agg_beat_features(self, return_arr=True) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         return self.agg_beat.extract_features(return_arr=return_arr)
@@ -556,7 +550,7 @@ class BeatSignal(ABC, BaseSignal):
     def extract_crit_points_features(
         self, return_arr=True, plot=False, ax=None
     ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = OrderedDict()
+        features = {}
         for name, loc in self.crit_points.items():
             features[f"{name}_loc"] = loc
             features[f"{name}_time"] = self.time[loc]
@@ -568,12 +562,10 @@ class BeatSignal(ABC, BaseSignal):
         return features
 
     def extract_energy_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = OrderedDict(
-            {
-                point["name"]: calculate_energy(self.data, point["start"], point["end"])
-                for point in self.energy_features_crit_points
-            }
-        )
+        features = {
+            point["name"]: calculate_energy(self.data, point["start"], point["end"])
+            for point in self.energy_features_crit_points
+        }
         if return_arr:
             return parse_feats_to_array(features)
         return features
@@ -581,12 +573,10 @@ class BeatSignal(ABC, BaseSignal):
     def extract_area_features(
         self, return_arr=True, method="trapz", plot=False, **kwargs
     ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = OrderedDict(
-            {
-                point["name"]: calculate_area(self.data, self.fs, point["start"], point["end"], method=method)
-                for point in self.area_features_crit_points
-            }
-        )
+        features = {
+            point["name"]: calculate_area(self.data, self.fs, point["start"], point["end"], method=method)
+            for point in self.area_features_crit_points
+        }
         if plot:
             self.plot_area_features()
         if return_arr:
@@ -596,12 +586,10 @@ class BeatSignal(ABC, BaseSignal):
     def extract_slope_features(
         self, return_arr=True, plot=False, ax=None
     ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = OrderedDict(
-            {
-                point["name"]: calculate_slope(self.time, self.data, point["start"], point["end"])
-                for point in self.slope_features_crit_points
-            }
-        )
+        features = {
+            point["name"]: calculate_slope(self.time, self.data, point["start"], point["end"])
+            for point in self.slope_features_crit_points
+        }
         if return_arr:
             return parse_feats_to_array(features)
         return features
@@ -673,15 +661,13 @@ class MultiChannelSignal:
         }
 
         signals_extraction_funcs = [{name: sig.extract_features for name, sig in self.signals.items()}]
-        self.feature_extraction_funcs = OrderedDict(ChainMap(*signals_extraction_funcs))
+        self.feature_extraction_funcs = ChainMap(*signals_extraction_funcs)
 
     def __getitem__(self, key):
         return self.signals[key]
 
     def extract_features(self, return_arr=False, plot=False) -> Union[NDArray[Shape["FC"], Float], Dict[str, float]]:
-        features = OrderedDict(
-            {name: func(return_arr=False, plot=plot) for name, func in self.feature_extraction_funcs.items()}
-        )
+        features = {name: func(return_arr=False, plot=plot) for name, func in self.feature_extraction_funcs.items()}
         features = parse_nested_feats(features)
         self.feature_names = list(features.keys())
         if return_arr:
@@ -704,7 +690,7 @@ class MultiChannelSignal:
         """
         if return_arr:
             return np.array([sig.get_whole_signal_waveform() for name, sig in self.signals.items()]).T
-        return OrderedDict({name: sig.get_whole_signal_waveform() for name, sig in self.signals.items()})
+        return {name: sig.get_whole_signal_waveform() for name, sig in self.signals.items()}
 
     def get_whole_signal_features(
         self, return_arr=True, **kwargs
@@ -719,7 +705,7 @@ class MultiChannelSignal:
         """
         if return_arr:
             return self.extract_features(return_arr=True)
-        return OrderedDict({name: func(return_arr=False) for name, func in self.feature_extraction_funcs.items()})
+        return {name: func(return_arr=False) for name, func in self.feature_extraction_funcs.items()}
 
     def get_windows_waveforms(
         self, return_arr=True, **kwargs
@@ -737,7 +723,7 @@ class MultiChannelSignal:
             return np.array([sig.get_windows_waveforms(return_arr=True) for _, sig in self.signals.items()]).transpose(
                 1, 2, 0
             )
-        return OrderedDict({name: sig.get_windows_waveforms(return_arr=False) for name, sig in self.signals.items()})
+        return {name: sig.get_windows_waveforms(return_arr=False) for name, sig in self.signals.items()}
 
     def get_windows_features(
         self, return_arr=True, **kwargs
@@ -755,7 +741,7 @@ class MultiChannelSignal:
             return np.concatenate(
                 [sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()], axis=1
             )
-        return OrderedDict({name: sig.get_windows_features(return_arr=False) for name, sig in self.signals.items()})
+        return {name: sig.get_windows_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_whole_signal_feature_names(self):
         self.extract_features()
@@ -868,7 +854,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
 
         if return_arr:
             return np.concatenate([sig.get_beats_features(return_arr=True) for _, sig in self.signals.items()], axis=1)
-        return OrderedDict({name: sig.get_beats_features(return_arr=False) for name, sig in self.signals.items()})
+        return {name: sig.get_beats_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_beats_waveforms(
         self, return_arr=True, **kwargs
@@ -886,7 +872,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             return np.array([sig.get_beats_waveforms(return_arr=True) for _, sig in self.signals.items()]).transpose(
                 1, 2, 0
             )
-        return OrderedDict({name: sig.get_beats_waveforms(return_arr=False) for name, sig in self.signals.items()})
+        return {name: sig.get_beats_waveforms(return_arr=False) for name, sig in self.signals.items()}
 
     def get_agg_beat_waveforms(
         self, return_arr=True, **kwargs
@@ -901,7 +887,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         """
         if return_arr:
             return np.array([sig.get_agg_beat_waveform() for _, sig in self.signals.items()]).T
-        return OrderedDict({name: sig.get_agg_beat_waveform() for name, sig in self.signals.items()})
+        return {name: sig.get_agg_beat_waveform() for name, sig in self.signals.items()}
 
     def get_agg_beat_features(
         self, return_arr=True, **kwargs
@@ -916,7 +902,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         """
         if return_arr:
             return np.concatenate([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()])
-        return OrderedDict({name: sig.get_agg_beat_features(return_arr=False) for name, sig in self.signals.items()})
+        return {name: sig.get_agg_beat_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_beats_feature_names(self):
         n_beats = len(list(self.signals.values())[0].beats)

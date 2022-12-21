@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from typing import Dict, List, Type, Union
 
 import numpy as np
@@ -27,7 +26,7 @@ def parse_nested_feats(
     """
     feats_df = pd.json_normalize(nested_feats, sep=sep)
     feats = feats_df.to_dict(orient="records")[0]
-    return OrderedDict({name: val for name, val in feats.items()})
+    return {name: val for name, val in feats.items()}
 
 
 def parse_feats_to_array(features):

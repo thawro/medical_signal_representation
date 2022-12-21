@@ -267,9 +267,7 @@
 # Models
 
 * Support Vector Machine
-* Decision Tree
 * Random Forest
-* LGBM
 * MLP
 * CNN
 * LSTM

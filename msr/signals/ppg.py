@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from typing import Dict, List, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
@@ -80,7 +79,7 @@ class PPGSignal(PeriodicSignal):
 
     def extract_hrv_features(self, return_arr=False, plot=False):
         ibi = np.diff(self.time[self.peaks])
-        features = OrderedDict({"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi)})
+        features = {"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi)}
         if return_arr:
             return parse_feats_to_array(features)
         return features
@@ -90,7 +89,7 @@ class PPGSignal(PeriodicSignal):
 
     # TODO
     def extract_xyz_features(self, return_arr=False, **kwargs):
-        features = OrderedDict({})
+        features = {}
         # TODO
         if return_arr:
             return parse_feats_to_array(features)
@@ -197,18 +196,16 @@ class PPGBeat(BeatSignal):
             ax.set_ylabel("Values [a.u.]", fontsize=self.fig_params["label_size"])
             ax.legend()
 
-        features = OrderedDict(
-            {
-                "duration": self.duration,
-                "systolic_peak_val": self.systolic_peak_val,
-                "systolic_peak_time": self.systolic_peak_time,
-                "systolic_onset_slope": systolic_onset_slope,
-                "systolic_offset_slope": systolic_offset_slope,
-                "energy": energy,
-                "before_systolic_area": before_systolic_area,
-                "after_systolic_area": after_systolic_area,
-            }
-        )
+        features = {
+            "duration": self.duration,
+            "systolic_peak_val": self.systolic_peak_val,
+            "systolic_peak_time": self.systolic_peak_time,
+            "systolic_onset_slope": systolic_onset_slope,
+            "systolic_offset_slope": systolic_offset_slope,
+            "energy": energy,
+            "before_systolic_area": before_systolic_area,
+            "after_systolic_area": after_systolic_area,
+        }
         if return_arr:
             return parse_feats_to_array(features)
         return features

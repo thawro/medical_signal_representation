@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 from msr.signals.base import MultiChannelSignal, Signal
 from msr.signals.utils import parse_feats_to_array, parse_nested_feats
 
@@ -15,7 +13,7 @@ class EOGSignal(Signal):
 
     # TODO
     def extract_xyz_features(self, return_arr=False, **kwargs):
-        features = OrderedDict({})
+        features = {}
         # TODO
         if return_arr:
             return parse_feats_to_array(features)

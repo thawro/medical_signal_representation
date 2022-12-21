@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 from scipy.signal import welch
 
 from msr.signals.base import MultiChannelSignal, Signal
@@ -23,16 +21,14 @@ class EEGSignal(Signal):
         freq_mask = (freqs >= fmin) & (freqs <= fmax)
         freqs, pxx = freqs[freq_mask], pxx[freq_mask]
         pxx /= pxx.sum()
-        features = OrderedDict(
-            {band: pxx[(freqs >= fmin) & (freqs < fmax)].mean() for band, (fmin, fmax) in FREQ_BANDS.items()}
-        )
+        features = {band: pxx[(freqs >= fmin) & (freqs < fmax)].mean() for band, (fmin, fmax) in FREQ_BANDS.items()}
         if return_arr:
             return parse_feats_to_array(features)
         return features
 
     # TODO
     def extract_xyz_features(self, return_arr=False, **kwargs):
-        features = OrderedDict({})
+        features = {}
         # TODO
         if return_arr:
             return parse_feats_to_array(features)
@@ -45,5 +41,5 @@ class MultiChannelEEGSignal(MultiChannelSignal):
 
 
 def create_multichannel_eeg(data, fs):
-    signals = OrderedDict({i + 1: EEGSignal(f"EEG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)})
+    signals = {i + 1: EEGSignal(f"EEG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)}
     return MultiChannelEEGSignal(signals)

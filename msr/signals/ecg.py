@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from typing import Dict, List, Type, Union
 
 import matplotlib.pyplot as plt
@@ -101,7 +100,7 @@ class ECGSignal(PeriodicSignal):
         r_vals = self.data[r_peaks]
         r_times = self.time[r_peaks]
         ibi = np.diff(r_times)
-        features = OrderedDict({"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi), "R_val": np.mean(r_vals)})
+        features = {"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi), "R_val": np.mean(r_vals)}
         if return_arr:
             return parse_feats_to_array(features)
         return features
