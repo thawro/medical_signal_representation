@@ -116,7 +116,7 @@ def get_valid_beats_mask(beats: List, max_duration=1.1, IQR_scale=1.5):
     return duration_mask & values_mask
 
 
-def interpolate_to_new_time(time, data, new_time):
-    interp_fn = PchipInterpolator(time, data)
+def interpolate_to_new_time(time, data, new_time, kind="nearest"):
+    interp_fn = interp1d(time, data, kind=kind, fill_value="extrapolate")
     interpolated = interp_fn(new_time)
     return interpolated

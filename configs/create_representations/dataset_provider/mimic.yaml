@@ -13,6 +13,7 @@ windows_params:
   step_s: 18
 beats_params:
   source_channel: ecg
+  align_to_beat: True
 agg_beat_params:
   valid_only: False
 n_beats: 100

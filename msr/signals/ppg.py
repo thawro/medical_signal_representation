@@ -87,8 +87,15 @@ class PPGSignal(PeriodicSignal):
         """
         source: https://neuropsychology.github.io/NeuroKit/functions/ppg.html#ppg-intervalrelated
         """
-        df = nk.ppg_intervalrelated(self.nk_signals_df, sampling_rate=self.fs)
-        features = df.to_dict(orient="records")[0]
+        peaks = self.peaks
+        vals = self.data[peaks]
+        times = self.time[peaks]
+        ibi = np.diff(times)
+        ibi_mean = ibi.mean()
+        hr = self.duration / len(peaks) * 60
+        features = {"hr": hr, "ibi_mean": ibi_mean, "ibi_std": ibi.std(), "R_val": vals.mean()}
+        # df = nk.ppg_intervalrelated(self.nk_signals_df, sampling_rate=self.fs)
+        # features = df.to_dict(orient="records")[0]
         if return_arr:
             return parse_feats_to_array(features)
         return features

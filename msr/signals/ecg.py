@@ -35,6 +35,7 @@ class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
         polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
+        self.nk_signals_df, self.nk_info = nk.ecg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
                 "hrv": self.extract_hrv_features,
@@ -99,11 +100,16 @@ class ECGSignal(PeriodicSignal):
         return intervals
 
     def extract_hrv_features(self, return_arr=True, **kwargs):
-        r_peaks = self.peaks
-        r_vals = self.data[r_peaks]
-        r_times = self.time[r_peaks]
-        ibi = np.diff(r_times)
-        features = {"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi), "R_val": np.mean(r_vals)}
+        peaks = self.peaks
+        vals = self.data[peaks]
+        times = self.time[peaks]
+        ibi = np.diff(times)
+        ibi_mean = ibi.mean()
+        hr = self.duration / len(peaks) * 60
+        features = {"hr": hr, "ibi_mean": ibi_mean, "ibi_std": ibi.std(), "R_val": vals.mean()}
+
+        # df = nk.ecg_intervalrelated(self.nk_signals_df, sampling_rate=self.fs)
+        # features = df.to_dict(orient="records")[0]
         if return_arr:
             return parse_feats_to_array(features)
         return features

@@ -366,7 +366,7 @@ class Signal(BaseSignal):
         amplitudes_sig = BaseSignal("amplitudes", dc, self.fs, start_sec=peaks_new_time[0])
         signals = [peaks_sig, troughs_sig, amplitudes_sig]
 
-        features = {sig.name: sig.extract_basic_features() for sig in signals}
+        features = {sig.name: sig.extract_basic_features(return_arr=False) for sig in signals}
 
         if plot:
             fig, ax = plt.subplots(figsize=(24, 6))
