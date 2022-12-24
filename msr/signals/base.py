@@ -35,6 +35,7 @@ from msr.signals.utils import (
     calculate_slope,
     get_valid_beats_mask,
     get_windows,
+    interpolate_to_new_time,
     parse_feats_to_array,
     parse_nested_feats,
     z_score,
@@ -262,6 +263,7 @@ class BaseSignal:
         use_samples=False,
         ax=None,
         title="",
+        lw=3,
     ):
         if ax is None:
             fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
@@ -275,8 +277,9 @@ class BaseSignal:
             signal_slice = self.get_slice(start_time, end_time)
         label = label if label is not None else signal_slice.name
         x = np.arange(signal_slice.n_samples) if use_samples else signal_slice.time
+        x = x + start_time
         y = signal_slice.data
-        plot_kwgs = dict(lw=3, label=label)
+        plot_kwgs = dict(lw=lw, label=label)
         sig_plot = ax.scatter(x, y, **plot_kwgs) if scatter else ax.plot(x, y, **plot_kwgs)
         plots = [sig_plot]
         if first_der:
@@ -291,7 +294,8 @@ class BaseSignal:
             ax2.axhline(y=0, c="black", ls="--", lw=0.5)
         plots = [plot[0] for plot in plots] if line else plots
         labels = [plot.get_label() for plot in plots]
-        ax.legend(plots, labels, loc=0, fontsize=18)
+        # ax.legend(plots, labels, loc=0, fontsize=18)
+        ax.legend()
         ax.set_ylabel("Values", fontsize=18)
         ax.set_xlabel("Samples" if use_samples else "Time [s]", fontsize=18)
         ax.set_title(f"{self.name} {title}", fontsize=22)
@@ -330,6 +334,7 @@ class BaseSignal:
 class Signal(BaseSignal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
+        self.feature_extraction_funcs.update({"peaks_troughs": self.extract_peaks_troughs_features})
 
     def set_windows(self, win_len_s, step_s):
         win_len_samples = win_len_s * self.fs
@@ -346,6 +351,31 @@ class Signal(BaseSignal):
                 for i, (start, end) in enumerate(intervals)
             ]
         )
+
+    def extract_peaks_troughs_features(self, return_arr=True, plot=False):
+        peaks_time, peaks_data = self.time[self.peaks], self.data[self.peaks]
+        troughs_time, troughs_data = self.time[self.troughs], self.data[self.troughs]
+        peaks_new_time = self.time[(self.time >= peaks_time[0]) & (self.time <= peaks_time[-1])]
+        troughs_new_time = self.time[(self.time >= troughs_time[0]) & (self.time <= troughs_time[-1])]
+        peaks_interp = interpolate_to_new_time(peaks_time, peaks_data, new_time=peaks_new_time)
+        troughs_interp = interpolate_to_new_time(troughs_time, troughs_data, new_time=peaks_new_time)
+        dc = peaks_interp - troughs_interp
+
+        peaks_sig = BaseSignal("peaks", peaks_interp, self.fs, start_sec=peaks_new_time[0])
+        troughs_sig = BaseSignal("troughs", troughs_interp, self.fs, start_sec=peaks_new_time[0])
+        amplitudes_sig = BaseSignal("amplitudes", dc, self.fs, start_sec=peaks_new_time[0])
+        signals = [peaks_sig, troughs_sig, amplitudes_sig]
+
+        features = {sig.name: sig.extract_basic_features() for sig in signals}
+
+        if plot:
+            fig, ax = plt.subplots(figsize=(24, 6))
+            for sig in [self] + signals:
+                lw = 1 if sig in signals else 3
+                sig.plot(start_time=sig.start_sec, width=sig.duration, ax=ax, label=sig.name, lw=lw)
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
 
     def plot_windows(self, **kwargs):
         for window in self.windows:
@@ -370,7 +400,11 @@ class PeriodicSignal(ABC, Signal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
         self.valid_beats_mask = None
-        self.feature_extraction_funcs.update({"agg_beat": self.extract_agg_beat_features})
+        self.feature_extraction_funcs.update(
+            {
+                "agg_beat": self.extract_agg_beat_features,
+            }
+        )
 
     @property
     def hr(self):

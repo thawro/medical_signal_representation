@@ -3,7 +3,7 @@ from typing import Dict, List, Type, Union
 import numpy as np
 import pandas as pd
 from scipy.integrate import simps
-from scipy.interpolate import interp1d
+from scipy.interpolate import PchipInterpolator, interp1d
 
 from msr.utils import EPSILON
 
@@ -114,3 +114,9 @@ def get_valid_beats_mask(beats: List, max_duration=1.1, IQR_scale=1.5):
     duration_mask = np.array([beat.duration <= max_duration for beat in beats])
     values_mask = get_valid_beats_values_mask(beats, IQR_scale=IQR_scale)
     return duration_mask & values_mask
+
+
+def interpolate_to_new_time(time, data, new_time):
+    interp_fn = PchipInterpolator(time, data)
+    interpolated = interp_fn(new_time)
+    return interpolated

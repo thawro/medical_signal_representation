@@ -117,6 +117,7 @@ class PPGBeat(BeatSignal):
                 "sppg": self.extract_sppg_features,
                 "pulse_width": self.extract_pulse_width_features,
                 "pulse_height": self.extract_pulse_height_features,
+                "frequency": self.extract_frequency_features,
             }
         )
 
@@ -261,6 +262,11 @@ class PPGBeat(BeatSignal):
             if return_arr:
                 return parse_feats_to_array(features)
             return features
+
+    def extract_frequency_features(self):
+        """https://ieeexplore.ieee.org/document/9558767"""
+        # TODO
+        pass
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)
