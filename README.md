@@ -288,3 +288,60 @@ Maybe:
 * 3 datasets
 * 8 representation types for 2 datasets (mimic, ptbxl) and 4 representation types for 1 dataset (sleep_edf)
 * 6 models
+
+
+
+
+# Features tree
+
+* **Base**
+    * **`BaseSignal`**
+        * `basic`: mean, std, kurtosis, skewness, median
+
+    * **`Signal(BaseSignal)`**
+        * `peaks`: `basic` features for peaks signal
+        * `troughs`: `basic` features for troughs signal
+        * `amplitudes`: `basic` features for amplitudes signal
+
+    * **`PeriodicSignal(Signal)`**
+        * `agg_beat`: `basic` + aggregated beat features dependent on signal type
+
+    * **`BeatSignal(BaseSignal)`**
+        * `crit_points`: critical points location, time and value for each critical point (dependent on signal type)
+        * `area`: area features determined by critical points locations
+        * `slope`: slope features determined by critical points locations
+        * `energy`: energy features determined by critical points locations
+
+
+* **ECG**
+    * **`ECGSignal(PeriodicSignal)`**
+        * `hrv`: hear rate variability features
+
+    * **`ECGBeat(BaseSignal)`**
+        * `crit_points`: [p_onset, p, p_offst, r_onset, r, r_offset, s, t_onset, t, t_offset]
+        * `area`: [p_onset, p_offset], [r_onset, r_offset], [t_onset, t_offset]
+        * `slope`: [p_onset, p], [p, p_offset], [r_onset, r], [r, r_offset], [t_onset, t], [t, t_offset]
+        * `energy`: [p_onset, p_offset], [r_onset, r_offset], [t_onset, t_offset]
+
+
+* **PPG**
+    * **`PPGSignal(PeriodicSignal)`**
+        * `hrv`: hear rate variability features
+
+    * **`PPGBeat(BaseSignal)`**
+        * `pulse_width`: pulse width features at different beat heights percantages
+        * `pulse_height`: pulse height features at different beat duration percantages
+        * `crit_points`: [systolic_peak, ]
+        * `area`: [0, systolic_peak], [systolic_peak, end]
+        * `slope`: [0, systolic_peak], [systolic_peak, end]
+        * `energy`: [0, systolic_peak], [systolic_peak, end]
+
+
+* **EOG**
+    * **`EOGSignal`**
+        * TODO
+
+
+* **EEG**
+    * **`EEGSignal`**
+        * `frequency`: frequency features, i.e. mean frequency power for different frequency bands (delta, theta, alpha, sigma, beta)

@@ -56,7 +56,6 @@ class PPGSignal(PeriodicSignal):
         self.feature_extraction_funcs.update(
             {
                 "hrv": self.extract_hrv_features,
-                # TODO
             }
         )
 
@@ -97,14 +96,6 @@ class PPGSignal(PeriodicSignal):
     def extract_agg_beat_features(self, return_arr=True, plot=False):
         return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
 
-    # TODO
-    def extract_xyz_features(self, return_arr=False, **kwargs):
-        features = {}
-        # TODO
-        if return_arr:
-            return parse_feats_to_array(features)
-        return features
-
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)
 
@@ -114,10 +105,8 @@ class PPGBeat(BeatSignal):
         super().__init__(name, data, fs, start_sec, beat_num)
         self.feature_extraction_funcs.update(
             {
-                "sppg": self.extract_sppg_features,
                 "pulse_width": self.extract_pulse_width_features,
                 "pulse_height": self.extract_pulse_height_features,
-                "frequency": self.extract_frequency_features,
             }
         )
 
@@ -140,7 +129,7 @@ class PPGBeat(BeatSignal):
     def energy_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
         return [
             {"name": "ZeroSysE", "start": 0, "end": self.systolic_peak_loc},
-            {"name": "SysEndE", "start": self.systolic_peak_loc, "end": self.n_samples},
+            {"name": "SysEndE", "start": self.systolic_peak_loc, "end": self.n_samples - 1},
         ]
 
     @lazy_property
@@ -151,7 +140,7 @@ class PPGBeat(BeatSignal):
         """
         return [
             {"name": "ZeroSysA", "start": 0, "end": self.systolic_peak_loc},
-            {"name": "SysEndA", "start": self.systolic_peak_loc, "end": self.n_samples},
+            {"name": "SysEndA", "start": self.systolic_peak_loc, "end": self.n_samples - 1},
         ]
 
     @lazy_property
@@ -162,65 +151,8 @@ class PPGBeat(BeatSignal):
         """
         return [
             {"name": "SysOnsetSlope", "start": 0, "end": self.systolic_peak_loc},
-            {"name": "SysOffsetSlope", "start": self.systolic_peak_loc, "end": self.n_samples},
+            {"name": "SysOffsetSlope", "start": self.systolic_peak_loc, "end": self.n_samples - 1},
         ]
-
-    def extract_sppg_features(self, return_arr=False, plot=True):
-        systolic_onset_slope = (self.systolic_peak_val - self.data[0]) / self.systolic_peak_time
-        systolic_offset_slope = (self.systolic_peak_val - self.data[-1]) / (self.duration - self.systolic_peak_time)
-        energy = (self.data**2).mean()
-        before_systolic_area = integrate.simpson(
-            abs(self.data[: self.systolic_peak_loc]), self.time[: self.systolic_peak_loc]
-        )
-        after_systolic_area = integrate.simpson(
-            abs(self.data[self.systolic_peak_loc :]), self.time[self.systolic_peak_loc :]
-        )
-
-        if plot:
-            fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
-            ax.plot(self.time, self.data, c=sns.color_palette()[0], lw=3)
-            ax.scatter(
-                self.time[self.systolic_peak_loc],
-                self.data[self.systolic_peak_loc],
-                s=self.fig_params["marker_size"],
-                c="r",
-                marker="^",
-                label="systolic peak",
-            )
-            ax.fill_between(
-                self.time,
-                self.data,
-                self.min,
-                where=self.time <= self.time[self.systolic_peak_loc],
-                color="g",
-                alpha=self.fig_params["fill_alpha"],
-            )
-            ax.fill_between(
-                self.time,
-                self.data,
-                self.min,
-                where=self.time >= self.time[self.systolic_peak_loc],
-                color="r",
-                alpha=self.fig_params["fill_alpha"],
-            )
-            ax.set_title(f"sPPG", fontsize=self.fig_params["title_size"])
-            ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
-            ax.set_ylabel("Values [a.u.]", fontsize=self.fig_params["label_size"])
-            ax.legend()
-
-        features = {
-            "duration": self.duration,
-            "systolic_peak_val": self.systolic_peak_val,
-            "systolic_peak_time": self.systolic_peak_time,
-            "systolic_onset_slope": systolic_onset_slope,
-            "systolic_offset_slope": systolic_offset_slope,
-            "energy": energy,
-            "before_systolic_area": before_systolic_area,
-            "after_systolic_area": after_systolic_area,
-        }
-        if return_arr:
-            return parse_feats_to_array(features)
-        return features
 
     def extract_pulse_width_features(self, return_arr=False, height_pcts=[10, 25, 33, 50, 66, 75], plot=False):
         """https://ieeexplore.ieee.org/document/9558767"""
@@ -231,7 +163,8 @@ class PPGBeat(BeatSignal):
         features = {f"pulse_width_{height_pct}%": width / self.fs for height_pct, width in zip(height_pcts, widths)}
         if plot:
             fig, ax = plt.subplots(figsize=(6, 4))
-            ax.plot(self.time, self.data, "-", lw=3)
+            # ax.plot(self.time, self.data, "-", lw=3)
+            self.plot(ax=ax, title="pulse width features")
             for height in height_pcts:
                 label = f"pw at {height}%"
                 start, end = times[height]
@@ -253,20 +186,16 @@ class PPGBeat(BeatSignal):
 
         if plot:
             fig, ax = plt.subplots(figsize=(6, 4))
-            ax.plot(self.time, self.data, "-", lw=3)
+            # ax.plot(self.time, self.data, "-", lw=3)
+            self.plot(ax=ax, title="pulse height features")
             for i, (width_loc, height_bounds) in enumerate(height_vals.items()):
                 label = f"ph at {width_pcts[i]}%"
                 lower, upper = height_bounds
                 ax.vlines(width_loc / self.fs, lower, upper, ls="--", color="black")
                 ax.annotate(label, (width_loc / self.fs, upper), size=14)
-            if return_arr:
-                return parse_feats_to_array(features)
-            return features
-
-    def extract_frequency_features(self):
-        """https://ieeexplore.ieee.org/document/9558767"""
-        # TODO
-        pass
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
 
     def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
         super().explore(start_time, width, window_size, min_hz, max_hz)

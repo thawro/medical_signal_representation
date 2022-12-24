@@ -61,6 +61,10 @@ class ECGSignal(PeriodicSignal):
                 peaks = find_peaks(normalized, height=0.7)[0]
                 return peaks
 
+    def find_troughs(self):
+        peaks = zip(self.peaks[:-1], self.peaks[1:])
+        return np.array([self.data[prev_peak:next_peak].argmin() + prev_peak for prev_peak, next_peak in peaks])
+
     def _get_beats_intervals(self, align_to_peak=True):
         try:
             qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=self.peaks, sampling_rate=self.fs, show=False)
@@ -111,14 +115,6 @@ class ECGSignal(PeriodicSignal):
 class ECGBeat(BeatSignal):
     def __init__(self, name, data, fs, start_sec, beat_num=0):
         super().__init__(name, data, fs, start_sec, beat_num)
-        self.feature_extraction_funcs.update(
-            {
-                "area": self.extract_area_features,
-                "energy": self.extract_energy_features,
-                "slope": self.extract_slope_features,
-                "energy": self.extract_energy_features,
-            }
-        )
 
     @lazy_property
     def r_onset_loc(self):

@@ -256,6 +256,7 @@ class BaseSignal:
         self,
         start_time=0,
         width=10,
+        use_raw=False,
         scatter=False,
         line=True,
         first_der=False,
@@ -278,7 +279,7 @@ class BaseSignal:
         label = label if label is not None else signal_slice.name
         x = np.arange(signal_slice.n_samples) if use_samples else signal_slice.time
         x = x + start_time
-        y = signal_slice.data
+        y = signal_slice.data if use_raw else signal_slice.cleaned
         plot_kwgs = dict(lw=lw, label=label)
         sig_plot = ax.scatter(x, y, **plot_kwgs) if scatter else ax.plot(x, y, **plot_kwgs)
         plots = [sig_plot]
@@ -353,10 +354,9 @@ class Signal(BaseSignal):
         )
 
     def extract_peaks_troughs_features(self, return_arr=True, plot=False):
-        peaks_time, peaks_data = self.time[self.peaks], self.data[self.peaks]
-        troughs_time, troughs_data = self.time[self.troughs], self.data[self.troughs]
+        peaks_time, peaks_data = self.time[self.peaks], self.cleaned[self.peaks]
+        troughs_time, troughs_data = self.time[self.troughs], self.cleaned[self.troughs]
         peaks_new_time = self.time[(self.time >= peaks_time[0]) & (self.time <= peaks_time[-1])]
-        troughs_new_time = self.time[(self.time >= troughs_time[0]) & (self.time <= troughs_time[-1])]
         peaks_interp = interpolate_to_new_time(peaks_time, peaks_data, new_time=peaks_new_time)
         troughs_interp = interpolate_to_new_time(troughs_time, troughs_data, new_time=peaks_new_time)
         dc = peaks_interp - troughs_interp
@@ -566,8 +566,25 @@ class BeatSignal(ABC, BaseSignal):
         self.feature_extraction_funcs.update(
             {
                 "crit_points": self.extract_crit_points_features,
+                "area": self.extract_area_features,
+                "slope": self.extract_slope_features,
+                "energy": self.extract_energy_features,
             }
         )
+
+    def extract_basic_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
+        features = super().extract_basic_features(return_arr=False)
+        features.update(
+            {
+                "duration": self.duration,
+                "max": self.max,
+                "min": self.min,
+                "energy": sum(self.data**2),
+            }
+        )
+        if return_arr:
+            return np.array(list(features.values()))
+        return features
 
     @lazy_property
     def crit_points(self) -> Dict[str, float]:

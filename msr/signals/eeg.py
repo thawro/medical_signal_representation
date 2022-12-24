@@ -11,12 +11,12 @@ class EEGSignal(Signal):
         super().__init__(name, data, fs, start_sec)
         self.feature_extraction_funcs.update(
             {
-                "relative_power_frequency": self.extract_relative_power_frequency_features,
+                "frequency": self.extract_frequency_features,
                 # TODO
             }
         )
 
-    def extract_relative_power_frequency_features(self, return_arr=False, fmin=0.5, fmax=30, **kwargs):
+    def extract_frequency_features(self, return_arr=False, fmin=0.5, fmax=30, **kwargs):
         freqs, pxx = welch(self.data, fs=self.fs)
         freq_mask = (freqs >= fmin) & (freqs <= fmax)
         freqs, pxx = freqs[freq_mask], pxx[freq_mask]
