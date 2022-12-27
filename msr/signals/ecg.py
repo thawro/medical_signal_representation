@@ -64,7 +64,7 @@ class ECGSignal(PeriodicSignal):
 
     def find_troughs(self):
         peaks = zip(self.peaks[:-1], self.peaks[1:])
-        return np.array([self.data[prev_peak:next_peak].argmin() + prev_peak for prev_peak, next_peak in peaks])
+        return np.array([self.data[prev_peak : next_peak + 1].argmin() + prev_peak for prev_peak, next_peak in peaks])
 
     def _get_beats_intervals(self, align_to_peak=True):
         try:

@@ -21,7 +21,9 @@ class EEGSignal(Signal):
         freq_mask = (freqs >= fmin) & (freqs <= fmax)
         freqs, pxx = freqs[freq_mask], pxx[freq_mask]
         pxx /= pxx.sum()
-        features = {band: pxx[(freqs >= fmin) & (freqs < fmax)].mean() for band, (fmin, fmax) in FREQ_BANDS.items()}
+        features = {
+            f"{band}_power": pxx[(freqs >= fmin) & (freqs < fmax)].mean() for band, (fmin, fmax) in FREQ_BANDS.items()
+        }
         if return_arr:
             return parse_feats_to_array(features)
         return features

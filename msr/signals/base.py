@@ -23,10 +23,10 @@ from scipy.signal import (
     sosfiltfilt,
     welch,
 )
-from scipy.stats import kurtosis, skew
 from sorcery import dict_of
 from statsmodels.tsa.seasonal import STL
 
+from msr.signals.features import get_basic_signal_features
 from msr.signals.utils import (
     BEAT_FIG_PARAMS,
     SIGNAL_FIG_PARAMS,
@@ -233,13 +233,7 @@ class BaseSignal:
         return self.data
 
     def extract_basic_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = {
-            "mean": self.data.mean(),
-            "std": self.data.std(),
-            "median": np.median(self.data),
-            "skewness": skew(self.data),
-            "kurtosis": kurtosis(self.data),
-        }
+        features = get_basic_signal_features(self.data)
         if return_arr:
             return np.array(list(features.values()))
         return features
@@ -335,7 +329,12 @@ class BaseSignal:
 class Signal(BaseSignal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
-        self.feature_extraction_funcs.update({"peaks_troughs": self.extract_peaks_troughs_features})
+        self.feature_extraction_funcs.update(
+            {
+                "peaks_troughs": self.extract_peaks_troughs_features,
+                "zero_crossing_rate": self.extract_zerocrossing_features,
+            }
+        )
 
     def set_windows(self, win_len_s, step_s):
         win_len_samples = win_len_s * self.fs
@@ -373,6 +372,14 @@ class Signal(BaseSignal):
             for sig in [self] + signals:
                 lw = 1 if sig in signals else 3
                 sig.plot(start_time=sig.start_sec, width=sig.duration, ax=ax, label=sig.name, lw=lw)
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_zerocrossing_features(self, return_arr=True, plot=False):
+        features = _  # TODO
+        if plot:
+            pass
         if return_arr:
             return parse_feats_to_array(features)
         return features
@@ -579,7 +586,6 @@ class BeatSignal(ABC, BaseSignal):
                 "duration": self.duration,
                 "max": self.max,
                 "min": self.min,
-                "energy": sum(self.data**2),
             }
         )
         if return_arr:

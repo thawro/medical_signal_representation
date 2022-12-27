@@ -36,6 +36,7 @@ sorcery = "^0.2.2"
 wandb = "^0.13.5"
 pyrootutils = "^1.0.4"
 lightgbm = "^3.3.3"
+pywavelets = "^1.4.1"
 
 [tool.black]
 experimental-string-processing = true
