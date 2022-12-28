@@ -11,6 +11,7 @@ from msr.signals.base import (
     PeriodicSignal,
     find_intervals_using_hr,
 )
+from msr.signals.features import get_basic_signal_features
 from msr.signals.utils import parse_feats_to_array
 from msr.utils import lazy_property
 
@@ -110,6 +111,31 @@ class ECGSignal(PeriodicSignal):
 
         # df = nk.ecg_intervalrelated(self.nk_signals_df, sampling_rate=self.fs)
         # features = df.to_dict(orient="records")[0]
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_critpoints_features(self, return_arr=True, critpoint_names=["p", "q", "r", "s", "t"], **kwargs):
+        # TODO: find better way of getting pqst locations (now it is taken from beats which are resampled)
+        features = {}
+        if hasattr(self, "beats"):
+            critpoints_times = {k: [] for k in critpoint_names}
+            critpoints_vals = {k: [] for k in critpoint_names}
+
+            for beat in self.beats:
+                for name in critpoint_names:
+                    critpoint_loc = getattr(beat, f"{name}_loc")
+                    critpoints_times[name].append(beat.time[critpoint_loc])
+                    critpoints_vals[name].append(beat.data[critpoint_loc])
+            for name in critpoint_names:
+                times = np.array(critpoints_times[name])
+                vals = np.array(critpoints_vals[name])
+                times_feats = get_basic_signal_features(times)
+                times_feats = {f"{name}_times_{k}": v for k, v in times_feats.items()}
+                vals_feats = get_basic_signal_features(vals)
+                vals_feats = {f"{name}_vals_{k}": v for k, v in vals_feats.items()}
+                features = {**features, **times_feats, **vals_feats}
+
         if return_arr:
             return parse_feats_to_array(features)
         return features

@@ -174,18 +174,6 @@
         * [github](https://github.com/emadeldeen24/TS-TCC)
 
 
-
-# Models
-
-* Support Vector Machine
-* Random Forest
-* MLP
-* CNN
-* LSTM
-
-
-
-
 # Features
 
 * **Base**
@@ -211,8 +199,8 @@
 * **ECG**
     * **`ECGSignal(PeriodicSignal)`**
         * `hrv`: hear rate variability features
+        * `basic` for P/Q/R/S/T time locations and values
         * TODO: `basic` for PP/QQ/RR/SS/TT intervals
-        * TODO: `basic` for P/Q/R/S/T signals
 
 
     * **`ECGBeat(BaseSignal)`**
@@ -246,6 +234,14 @@
     * **`EEGSignal`**
         * `frequency`: frequency features, i.e. mean frequency power for different frequency bands (delta, theta, alpha, sigma, beta)
 
+# Models
+
+* Support Vector Machine
+* Random Forest
+* MLP
+* CNN
+* LSTM
+
 
 # References
 
@@ -255,6 +251,9 @@
 * Blogs:
     * [Wavelet Transform](https://ataspinar.com/2018/12/21/a-guide-for-using-the-wavelet-transform-in-machine-learning/)
     * [Fourier Transform](https://betterexplained.com/articles/an-interactive-guide-to-the-fourier-transform/)
+
+* Datasets
+    * TODO
 
 * Features:
     * Common:
@@ -276,6 +275,9 @@
         * [Statistic features](https://www.hindawi.com/journals/cmmm/2014/713818/)
         * [Statistic features](https://www.researchgate.net/publication/257724368_Evaluating_Feature_Extraction_Methods_of_Electrooculography_EOG_Signal_for_Human-Computer_Interface)
         * [Statistic features](https://www.rsisinternational.org/journals/ijrsi/digital-library/volume-5-issue-4/287-290.pdf)
+
+* Models
+    * TODO
 
 
 # In total:
