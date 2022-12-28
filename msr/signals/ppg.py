@@ -52,7 +52,7 @@ def find_systolic_peaks_ELGENDI(
 class PPGSignal(PeriodicSignal):
     def __init__(self, name: str, data: np.ndarray, fs: float, start_sec: float = 0):
         super().__init__(name, data, fs, start_sec)
-        self.nk_signals_df, self.nk_info = nk.ppg_process(self.data, sampling_rate=self.fs)
+        # self.nk_signals_df, self.nk_info = nk.ppg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
                 "hrv": self.extract_hrv_features,
@@ -61,7 +61,7 @@ class PPGSignal(PeriodicSignal):
 
     @property
     def cleaned(self):
-        return self.nk_signals_df["PPG_Clean"].values
+        return nk.ppg_clean(self.data, sampling_rate=self.fs)
 
     @property
     def BeatClass(self):

@@ -37,6 +37,7 @@ from msr.signals.utils import (
     calculate_area,
     calculate_energy,
     calculate_slope,
+    find_closest_element,
     get_valid_beats_mask,
     get_windows,
     interpolate_to_new_time,
@@ -56,10 +57,11 @@ def find_intervals_using_hr(signal: Type[PeriodicSignal]):
     x = signal.cleaned
     neg_x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1
     troughs, _ = find_peaks(neg_x_minmax, height=0.9)
-    intervals = [(troughs[0], troughs[0] + T_in_samples)]
+    intervals = [(troughs[0], find_closest_element(troughs, troughs[0] + T_in_samples))]
     while intervals[-1][1] + T_in_samples < signal.n_samples:
         prev_end = intervals[-1][1]
-        intervals.append((prev_end, prev_end + T_in_samples))
+        next_end = find_closest_element(troughs, prev_end + T_in_samples)
+        intervals.append((prev_end, next_end))
     return np.array(intervals)
 
 
@@ -919,7 +921,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             }
         )
 
-    def set_beats(self, source_channel=None, align_to_peak=False, **kwargs):
+    def set_beats(self, source_channel=None, align_peaks_loc=False, **kwargs):
         """Return beats from all channels.
 
         If `source_channel` is specified, it will be used as source of beat intervals
@@ -965,8 +967,8 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         for name, signal in self.signals.items():
             if name == new_source_channel:
                 continue
-            align_peaks_loc = source_signal.peaks if align_to_peak else None
-            signal.set_beats(intervals, align_peaks_loc=align_peaks_loc, **kwargs)
+            _align_peaks_loc = source_signal.peaks if align_peaks_loc else None
+            signal.set_beats(intervals, align_peaks_loc=_align_peaks_loc, **kwargs)
 
     def set_agg_beat(self, **kwargs):
         for _, signal in self.signals.items():

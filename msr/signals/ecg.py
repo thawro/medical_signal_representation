@@ -36,7 +36,7 @@ class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
         polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
-        self.nk_signals_df, self.nk_info = nk.ecg_process(self.data, sampling_rate=self.fs)
+        # self.nk_signals_df, self.nk_info = nk.ecg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
                 "hrv": self.extract_hrv_features,
@@ -53,15 +53,21 @@ class ECGSignal(PeriodicSignal):
 
     def find_peaks(self):
         try:
-            return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="neurokit")[1]["ECG_R_Peaks"]
-        except IndexError:  # Error from neurokit2
+            peaks = nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="neurokit")[1]["ECG_R_Peaks"]
+            if len(peaks) == 0:
+                raise Exception
+        except Exception:  # Error from neurokit2 (IndexError)
             try:
-                return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="elgendi2010")[1]["ECG_R_Peaks"]
+                peaks = nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="elgendi2010")[1]["ECG_R_Peaks"]
+                if len(peaks) == 0:
+                    raise Exception
             except Exception:  # TODO # both methods raise exceptions
-                sig = self.cleaned
-                normalized = (sig - sig.min()) / (sig.max() - sig.min())
-                peaks = find_peaks(normalized, height=0.7)[0]
-                return peaks
+                intervals = find_intervals_using_hr(self)
+                peaks = np.array([self.data[start:end].argmax()] + start for start, end in intervals)
+                # sig = self.cleaned
+                # normalized = (sig - sig.min()) / (sig.max() - sig.min())
+                # peaks = find_peaks(normalized, height=0.7)[0]
+        return peaks
 
     def find_troughs(self):
         peaks = zip(self.peaks[:-1], self.peaks[1:])
@@ -69,7 +75,8 @@ class ECGSignal(PeriodicSignal):
 
     def _get_beats_intervals(self, align_to_peak=True):
         try:
-            qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=self.peaks, sampling_rate=self.fs, show=False)
+            rpeaks = None  # rpeaks = self.peaks
+            qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=rpeaks, sampling_rate=self.fs, show=False)
             beats_times = []
             intervals = []
             prev_end_idx = qrs_epochs["1"].Index.values[-1]
@@ -97,6 +104,7 @@ class ECGSignal(PeriodicSignal):
                 intervals[0][0] = 0
             intervals = np.array(intervals)
         except ZeroDivisionError:
+            print("Setting intervals using hr")
             intervals = find_intervals_using_hr(self)
         return intervals
 

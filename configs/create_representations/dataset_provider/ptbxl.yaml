@@ -13,7 +13,7 @@ windows_params:
   step_s: 2
 beats_params:
   source_channel: ecg_2
-  align_to_peak: False
+  align_peaks_loc: False
 agg_beat_params:
   valid_only: False
 n_beats: 7

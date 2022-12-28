@@ -120,3 +120,8 @@ def interpolate_to_new_time(time, data, new_time, kind="nearest"):
     interp_fn = interp1d(time, data, kind=kind, fill_value="extrapolate")
     interpolated = interp_fn(new_time)
     return interpolated
+
+
+def find_closest_element(arr, val):
+    idx = (abs(arr - val)).argmin()
+    return idx, arr[idx]
