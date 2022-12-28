@@ -273,6 +273,16 @@ class ECGBeat(BeatSignal):
             {"name": "T_offset_slope", "start": self.t_loc, "end": self.t_offset_loc},
         ]
 
+    @lazy_property
+    def intervals_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        return [
+            {"name": "PQ_segment", "start": self.p_offset_loc, "end": self.q_loc},
+            {"name": "ST_segment", "start": self.s_loc, "end": self.t_onset_loc},
+            {"name": "PR_interval", "start": self.p_onset_loc, "end": self.r_offset_loc},
+            {"name": "QRS_interval", "start": self.q_loc, "end": self.s_loc},
+            {"name": "QT_interval", "start": self.q_loc, "end": self.t_offset_loc},
+        ]
+
 
 class MultiChannelECGSignal(MultiChannelPeriodicSignal):
     def plot_beats_segmentation(self, use_raw=False, **kwargs):

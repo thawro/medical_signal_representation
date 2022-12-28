@@ -26,7 +26,11 @@ from scipy.signal import (
 from sorcery import dict_of
 from statsmodels.tsa.seasonal import STL
 
-from msr.signals.features import get_basic_signal_features
+from msr.signals.features import (
+    extract_dwt_features,
+    get_basic_signal_features,
+    get_cwt_img,
+)
 from msr.signals.utils import (
     BEAT_FIG_PARAMS,
     SIGNAL_FIG_PARAMS,
@@ -332,7 +336,7 @@ class Signal(BaseSignal):
         self.feature_extraction_funcs.update(
             {
                 "peaks_troughs": self.extract_peaks_troughs_features,
-                "zero_crossing_rate": self.extract_zerocrossing_features,
+                "DWT": self.extract_DWT_features,
             }
         )
 
@@ -376,13 +380,25 @@ class Signal(BaseSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_zerocrossing_features(self, return_arr=True, plot=False):
-        features = _  # TODO
-        if plot:
-            pass
+    def extract_DWT_features(self, return_arr=True, wavelet="db5", level=None, plot=False):
+        """Discrete wavelet transform"""
+        features = extract_dwt_features(self.cleaned, self.fs, wavelet, level, plot=plot)
         if return_arr:
             return parse_feats_to_array(features)
         return features
+
+    def get_CWT(self, wavelet="morl", freq_dim_scale=256, fmin=None, fmax=None, plot=False):
+        """Contiunous wavelet transform"""
+        freqs, cwt_matrix = get_cwt_img(data=self.data, fs=self.fs, freq_dim_scale=freq_dim_scale, wavelet=wavelet)
+        fmin = fmin or min(freqs)
+        fmax = fmax or max(freqs)
+        mask = (freqs >= fmin) & (freqs <= fmax)
+        freqs, cwt_matrix = freqs[mask], cwt_matrix[mask]
+        if plot:
+            fig, ax = plt.subplots(figsize=(14, 8))
+            im = ax.contourf(self.time, freqs, cwt_matrix, cmap=plt.cm.seismic)
+            fig.colorbar(im)
+        return freqs, cwt_matrix
 
     def plot_windows(self, **kwargs):
         for window in self.windows:
@@ -576,6 +592,7 @@ class BeatSignal(ABC, BaseSignal):
                 "area": self.extract_area_features,
                 "slope": self.extract_slope_features,
                 "energy": self.extract_energy_features,
+                "intervals": self.extract_intervals_features,
             }
         )
 
@@ -614,6 +631,14 @@ class BeatSignal(ABC, BaseSignal):
 
     @lazy_property
     def slope_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        """Must return list of dicts with `name`, `start` and `end` keys
+
+        Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
+        """
+        return []
+
+    @lazy_property
+    def intervals_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
         """Must return list of dicts with `name`, `start` and `end` keys
 
         Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
@@ -663,6 +688,23 @@ class BeatSignal(ABC, BaseSignal):
             point["name"]: calculate_slope(self.time, self.data, point["start"], point["end"])
             for point in self.slope_features_crit_points
         }
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_intervals_features(
+        self, return_arr=True, **kwargs
+    ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
+        time_features = {
+            f"{point['name']}_time": (point["end"] - point["start"]) / self.fs
+            for point in self.intervals_features_crit_points
+        }
+
+        val_diff_features = {
+            f"{point['name']}_val_diff": self.data[point["end"]] - self.data[point["start"]]
+            for point in self.intervals_features_crit_points
+        }
+        features = {**time_features, **val_diff_features}
         if return_arr:
             return parse_feats_to_array(features)
         return features
