@@ -1,9 +1,13 @@
 import logging
+import warnings
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from msr.utils import CONFIG_PATH, print_config_tree
+
+warnings.filterwarnings("ignore", module="numpy")  # TODO: Not a good idea to filter out all warnings
+
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)

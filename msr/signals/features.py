@@ -1,4 +1,5 @@
 from collections import Counter
+from functools import partial
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,21 +14,25 @@ def calculate_entropy_features(arr):
 
 
 def calculate_statistic_features(arr):
-    return {
-        "percentile_5": np.percentile(arr, 5),
-        "percentile_25": np.percentile(arr, 25),
-        "percentile_75": np.percentile(arr, 75),
-        "percentile_95": np.percentile(arr, 95),
-        "median": np.median(arr),
-        "mean": np.mean(arr),
-        "std": np.std(arr),
-        "var": np.var(arr),
-        "root_mean_square": np.mean(np.sqrt(arr**2)),
-        "kurtosis": kurtosis(arr),
-        "skew": skew(arr),
-        "energy": sum(arr**2),
-        "auc": sum(abs(arr)),
+    calculate_rms = lambda arr: np.mean(np.sqrt(arr**2))
+    calculate_energy = lambda arr: sum(arr**2)
+    calculate_rms = lambda arr: sum(abs(arr))
+
+    percentiles = [5, 25, 75, 95]
+    get_stat_or_nan = lambda func, arr: func(arr) if len(arr) > 0 else np.nan
+    statistic_funcs = {
+        "mean": np.mean,
+        "median": np.median,
+        "std": np.std,
+        "var": np.var,
+        "kurtosis": kurtosis,
+        "skew": skew,
+        **{f"percentile_{q}": partial(np.percentile, q=q) for q in percentiles},
+        "root_mean_square": calculate_rms,
+        "energy": calculate_energy,
+        "auc": calculate_rms,
     }
+    return {name: get_stat_or_nan(func, arr) for name, func in statistic_funcs.items()}
 
 
 def calculate_zerocross_features(arr, thr=0):

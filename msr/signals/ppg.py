@@ -27,7 +27,7 @@ def find_systolic_peaks_ELGENDI(
     ma_peak = moving_average(squared, int(w1 * fs))  # 5
     ma_beat = moving_average(squared, int(w2 * fs))  # 6
 
-    z_mean = squared.mean()  # 7
+    z_mean = np.mean(squared)  # 7
     alpha = beta * z_mean  # 8
 
     thr_1 = ma_beat + alpha  # 9
@@ -88,12 +88,17 @@ class PPGSignal(PeriodicSignal):
         source: https://neuropsychology.github.io/NeuroKit/functions/ppg.html#ppg-intervalrelated
         """
         peaks = self.peaks
-        vals = self.data[peaks]
-        times = self.time[peaks]
-        ibi = np.diff(times)
-        ibi_mean = ibi.mean()
-        hr = self.duration / len(peaks) * 60
-        features = {"hr": hr, "ibi_mean": ibi_mean, "ibi_std": ibi.std(), "R_val": vals.mean()}
+        if len(peaks) == 0:
+            hr, ibi_mean, ibi_std, mean_val = np.nan, np.nan, np.nan, np.nan
+        else:
+            vals = self.data[peaks]
+            times = self.time[peaks]
+            ibi = np.diff(times)
+            ibi_mean = np.mean(ibi)
+            ibi_std = np.std(ibi)
+            mean_val = np.mean(vals)
+            hr = self.duration / len(peaks) * 60
+        features = {"hr": hr, "ibi_mean": ibi_mean, "ibi_std": ibi_std, "R_val": mean_val}
         # df = nk.ppg_intervalrelated(self.nk_signals_df, sampling_rate=self.fs)
         # features = df.to_dict(orient="records")[0]
         if return_arr:
