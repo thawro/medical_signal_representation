@@ -2,7 +2,7 @@
 
 defaults:
   - override /datamodule: mimic.yaml
-  - override /model: random_forest_regressor.yaml
+  - override /model: lgbm_regressor.yaml
   - override /callbacks: default.yaml
   - override /trainer: ml_regressor_trainer.yaml
   - override /logger: ml_wandb_logger.yaml

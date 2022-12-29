@@ -464,7 +464,9 @@ class PeriodicSignal(ABC, Signal):
                 peak_diff = start + data[start:end].argmax() - peak_loc
                 intervals[i][0] = max(0, start + peak_diff)
                 intervals[i][1] = min(self.n_samples, end + peak_diff)
-
+        intervals = np.array(
+            [(start, end) for start, end in intervals if (end - start) > 1]
+        )  # TODO Check if works fine
         beats = []
         for i, (start, end) in enumerate(intervals):
             start_sec = start / self.fs
@@ -967,7 +969,14 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         for name, signal in self.signals.items():
             if name == new_source_channel:
                 continue
-            _align_peaks_loc = source_signal.peaks if align_peaks_loc else None
+            if align_peaks_loc:
+                _align_peaks_loc = source_signal.peaks
+                if len(_align_peaks_loc) != len(intervals):
+                    _align_peaks_loc = np.array(
+                        [source_signal.cleaned[start:end].argmax() + start for start, end in intervals]
+                    )
+            else:
+                _align_peaks_loc = None
             signal.set_beats(intervals, align_peaks_loc=_align_peaks_loc, **kwargs)
 
     def set_agg_beat(self, **kwargs):

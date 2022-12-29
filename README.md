@@ -89,7 +89,7 @@
 3. Sleep-EDF
     * [source URL](TODO)
     * papers:
-        * TODO
+        * [Best metric](https://arxiv.org/pdf/2207.07753v3.pdf)
 
     * interesting urls:
         * TODO

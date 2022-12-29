@@ -1,7 +1,0 @@
-2. Rozszerzenie ekstrakcji cech dla sygnalow:
-    * PPG
-    * EOG
-    * EEG
-3. Rozszerzenie modulu sieci glebokich
-4. Przetestowanie wszystkich mozliwych polaczen dataset_repType_model
-5. sprawdzic czemu align_to_beat pomaga w mimicu a przeszkadza w ptbxl

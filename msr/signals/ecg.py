@@ -15,6 +15,8 @@ from msr.signals.features import get_basic_signal_features
 from msr.signals.utils import parse_feats_to_array
 from msr.utils import lazy_property
 
+MIN_HR, MAX_HR = 30, 200
+
 
 def check_ecg_polarity(data):
     try:
@@ -52,21 +54,24 @@ class ECGSignal(PeriodicSignal):
         return ECGBeat
 
     def find_peaks(self):
+        def is_peaks_valid(peaks):
+            if len(peaks) == 0:
+                return False
+            min_n_beats, max_n_beats = MIN_HR / 60 * self.duration, MAX_HR / 60 * self.duration
+            return min_n_beats <= len(peaks) <= max_n_beats
+
         try:
             peaks = nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="neurokit")[1]["ECG_R_Peaks"]
-            if len(peaks) == 0:
+            if not is_peaks_valid(peaks):
                 raise Exception
         except Exception:  # Error from neurokit2 (IndexError)
             try:
                 peaks = nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="elgendi2010")[1]["ECG_R_Peaks"]
-                if len(peaks) == 0:
+                if not is_peaks_valid(peaks):
                     raise Exception
             except Exception:  # TODO # both methods raise exceptions
                 intervals = find_intervals_using_hr(self)
                 peaks = np.array([self.data[start:end].argmax()] + start for start, end in intervals)
-                # sig = self.cleaned
-                # normalized = (sig - sig.min()) / (sig.max() - sig.min())
-                # peaks = find_peaks(normalized, height=0.7)[0]
         return peaks
 
     def find_troughs(self):
