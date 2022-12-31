@@ -1,6 +1,5 @@
 import glob
 import logging
-from collections import OrderedDict
 from typing import List, Tuple
 
 import mne
@@ -33,8 +32,8 @@ for path in [RAW_TENSORS_DATA_PATH, RAW_TENSORS_TARGETS_PATH, LOGS_PATH]:
     path.mkdir(parents=True, exist_ok=True)
 
 
-EVENT_ID = OrderedDict({f"Sleep stage {tok}": i for i, tok in enumerate(["W", 1, 2, 3, 4, "R", "M"])})
-INV_EVENT_ID = OrderedDict({v: k for k, v in EVENT_ID.items()})
+EVENT_ID = {f"Sleep stage {tok}": i for i, tok in enumerate(["W", 1, 2, 3, 4, "R", "M"])}
+INV_EVENT_ID = {v: k for k, v in EVENT_ID.items()}
 SIG_NAMES = ["EEG Fpz-Cz", "EEG Pz-Oz", "EOG horizontal"]
 
 

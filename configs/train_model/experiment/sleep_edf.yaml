@@ -2,7 +2,7 @@
 
 defaults:
   - override /datamodule: sleep_edf.yaml
-  - override /model: random_forest_classifier.yaml
+  - override /model: lgbm_classifier.yaml
   - override /callbacks: default.yaml
   - override /trainer: ml_classifier_trainer.yaml
   - override /logger: ml_wandb_logger.yaml
