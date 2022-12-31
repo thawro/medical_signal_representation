@@ -3,7 +3,13 @@ from typing import List, Tuple, Union
 from sorcery import dict_of
 from torch import nn
 
-from msr.models.architectures.helpers import _batchnorm, _conv, _pool, get_layer_kwargs
+from msr.models.architectures.helpers import (
+    _activation,
+    _batchnorm,
+    _conv,
+    _pool,
+    get_ith_layer_kwargs,
+)
 
 
 class CNNBlock(nn.Module):
@@ -24,11 +30,11 @@ class CNNBlock(nn.Module):
         super().__init__()
         layers = [_conv(dim, transpose)(in_channels, out_channels, kernel_size, stride, padding, dilation)]
         if maxpool_kernel_size is not None:
-            layers.append(_pool(dim)(maxpool_kernel_size))
+            layers.append(_pool(dim)(kernel_size=maxpool_kernel_size))
         if use_batchnorm:
             layers.append(_batchnorm(dim)(out_channels))
-        layers.append(getattr(nn, activation)())
-
+        if activation is not None:
+            layers.append(_activation(activation)())
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -59,7 +65,7 @@ class CNN(nn.Module):
         layers = [
             CNNBlock(
                 dim=dim,
-                **get_layer_kwargs(
+                **get_ith_layer_kwargs(
                     i,
                     **dict_of(
                         in_channels,

@@ -2,7 +2,11 @@ from typing import List, Union
 
 from torch import nn
 
-from msr.models.architectures.helpers import get_layer_kwargs
+from msr.models.architectures.helpers import (
+    _activation,
+    _batchnorm,
+    get_ith_layer_kwargs,
+)
 
 
 class FeedForwardBlock(nn.Module):
@@ -27,10 +31,10 @@ class FeedForwardBlock(nn.Module):
             layers = [nn.utils.weight_norm(nn.Linear(in_features, out_features))]
         else:
             layers = [nn.Linear(in_features, out_features)]
-
         if batch_norm:
-            layers.append(nn.BatchNorm1d(out_features))
-        layers.append(getattr(nn, activation)())
+            layers.append(_batchnorm(dim=1)(out_features))
+        if activation is not None:
+            layers.append(_activation(activation)())
         if dropout > 0:
             layers.append(nn.Dropout(p=dropout))
 
@@ -57,7 +61,7 @@ class FeedForward(nn.Module):
         n_layers = len(in_dims)
         layers = [
             FeedForwardBlock(
-                **get_layer_kwargs(
+                **get_ith_layer_kwargs(
                     i,
                     in_features=in_dims,
                     out_features=out_dims,
