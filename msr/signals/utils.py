@@ -1,10 +1,9 @@
-from collections import OrderedDict
 from typing import Dict, List, Type, Union
 
 import numpy as np
 import pandas as pd
 from scipy.integrate import simps
-from scipy.interpolate import interp1d
+from scipy.interpolate import PchipInterpolator, interp1d
 
 from msr.utils import EPSILON
 
@@ -27,7 +26,7 @@ def parse_nested_feats(
     """
     feats_df = pd.json_normalize(nested_feats, sep=sep)
     feats = feats_df.to_dict(orient="records")[0]
-    return OrderedDict({name: val for name, val in feats.items()})
+    return {name: val for name, val in feats.items()}
 
 
 def parse_feats_to_array(features):
@@ -115,3 +114,14 @@ def get_valid_beats_mask(beats: List, max_duration=1.1, IQR_scale=1.5):
     duration_mask = np.array([beat.duration <= max_duration for beat in beats])
     values_mask = get_valid_beats_values_mask(beats, IQR_scale=IQR_scale)
     return duration_mask & values_mask
+
+
+def interpolate_to_new_time(time, data, new_time, kind="nearest"):
+    interp_fn = interp1d(time, data, kind=kind, fill_value="extrapolate")
+    interpolated = interp_fn(new_time)
+    return interpolated
+
+
+def find_closest_element(arr, val):
+    idx = (abs(arr - val)).argmin()
+    return idx, arr[idx]

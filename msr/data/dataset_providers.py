@@ -85,7 +85,7 @@ class DatasetProvider:
                 log.info("Feature names saved")
 
             _batch_size = n_samples if batch_size == -1 else batch_size
-            start_idx = 0
+            start_idx = 0  # TODO: change to 10000
             n_batches = math.ceil(n_samples / _batch_size)
             log.info(f"{split} split. Exctracting representations using batch_size={_batch_size} ({n_batches} batches)")
             while start_idx < n_samples:

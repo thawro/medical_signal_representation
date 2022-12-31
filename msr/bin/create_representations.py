@@ -1,9 +1,13 @@
 import logging
+import warnings
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from msr.utils import CONFIG_PATH, print_config_tree
+
+warnings.filterwarnings("ignore", module="numpy")  # TODO: Not a good idea to filter out all warnings
+
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -19,7 +23,8 @@ def main(cfg: DictConfig):
     dataset_provider.concat_data_files()
 
     log.info("Representasions dataset creation finished")
-    OmegaConf.save(cfg, dataset_provider.representations_path / "config.yaml")
+    for rep_type in dataset_provider.representation_types:
+        OmegaConf.save(cfg, dataset_provider.representations_path / rep_type / "config.yaml")
     log.info("Config file saved in representations directory")
     log.info("Finished")
 

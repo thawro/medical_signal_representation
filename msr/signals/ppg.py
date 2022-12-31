@@ -1,7 +1,7 @@
-from collections import OrderedDict
-from typing import List, Type
+from typing import Dict, List, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
+import neurokit2 as nk
 import numpy as np
 import seaborn as sns
 from scipy import integrate
@@ -27,7 +27,7 @@ def find_systolic_peaks_ELGENDI(
     ma_peak = moving_average(squared, int(w1 * fs))  # 5
     ma_beat = moving_average(squared, int(w2 * fs))  # 6
 
-    z_mean = squared.mean()  # 7
+    z_mean = np.mean(squared)  # 7
     alpha = beta * z_mean  # 8
 
     thr_1 = ma_beat + alpha  # 9
@@ -52,11 +52,16 @@ def find_systolic_peaks_ELGENDI(
 class PPGSignal(PeriodicSignal):
     def __init__(self, name: str, data: np.ndarray, fs: float, start_sec: float = 0):
         super().__init__(name, data, fs, start_sec)
+        # self.nk_signals_df, self.nk_info = nk.ppg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
                 "hrv": self.extract_hrv_features,
             }
         )
+
+    @property
+    def cleaned(self):
+        return nk.ppg_clean(self.data, sampling_rate=self.fs)
 
     @property
     def BeatClass(self):
@@ -68,6 +73,7 @@ class PPGSignal(PeriodicSignal):
 
     def find_peaks(self):
         peaks = find_systolic_peaks_ELGENDI(self.data, self.fs)
+        # peaks = self.nk_info['PPG_Peaks'].values
         return peaks
 
     def _get_beats_intervals(self):
@@ -78,8 +84,23 @@ class PPGSignal(PeriodicSignal):
         return intervals
 
     def extract_hrv_features(self, return_arr=False, plot=False):
-        ibi = np.diff(self.time[self.peaks])
-        features = OrderedDict({"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi)})
+        """
+        source: https://neuropsychology.github.io/NeuroKit/functions/ppg.html#ppg-intervalrelated
+        """
+        peaks = self.peaks
+        if len(peaks) == 0:
+            hr, ibi_mean, ibi_std, mean_val = np.nan, np.nan, np.nan, np.nan
+        else:
+            vals = self.data[peaks]
+            times = self.time[peaks]
+            ibi = np.diff(times)
+            ibi_mean = np.mean(ibi)
+            ibi_std = np.std(ibi)
+            mean_val = np.mean(vals)
+            hr = self.duration / len(peaks) * 60
+        features = {"hr": hr, "ibi_mean": ibi_mean, "ibi_std": ibi_std, "R_val": mean_val}
+        # df = nk.ppg_intervalrelated(self.nk_signals_df, sampling_rate=self.fs)
+        # features = df.to_dict(orient="records")[0]
         if return_arr:
             return parse_feats_to_array(features)
         return features
@@ -96,7 +117,8 @@ class PPGBeat(BeatSignal):
         super().__init__(name, data, fs, start_sec, beat_num)
         self.feature_extraction_funcs.update(
             {
-                "sppg": self.extract_sppg_features,
+                "pulse_width": self.extract_pulse_width_features,
+                "pulse_height": self.extract_pulse_height_features,
             }
         )
 
@@ -115,61 +137,74 @@ class PPGBeat(BeatSignal):
             "systolic_peak": self.systolic_peak_loc,
         }
 
-    def extract_sppg_features(self, return_arr=False, plot=True):
-        systolic_onset_slope = (self.systolic_peak_val - self.data[0]) / self.systolic_peak_time
-        systolic_offset_slope = (self.systolic_peak_val - self.data[-1]) / (self.duration - self.systolic_peak_time)
-        energy = (self.data**2).mean()
-        before_systolic_area = integrate.simpson(
-            abs(self.data[: self.systolic_peak_loc]), self.time[: self.systolic_peak_loc]
-        )
-        after_systolic_area = integrate.simpson(
-            abs(self.data[self.systolic_peak_loc :]), self.time[self.systolic_peak_loc :]
-        )
+    @lazy_property
+    def energy_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        return [
+            {"name": "ZeroSysE", "start": 0, "end": self.systolic_peak_loc},
+            {"name": "SysEndE", "start": self.systolic_peak_loc, "end": self.n_samples - 1},
+        ]
+
+    @lazy_property
+    def area_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        """Must return list of dicts with `name`, `start` and `end` keys
+
+        Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
+        """
+        return [
+            {"name": "ZeroSysA", "start": 0, "end": self.systolic_peak_loc},
+            {"name": "SysEndA", "start": self.systolic_peak_loc, "end": self.n_samples - 1},
+        ]
+
+    @lazy_property
+    def slope_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        """Must return list of dicts with `name`, `start` and `end` keys
+
+        Example: [{"name": <feat_name>, "start": <start_location>, "end": <end_location>}, ...]
+        """
+        return [
+            {"name": "SysOnsetSlope", "start": 0, "end": self.systolic_peak_loc},
+            {"name": "SysOffsetSlope", "start": self.systolic_peak_loc, "end": self.n_samples - 1},
+        ]
+
+    def extract_pulse_width_features(self, return_arr=False, height_pcts=[10, 25, 33, 50, 66, 75], plot=False):
+        """https://ieeexplore.ieee.org/document/9558767"""
+        heights = np.array([pct / 100 * (self.range) + self.min for pct in height_pcts])
+        idxs = [np.argwhere(np.diff(np.sign(height - self.data))).flatten() for height in heights]
+        widths = np.array([idx[-1] - idx[0] for idx in idxs])
+        times = {height_pcts[i]: [self.time[idxs[i][0]], self.time[idxs[i][-1]]] for i in range(len(heights))}
+        features = {f"pulse_width_{height_pct}%": width / self.fs for height_pct, width in zip(height_pcts, widths)}
+        if plot:
+            fig, ax = plt.subplots(figsize=(6, 4))
+            # ax.plot(self.time, self.data, "-", lw=3)
+            self.plot(ax=ax, title="pulse width features")
+            for height in height_pcts:
+                label = f"pw at {height}%"
+                start, end = times[height]
+                height_val = height / 100 * self.range + self.min
+                ax.hlines(height_val, start, end, ls="--", color="black")
+                ax.annotate(label, (end, height_val), size=14)
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_pulse_height_features(self, return_arr=False, width_pcts=[10, 25, 33, 50, 66, 75], plot=False):
+        """https://ieeexplore.ieee.org/document/9558767"""
+        width_sample_locs = [int(self.n_samples * pct / 100) for pct in width_pcts]
+        height_vals = [self.data[loc] - self.min for loc in width_sample_locs]
+        features = {f"pulse_height_{width_pct}%": height_val for width_pct, height_val in zip(width_pcts, height_vals)}
+        height_vals = {
+            width_sample_loc: [self.min, self.data[width_sample_loc]] for width_sample_loc in width_sample_locs
+        }
 
         if plot:
-            fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
-            ax.plot(self.time, self.data, c=sns.color_palette()[0], lw=3)
-            ax.scatter(
-                self.time[self.systolic_peak_loc],
-                self.data[self.systolic_peak_loc],
-                s=self.fig_params["marker_size"],
-                c="r",
-                marker="^",
-                label="systolic peak",
-            )
-            ax.fill_between(
-                self.time,
-                self.data,
-                self.data.min(),
-                where=self.time <= self.time[self.systolic_peak_loc],
-                color="g",
-                alpha=self.fig_params["fill_alpha"],
-            )
-            ax.fill_between(
-                self.time,
-                self.data,
-                self.data.min(),
-                where=self.time >= self.time[self.systolic_peak_loc],
-                color="r",
-                alpha=self.fig_params["fill_alpha"],
-            )
-            ax.set_title(f"sPPG", fontsize=self.fig_params["title_size"])
-            ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
-            ax.set_ylabel("Values [a.u.]", fontsize=self.fig_params["label_size"])
-            ax.legend()
-
-        features = OrderedDict(
-            {
-                "duration": self.duration,
-                "systolic_peak_val": self.systolic_peak_val,
-                "systolic_peak_time": self.systolic_peak_time,
-                "systolic_onset_slope": systolic_onset_slope,
-                "systolic_offset_slope": systolic_offset_slope,
-                "energy": energy,
-                "before_systolic_area": before_systolic_area,
-                "after_systolic_area": after_systolic_area,
-            }
-        )
+            fig, ax = plt.subplots(figsize=(6, 4))
+            # ax.plot(self.time, self.data, "-", lw=3)
+            self.plot(ax=ax, title="pulse height features")
+            for i, (width_loc, height_bounds) in enumerate(height_vals.items()):
+                label = f"ph at {width_pcts[i]}%"
+                lower, upper = height_bounds
+                ax.vlines(width_loc / self.fs, lower, upper, ls="--", color="black")
+                ax.annotate(label, (width_loc / self.fs, upper), size=14)
         if return_arr:
             return parse_feats_to_array(features)
         return features

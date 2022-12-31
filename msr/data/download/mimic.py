@@ -651,8 +651,7 @@ def create_raw_tensors_dataset(
             torch.save(target_data, target_path / f"{split}.pt")
 
 
-def load_mimic_raw_tensors_for_split(split):
-    data, targets = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt"), load_tensor(
-        RAW_TENSORS_TARGETS_PATH / f"{split}.pt"
-    )
+def load_mimic_raw_tensors_for_split(split: str, target: str):
+    data = load_tensor(RAW_TENSORS_DATA_PATH / f"{split}.pt")
+    targets = load_tensor(RAW_TENSORS_TARGETS_PATH / target / f"{split}.pt")
     return data, targets

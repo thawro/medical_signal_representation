@@ -1,9 +1,8 @@
-from collections import OrderedDict
-
+import numpy as np
 from scipy.signal import welch
 
 from msr.signals.base import MultiChannelSignal, Signal
-from msr.signals.utils import parse_feats_to_array, parse_nested_feats
+from msr.signals.utils import parse_feats_to_array
 
 FREQ_BANDS = {"delta": [0.5, 4.5], "theta": [4.5, 8.5], "alpha": [8.5, 11.5], "sigma": [11.5, 15.5], "beta": [15.5, 30]}
 
@@ -13,23 +12,30 @@ class EEGSignal(Signal):
         super().__init__(name, data, fs, start_sec)
         self.feature_extraction_funcs.update(
             {
-                "relative_power_frequency": self.extract_relative_power_frequency_features,
+                "frequency": self.extract_frequency_features,
+                # TODO
             }
         )
 
-    def extract_relative_power_frequency_features(self, return_arr=False, fmin=0.5, fmax=30, **kwargs):
+    def extract_frequency_features(self, return_arr=False, fmin=0.5, fmax=30, **kwargs):
         freqs, pxx = welch(self.data, fs=self.fs)
         freq_mask = (freqs >= fmin) & (freqs <= fmax)
         freqs, pxx = freqs[freq_mask], pxx[freq_mask]
-        pxx /= pxx.sum()
-        features = OrderedDict(
-            {band: pxx[(freqs >= fmin) & (freqs < fmax)].mean() for band, (fmin, fmax) in FREQ_BANDS.items()}
-        )
+        pxx /= sum(pxx)
+        features = {
+            f"{band}_power": np.mean(pxx[(freqs >= fmin) & (freqs < fmax)]) for band, (fmin, fmax) in FREQ_BANDS.items()
+        }
         if return_arr:
             return parse_feats_to_array(features)
         return features
 
-    # TODO: Add another features
+    # TODO
+    def extract_xyz_features(self, return_arr=False, **kwargs):
+        features = {}
+        # TODO
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
 
 
 class MultiChannelEEGSignal(MultiChannelSignal):
@@ -38,5 +44,5 @@ class MultiChannelEEGSignal(MultiChannelSignal):
 
 
 def create_multichannel_eeg(data, fs):
-    signals = OrderedDict({i + 1: EEGSignal(f"EEG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)})
+    signals = {i + 1: EEGSignal(f"EEG_{i+1}", channel_data, fs) for i, channel_data in enumerate(data)}
     return MultiChannelEEGSignal(signals)

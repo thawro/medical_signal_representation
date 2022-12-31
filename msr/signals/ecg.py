@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from typing import Dict, List, Type, Union
 
 import matplotlib.pyplot as plt
@@ -12,15 +11,16 @@ from msr.signals.base import (
     PeriodicSignal,
     find_intervals_using_hr,
 )
+from msr.signals.features import get_basic_signal_features
 from msr.signals.utils import parse_feats_to_array
 from msr.utils import lazy_property
 
-CHANNELS_POLARITY = [1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1]  # some channels are with oposite polarity
+MIN_HR, MAX_HR = 30, 200
 
 
 def check_ecg_polarity(data):
     try:
-        sig = data - data.mean()
+        sig = data - np.mean(data)
         pos_peaks, _ = find_peaks(sig)
         neg_peaks, _ = find_peaks(-sig)
         pos_peaks_amps = sig[pos_peaks]
@@ -38,6 +38,7 @@ class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
         polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
+        # self.nk_signals_df, self.nk_info = nk.ecg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
                 "hrv": self.extract_hrv_features,
@@ -52,22 +53,35 @@ class ECGSignal(PeriodicSignal):
     def BeatClass(self):
         return ECGBeat
 
-    @lazy_property
-    def rpeaks(self):
-        try:
-            return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="neurokit")[1]["ECG_R_Peaks"]
-        except IndexError:  # Error from neurokit2
-            try:
-                return nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="elgendi2010")[1]["ECG_R_Peaks"]
-            except Exception:  # TODO # both methods raise exceptions
-                sig = self.cleaned
-                normalized = (sig - sig.min()) / (sig.max() - sig.min())
-                peaks = find_peaks(normalized, height=0.7)[0]
-                return peaks
+    def find_peaks(self):
+        def is_peaks_valid(peaks):
+            if len(peaks) == 0:
+                return False
+            min_n_beats, max_n_beats = MIN_HR / 60 * self.duration, MAX_HR / 60 * self.duration
+            return min_n_beats <= len(peaks) <= max_n_beats
 
-    def _get_beats_intervals(self, align_to_r=True):
         try:
-            qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=None, sampling_rate=self.fs, show=False)
+            peaks = nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="neurokit")[1]["ECG_R_Peaks"]
+            if not is_peaks_valid(peaks):
+                raise Exception
+        except Exception:  # Error from neurokit2 (IndexError)
+            try:
+                peaks = nk.ecg_peaks(self.cleaned, sampling_rate=self.fs, method="elgendi2010")[1]["ECG_R_Peaks"]
+                if not is_peaks_valid(peaks):
+                    raise Exception
+            except Exception:  # TODO # both methods raise exceptions
+                intervals = find_intervals_using_hr(self)
+                peaks = np.array([self.data[start:end].argmax()] + start for start, end in intervals)
+        return peaks
+
+    def find_troughs(self):
+        peaks = zip(self.peaks[:-1], self.peaks[1:])
+        return np.array([self.data[prev_peak : next_peak + 1].argmin() + prev_peak for prev_peak, next_peak in peaks])
+
+    def _get_beats_intervals(self, align_to_peak=True):
+        try:
+            rpeaks = None  # rpeaks = self.peaks
+            qrs_epochs = nk.ecg_segment(self.cleaned, rpeaks=rpeaks, sampling_rate=self.fs, show=False)
             beats_times = []
             intervals = []
             prev_end_idx = qrs_epochs["1"].Index.values[-1]
@@ -75,7 +89,7 @@ class ECGSignal(PeriodicSignal):
                 if int(idx) == 1:
                     beats_times.append(beat.index.values)
                 else:
-                    if not align_to_r:
+                    if not align_to_peak:
                         start_idx = np.where(beat.Index.values == prev_end_idx)[0]
                         start_idx = start_idx[0] if len(start_idx) == 1 else 0
                         beat = beat.iloc[start_idx:]
@@ -95,15 +109,51 @@ class ECGSignal(PeriodicSignal):
                 intervals[0][0] = 0
             intervals = np.array(intervals)
         except ZeroDivisionError:
+            print("Setting intervals using hr")
             intervals = find_intervals_using_hr(self)
         return intervals
 
     def extract_hrv_features(self, return_arr=True, **kwargs):
-        r_peaks = self.rpeaks
-        r_vals = self.data[r_peaks]
-        r_times = self.time[r_peaks]
-        ibi = np.diff(r_times)
-        features = OrderedDict({"ibi_mean": np.mean(ibi), "ibi_std": np.std(ibi), "R_val": np.mean(r_vals)})
+        peaks = self.peaks
+        if len(peaks) == 0:
+            hr, ibi_mean, ibi_std, mean_val = np.nan, np.nan, np.nan, np.nan
+        else:
+            vals = self.data[peaks]
+            times = self.time[peaks]
+            ibi = np.diff(times)
+            ibi_mean = np.mean(ibi)
+            ibi_std = np.std(ibi)
+            mean_val = np.mean(vals)
+            hr = self.duration / len(peaks) * 60
+        features = {"hr": hr, "ibi_mean": ibi_mean, "ibi_std": ibi_std, "R_val": mean_val}
+
+        # df = nk.ecg_intervalrelated(self.nk_signals_df, sampling_rate=self.fs)
+        # features = df.to_dict(orient="records")[0]
+        if return_arr:
+            return parse_feats_to_array(features)
+        return features
+
+    def extract_critpoints_features(self, return_arr=True, critpoint_names=["p", "q", "r", "s", "t"], **kwargs):
+        # TODO: find better way of getting pqst locations (now it is taken from beats which are resampled)
+        features = {}
+        if hasattr(self, "beats"):
+            critpoints_times = {k: [] for k in critpoint_names}
+            critpoints_vals = {k: [] for k in critpoint_names}
+
+            for beat in self.beats:
+                for name in critpoint_names:
+                    critpoint_loc = getattr(beat, f"{name}_loc")
+                    critpoints_times[name].append(beat.time[critpoint_loc])
+                    critpoints_vals[name].append(beat.data[critpoint_loc])
+            for name in critpoint_names:
+                times = np.array(critpoints_times[name])
+                vals = np.array(critpoints_vals[name])
+                times_feats = get_basic_signal_features(times)
+                times_feats = {f"{name}_times_{k}": v for k, v in times_feats.items()}
+                vals_feats = get_basic_signal_features(vals)
+                vals_feats = {f"{name}_vals_{k}": v for k, v in vals_feats.items()}
+                features = {**features, **times_feats, **vals_feats}
+
         if return_arr:
             return parse_feats_to_array(features)
         return features
@@ -115,14 +165,6 @@ class ECGSignal(PeriodicSignal):
 class ECGBeat(BeatSignal):
     def __init__(self, name, data, fs, start_sec, beat_num=0):
         super().__init__(name, data, fs, start_sec, beat_num)
-        self.feature_extraction_funcs.update(
-            {
-                "area": self.extract_area_features,
-                "energy": self.extract_energy_features,
-                "slope": self.extract_slope_features,
-                "energy": self.extract_energy_features,
-            }
-        )
 
     @lazy_property
     def r_onset_loc(self):
@@ -273,6 +315,16 @@ class ECGBeat(BeatSignal):
             {"name": "R_offset_slope", "start": self.r_loc, "end": self.r_offset_loc},
             {"name": "T_onset_slope", "start": self.t_onset_loc, "end": self.t_loc},
             {"name": "T_offset_slope", "start": self.t_loc, "end": self.t_offset_loc},
+        ]
+
+    @lazy_property
+    def intervals_features_crit_points(self) -> List[Dict[str, Union[int, str]]]:
+        return [
+            {"name": "PQ_segment", "start": self.p_offset_loc, "end": self.q_loc},
+            {"name": "ST_segment", "start": self.s_loc, "end": self.t_onset_loc},
+            {"name": "PR_interval", "start": self.p_onset_loc, "end": self.r_offset_loc},
+            {"name": "QRS_interval", "start": self.q_loc, "end": self.s_loc},
+            {"name": "QT_interval", "start": self.q_loc, "end": self.t_offset_loc},
         ]
 
 
