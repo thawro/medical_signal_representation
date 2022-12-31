@@ -434,8 +434,10 @@ class PeriodicSignal(ABC, Signal):
     @property
     def hr(self):
         freqs, amps = self.psd(window_size=10, plot=False)
-        most_dominant_freq = freqs[amps.argmax()]
-        return most_dominant_freq
+        hr = freqs[amps.argmax()] * 60
+        if not MIN_HR <= hr <= MAX_HR:
+            hr = 60
+        return hr
 
     @abstractmethod
     def extract_agg_beat_features(self, return_arr=False, plot=False):
