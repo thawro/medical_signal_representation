@@ -12,14 +12,15 @@ class BaseModule(pl.LightningModule):
     def __init__(self, net: nn.Module):
         super().__init__()
         self.net = net
-        self.save_hyperparameters(logger=False, ignore=["net"])
+        self.save_hyperparameters(logger=False)
 
     @abstractmethod
     def get_metrics(self, preds, target, metrics):
         pass
 
     def forward(self, x):
-        return self.net(x)
+        out = self.net(x)
+        return out.squeeze()
 
     def _common_step(self, batch, batch_idx: int, stage: str):
         data, target = batch

@@ -1,0 +1,7 @@
+train_transform:
+  _target_: msr.training.data.transforms.Permute
+  dims: [1, 0]
+
+inference_transform:
+  _target_: msr.training.data.transforms.Permute
+  dims: [1, 0]

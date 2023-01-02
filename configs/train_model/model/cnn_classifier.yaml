@@ -1,14 +1,16 @@
-_target_: msr.models.architectures.networks.cnn.CNNClassifier
-_partial_: true
-# num_classes
-# in_channels
-dim: 2
-out_channels: [32, 64, 128, 256]
-maxpool_kernel_size: 2
-kernel_size: [[1, 5], [1, 5], [12, 1], [5, 1]]
-stride: 1
-padding: valid
-dilation: 1
-transpose: false
-use_batchnorm: true
-activation: ReLU
+_target_: msr.models.modules.ClassifierModule
+net:
+  _target_: msr.models.architectures.networks.cnn.CNNClassifier
+  _partial_: true
+  # num_classes
+  # in_channels
+  dim: 1
+  out_channels: [4]
+  maxpool_kernel_size: 2
+  kernel_size: [11]
+  stride: 1
+  padding: valid
+  dilation: 1
+  transpose: false
+  use_batchnorm: true
+  activation: ReLU

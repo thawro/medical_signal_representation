@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - override /callbacks: default.yaml
+  - override /logger: ml_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+  - override /trainer: ml_regressor_trainer.yaml
+  - override /datamodule: mimic.yaml
+  - override /model: lgbm_regressor.yaml
+  - override /transforms: flatten.yaml

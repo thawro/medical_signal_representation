@@ -1,4 +1,5 @@
 import omegaconf
+from pytorch_lightning.loggers import WandbLogger
 
 import wandb
 
@@ -29,3 +30,11 @@ class MLWandbLogger:
 
     def finish(self, quiet: bool = True):
         wandb.finish(quiet=quiet)
+
+
+class DLWandbLogger(WandbLogger):
+    def log(self, data):
+        self.experiment.log(data)
+
+    def finish(self, quiet: bool = True):
+        self.experiment.finish(quiet=quiet)

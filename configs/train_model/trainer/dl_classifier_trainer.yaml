@@ -4,7 +4,7 @@ trainer:
   _target_: pytorch_lightning.Trainer
   accelerator: auto
   devices: 1
-  max_epochs: 50
-  deterministic: true
+  max_epochs: 5
+  deterministic: warn # true
 # model
 # datamodule

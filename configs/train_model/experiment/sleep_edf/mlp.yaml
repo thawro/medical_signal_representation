@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - override /callbacks: default.yaml
+  - override /logger: dl_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+  - override /trainer: dl_classifier_trainer.yaml
+  - override /datamodule: sleep_edf.yaml
+  - override /model: mlp_classifier.yaml
+  - override /transforms: flatten_downsample.yaml

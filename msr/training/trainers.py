@@ -97,8 +97,8 @@ class BaseTrainer:
     def evaluate(self, plotter: BasePlotter = None, logger: MLWandbLogger = None):
         all_y_values = {
             # "train": {"preds": self.predict(self.datamodule.train.data), "target": self.datamodule.train.targets},
-            "val": {"preds": self.predict(self.datamodule.val_data), "target": self.datamodule.val.targets},
-            "test": {"preds": self.predict(self.datamodule.test_data), "target": self.datamodule.test.targets},
+            "val": {"preds": self.predict(self.datamodule.val_data), "target": self.datamodule.val.targets.detach()},
+            "test": {"preds": self.predict(self.datamodule.test_data), "target": self.datamodule.test.targets.detach()},
         }
 
         metrics = {split: self.get_metrics(**y_values) for split, y_values in all_y_values.items()}
@@ -132,12 +132,15 @@ class DLTrainer(BaseTrainer):
         self.trainer.fit(self.model, self.datamodule)
 
     def predict(self, data):
-        return self.model(data)
+        return self.model(data).detach().flatten()
 
 
 class DLClassifierTrainer(DLTrainer, Classifier):
     def __init__(self, trainer: pl.Trainer, model: nn.Module, datamodule: pl.LightningDataModule):
         super().__init__(trainer, model, datamodule)
+
+    def predict(self, data):
+        return self.model(data).detach()
 
 
 class DLRegressorTrainer(DLTrainer, Regressor):
@@ -155,7 +158,7 @@ class MLTrainer(BaseTrainer):
         self.model.fit(X=self.datamodule.train_data.numpy(), y=self.datamodule.train.targets)
 
     def predict(self, X):
-        return self.model.predict(X)
+        return self.model.predict(X).flatten()
 
 
 class MLClassifierTrainer(MLTrainer, Classifier):

@@ -68,13 +68,24 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
             return ds.input_shape
 
     @property
+    def transformed_input_shape(self):
+        for ds in self.datasets:
+            return ds.transformed_input_shape
+
+    @property
     def num_classes(self):
-        return len(self.class_names)
+        try:
+            return len(self.class_names)
+        except TypeError:
+            return
 
     @property
     def class_names(self):
         for ds in self.datasets:
-            return ds.class_names
+            try:
+                return ds.class_names
+            except AttributeError:
+                return
 
     @property
     def feature_names(self):
@@ -123,21 +134,25 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def train_dataloader(self):
         return DataLoader(
             self.train,
-            batch_sampler=StratifiedBatchSampler(self.train.targets, batch_size=self.batch_size, shuffle=True),
+            batch_sampler=StratifiedBatchSampler(self.train.targets.int(), batch_size=self.batch_size, shuffle=True),
             num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
         return DataLoader(
             self.val,
-            batch_sampler=StratifiedBatchSampler(self.val.targets, batch_size=10 * self.batch_size, shuffle=False),
+            batch_sampler=StratifiedBatchSampler(
+                self.val.targets.int(), batch_size=10 * self.batch_size, shuffle=False
+            ),
             num_workers=self.num_workers,
         )
 
     def test_dataloader(self):
         return DataLoader(
             self.test,
-            batch_sampler=StratifiedBatchSampler(self.test.targets, batch_size=10 * self.batch_size, shuffle=False),
+            batch_sampler=StratifiedBatchSampler(
+                self.test.targets.int(), batch_size=10 * self.batch_size, shuffle=False
+            ),
             num_workers=self.num_workers,
         )
 

@@ -56,22 +56,27 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        data = self.data[idx].float()
+        data = self.data[idx]
         data = torch.nan_to_num(data, nan=0.0)  # TODO !!!
         if self.transform:
             data = self.transform(data)
-        return data, self.targets[idx]
+        return data.float(), self.targets[idx]
 
     @property
     def input_shape(self):
-        return self.data.shape[1:]
+        return self.data[0].shape
+
+    @property
+    def transformed_input_shape(self):
+        data, _ = self[0]
+        return data.shape
 
     @property
     def info_dict(self):
         return dict(
             # representation_type=self.representation_type,
             n_samples=len(self),
-            input_shape=self.input_shape,
+            data_shape=self.data.shape,
             targets=self.targets,
             info=self.info,
         )
@@ -148,7 +153,7 @@ class MimicDataset(RegressionDataset):
         bp_targets_idxs = [bp_targets_idxs[target] for target in bp_targets]
         if len(bp_targets) == 1:
             bp_targets_idxs = bp_targets_idxs[0]
-        self.targets = self.targets[:, bp_targets_idxs]
+        self.targets = self.targets[:, bp_targets_idxs].float()
 
     @property
     def _dataset_loader(self) -> Callable:

@@ -6,21 +6,26 @@ import omegaconf
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-from msr.utils import logger_name_to_str, logger_project_to_str, print_config_tree
+from msr.utils import dataset_to_str, logger_name_to_str, model2str, print_config_tree
 
 
 @hydra.main(version_base=None, config_path="../../configs/train_model", config_name="train")
 def main(cfg: omegaconf.DictConfig):
 
-    cfg.logger.project = logger_project_to_str(cfg.logger.project)
+    # cfg.logger.project = dataset_to_str(cfg.dataset)
+    if "Module" in cfg.model._target_:  # DL models
+        cfg.logger.name = f"{cfg.dataset}__{cfg.representation_type}__{cfg.model.net._target_}"
     cfg.logger.name = logger_name_to_str(cfg.logger.name)
     log.info(f"Project: {cfg.logger.project}")
     log.info(f"Run: {cfg.logger.name}")
 
-    logger = hydra.utils.instantiate(cfg.logger)
+    if cfg.logger._target_ == "msr.training.loggers.DLWandbLogger":
+        config = omegaconf.OmegaConf.to_object(cfg)
+        logger = hydra.utils.instantiate(cfg.logger)(config=config)
+    else:
+        logger = hydra.utils.instantiate(cfg.logger)
+        logger.init(config=cfg)
     log.info(f"{logger} initialized")
-    logger.init(config=cfg)
-
     log.info(f"Logger set config and initialized")
 
     log.info("Training + evaluation started")
@@ -31,7 +36,16 @@ def main(cfg: omegaconf.DictConfig):
     datamodule.setup()
     log.info(f"Datamodule set up")
 
-    model = hydra.utils.instantiate(cfg.model)
+    if "Module" in cfg.model._target_:  # DL models
+        net_factory = hydra.utils.instantiate(cfg.model.net)
+        net_params = {"num_classes": datamodule.num_classes} if "Classifier" in cfg.model._target_ else {}
+        if "MLP" in cfg.model.net._target_:
+            net = net_factory(**net_params, input_size=datamodule.transformed_input_shape[0])
+        elif "CNN" in cfg.model.net._target_:
+            net = net_factory(**net_params, in_channels=datamodule.transformed_input_shape[0])
+        model = hydra.utils.instantiate(cfg.model, net=net)
+    else:
+        model = hydra.utils.instantiate(cfg.model)
     log.info(f"{model} initialized")
 
     plotter = hydra.utils.instantiate(cfg.plotter)
@@ -40,11 +54,12 @@ def main(cfg: omegaconf.DictConfig):
     trainer = hydra.utils.instantiate(cfg.trainer)(model=model, datamodule=datamodule)
     log.info(f"{trainer} initialized")
 
+    log.info(f"Trainer fit started")
     trainer.fit()
     log.info(f"Trainer fit finished")
 
-    representation_type, model_name = cfg.logger.name.split("__")
-    params = dict(dataset=cfg.logger.project, representation=representation_type, model=model_name)
+    dataset, representation_type, model_name = cfg.logger.name.split("__")
+    params = dict(dataset=dataset, representation=representation_type, model=model2str[model_name])  # logger.project,
     logger.log(params)
     results = trainer.evaluate(plotter=plotter, logger=logger)
 

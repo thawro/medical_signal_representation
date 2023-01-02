@@ -4,6 +4,12 @@ mimic_download:
 mimic_create_representations:
 	python msr/bin/create_representations.py dataset_provider=mimic
 
+mimic_experiments:
+	python msr/bin/train_and_evaluate.py \
+		experiment=mimic/lgbm,mimic/decision_tree,mimic/regression,mimic/mlp \
+		representation_type=whole_signal_waveforms,whole_signal_features,agg_beat_waveforms,agg_beat_features \
+		--multirun
+
 
 
 ptbxl_download:
@@ -12,8 +18,11 @@ ptbxl_download:
 ptbxl_create_representations:
 	python msr/bin/create_representations.py dataset_provider=ptbxl
 
-ptbxl_train:
-	python msr/bin/train_and_evaluate.py experiment=ptbxl datamodule.representation_type="whole_signal_features"
+ptbxl_experiments:
+	python msr/bin/train_and_evaluate.py \
+		experiment=ptbxl/lgbm,ptbxl/decision_tree,ptbxl/regression,ptbxl/mlp \
+		representation_type=whole_signal_waveforms,whole_signal_features,agg_beat_waveforms,agg_beat_features \
+		--multirun
 
 
 
@@ -22,3 +31,9 @@ sleep_edf_download:
 
 sleep_edf_create_representations:
 	python msr/bin/create_representations.py dataset_provider=sleep_edf
+
+sleep_edf_experiments:
+	python msr/bin/train_and_evaluate.py \
+		experiment=sleep_edf/lgbm,sleep_edf/decision_tree,sleep_edf/regression,sleep_edf/mlp \
+		representation_type=whole_signal_features \
+		--multirun

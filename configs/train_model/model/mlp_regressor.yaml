@@ -1,12 +1,14 @@
-_target_: msr.models.architectures.networks.mlp.MLPRegressor
-_partial_: true
-# num_classes
-# input_size
-hidden_dims:
-  - 128
-  - 256
-  - 512
-weight_norm: false
-batch_norm: true
-dropout: 0
-activation: ReLU
+_target_: msr.models.modules.RegressorModule
+net:
+  _target_: msr.models.architectures.networks.mlp.MLPRegressor
+  _partial_: true
+  # num_classes
+  # input_size
+  hidden_dims:
+    - 128
+    - 256
+    - 512
+  weight_norm: false
+  batch_norm: true
+  dropout: 0
+  activation: ReLU
