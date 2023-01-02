@@ -14,14 +14,19 @@ from msr.utils import align_left
 
 class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def __init__(
-        self, representation_type: str, batch_size: int = 64, num_workers: int = 8, transform: Callable = None
+        self,
+        representation_type: str,
+        batch_size: int = 64,
+        num_workers: int = 8,
+        train_transform: Callable = None,
+        inference_transform: Callable = None,
     ):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.representation_type = representation_type
-        self.transform = transform
-        self.dataset_params = dict(representation_type=representation_type, transform=transform)
+        self.train_transform = train_transform
+        self.inference_transform = inference_transform
         self.datasets = []
 
     def describe(self, ds_fields=["data_shape", "classes_counts"], dm_fields=["info"]):
@@ -44,24 +49,43 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train = self.DatasetFactory(split="train", **self.dataset_params)
-            self.val = self.DatasetFactory(split="val", **self.dataset_params)
+            self.train = self.DatasetFactory(
+                split="train", representation_type=self.representation_type, transform=self.train_transform
+            )
+            self.val = self.DatasetFactory(
+                split="val", representation_type=self.representation_type, transform=self.inference_transform
+            )
             self.datasets.extend([self.train, self.val])
         if stage == "test" or stage is None:
-            self.test = self.DatasetFactory(split="test", **self.dataset_params)
+            self.test = self.DatasetFactory(
+                split="test", representation_type=self.representation_type, transform=self.inference_transform
+            )
             self.datasets.append(self.test)
 
-        for dataset in self.datasets:
-            if hasattr(dataset, "feature_names"):
-                self.feature_names = dataset.feature_names
-            if hasattr(dataset, "class_names"):
-                self.class_names = dataset.class_names
-                self.num_classes = len(self.class_names)
+    @property
+    def input_shape(self):
+        for ds in self.datasets:
+            return ds.input_shape
+
+    @property
+    def num_classes(self):
+        return len(self.class_names)
+
+    @property
+    def class_names(self):
+        for ds in self.datasets:
+            return ds.class_names
+
+    @property
+    def feature_names(self):
+        for ds in self.datasets:
+            return ds.feature_names
 
     def get_transformed_data(self, split):
-        split_data = getattr(self, split).data
-        if self.transform is not None:
-            return torch.stack([self.transform(sample) for sample in split_data])
+        split_dataset = getattr(self, split)
+        split_data = split_dataset.data
+        if split_dataset.transform is not None:
+            return torch.stack([split_dataset.transform(sample) for sample in split_data])
         else:
             return split_data
 
@@ -77,6 +101,17 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def test_data(self):
         return self.get_transformed_data("test")
 
+    def get_X_y(self, split="all"):
+        if split == "all":
+            data = []
+            for _split in ["train", "val", "test"]:
+                data.extend(self.get_X_y(_split))
+            return data
+        else:
+            X = getattr(self, f"{split}_data")
+            y = getattr(self, split).targets
+            return X, y
+
     def plot_targets(self):
         ncols = len(self.datasets)
         fig, axes = plt.subplots(1, ncols, figsize=(ncols * 5, 3.5))
@@ -88,21 +123,21 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def train_dataloader(self):
         return DataLoader(
             self.train,
-            batch_sampler=StratifiedBatchSampler(self.train[:][1], batch_size=self.batch_size, shuffle=True),
+            batch_sampler=StratifiedBatchSampler(self.train.targets, batch_size=self.batch_size, shuffle=True),
             num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
         return DataLoader(
             self.val,
-            batch_sampler=StratifiedBatchSampler(self.val[:][1], batch_size=10 * self.batch_size, shuffle=False),
+            batch_sampler=StratifiedBatchSampler(self.val.targets, batch_size=10 * self.batch_size, shuffle=False),
             num_workers=self.num_workers,
         )
 
     def test_dataloader(self):
         return DataLoader(
             self.test,
-            batch_sampler=StratifiedBatchSampler(self.test[:][1], batch_size=10 * self.batch_size, shuffle=False),
+            batch_sampler=StratifiedBatchSampler(self.test.targets, batch_size=10 * self.batch_size, shuffle=False),
             num_workers=self.num_workers,
         )
 
@@ -117,9 +152,10 @@ class PtbXLDataModule(BaseDataModule):
         target: str = "diagnostic_class",
         batch_size: int = 64,
         num_workers=8,
-        transform: Callable = None,
+        train_transform: Callable = None,
+        inference_transform: Callable = None,
     ):
-        super().__init__(representation_type, batch_size, num_workers, transform)
+        super().__init__(representation_type, batch_size, num_workers, train_transform, inference_transform)
         self.fs = fs
         self.target = target
 
@@ -138,9 +174,10 @@ class MimicDataModule(BaseDataModule):
         bp_targets: List[Literal["sbp", "dbp"]] = ["sbp"],
         batch_size: int = 64,
         num_workers=8,
-        transform: Callable = None,
+        train_transform: Callable = None,
+        inference_transform: Callable = None,
     ):
-        super().__init__(representation_type, batch_size, num_workers, transform)
+        super().__init__(representation_type, batch_size, num_workers, train_transform, inference_transform)
         self.target = target
         self.bp_targets = bp_targets
 

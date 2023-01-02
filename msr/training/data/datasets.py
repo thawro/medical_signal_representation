@@ -63,15 +63,20 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         return data, self.targets[idx]
 
     @property
+    def input_shape(self):
+        return self.data.shape[1:]
+
+    @property
     def info_dict(self):
         return dict(
             # representation_type=self.representation_type,
-            data_shape=self.data.shape,
+            n_samples=len(self),
+            input_shape=self.input_shape,
             targets=self.targets,
             info=self.info,
         )
 
-    def describe(self, fields=["data_shape"]):
+    def describe(self, fields=["input_shape"]):
         info_dict_str = "\n".join([align_left(f"    {name}", self.info_dict[name], n_signs=25) for name in fields])
         return f"{self.split.title()} {self.__class__.__name__}:\n" + info_dict_str
 

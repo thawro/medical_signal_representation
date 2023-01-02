@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 
 
@@ -8,3 +10,11 @@ class Flatten:
 
     def __call__(self, sample: torch.Tensor):
         return sample.flatten(start_dim=self.start_dim, end_dim=self.end_dim)
+
+
+class Permute:
+    def __init__(self, dims: List[int]):
+        self.dims = dims
+
+    def __call__(self, sample: torch.Tensor):
+        return torch.permute(sample, self.dims)

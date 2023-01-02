@@ -1,6 +1,5 @@
 from typing import List, Tuple, Union
 
-import torch.nn.functional as F
 from sorcery import dict_of
 from torch import nn
 
@@ -51,7 +50,7 @@ class CNNExtractor(FeatureExtractor):
         super().__init__(net=net, output_size=output_size)
 
     def forward(self, x):
-        out = self.net(x.permute(0, 2, 1))  # TODO
+        out = self.net(x)
         return out
 
 
