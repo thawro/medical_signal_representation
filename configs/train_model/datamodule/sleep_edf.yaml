@@ -2,7 +2,12 @@ _target_: msr.training.data.datamodules.SleepEDFDataModule
 representation_type: whole_signal_features
 batch_size: 64
 num_workers: 8
-transform:
+train_transform:
+  _target_: msr.training.data.transforms.Flatten
+  start_dim: 0
+  end_dim: -1
+
+inference_transform:
   _target_: msr.training.data.transforms.Flatten
   start_dim: 0
   end_dim: -1
