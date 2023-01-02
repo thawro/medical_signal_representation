@@ -7,4 +7,4 @@ defaults:
   - override /trainer: ml_regressor_trainer.yaml
   - override /datamodule: mimic.yaml
   - override /model: linear_regression.yaml
-  - override /transforms: flatten.yaml
+  - override /transforms: [flatten.yaml]

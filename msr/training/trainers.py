@@ -149,7 +149,7 @@ class DLRegressorTrainer(DLTrainer, Regressor):
 
 
 class MLTrainer(BaseTrainer):
-    def __init__(self, model, datamodule, normalize=True):
+    def __init__(self, model, datamodule):
         self.model = model
         self.datamodule = datamodule
         self.feature_names = datamodule.feature_names

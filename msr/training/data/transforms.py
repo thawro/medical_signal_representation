@@ -21,16 +21,27 @@ class Permute:
 
 
 class Downsample:
-    def __init__(self, n: int, dim: int = 0):
-        self.n = n
+    def __init__(self, ratio: int, dim: int = 0):
+        self.ratio = ratio
         self.dim = dim
 
     def __call__(self, sample: torch.Tensor):
         if self.dim == 0:
-            return sample[:: self.n]
+            return sample[:: self.ratio]
         elif self.dim == 1:
-            return sample[:, :: self.n]
+            return sample[:, :: self.ratio]
         elif self.dim == 2:
-            return sample[:, :, :: self.n]
+            return sample[:, :, :: self.ratio]
         else:
-            return sample[..., :: self.n]
+            return sample[..., :: self.ratio]
+
+
+class Normalize:
+    def __init__(self, dim: int = 0):
+        self.dim = dim
+
+    def __call__(self, sample: torch.Tensor):
+        mean_ = torch.mean(sample, keepdim=True, axis=self.dim)
+        std_ = torch.std(sample, keepdim=True, axis=self.dim) + 1e-10
+        standarized = (sample - mean_) / std_
+        return standarized

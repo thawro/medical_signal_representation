@@ -9,19 +9,12 @@ defaults:
   - hydra: default.yaml
   - paths: default.yaml
   - plotter: plotly.yaml
-  - transforms: flatten.yaml
+  - transforms: [flatten.yaml, ]
   - experiment: null
   - debug: null
 
-# dataset: ptbxl
-# representation_type: whole_signal_features
-
-# dataset: ???
 representation_type: agg_beat_features
 dataset: ${datamodule._target_}
-
-# datamodule:
-#   representation_type: whole_signal_features
 
 logger_project: medical_signals_representation #${datamodule._target_}
 logger_run_name: ${dataset}__${representation_type}__${model._target_}

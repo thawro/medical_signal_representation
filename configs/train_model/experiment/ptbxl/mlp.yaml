@@ -7,4 +7,4 @@ defaults:
   - override /trainer: dl_classifier_trainer.yaml
   - override /datamodule: ptbxl.yaml
   - override /model: mlp_classifier.yaml
-  - override /transforms: flatten.yaml
+  - override /transforms: [flatten.yaml]

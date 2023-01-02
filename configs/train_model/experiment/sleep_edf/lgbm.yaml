@@ -7,4 +7,4 @@ defaults:
   - override /trainer: ml_classifier_trainer.yaml
   - override /datamodule: sleep_edf.yaml
   - override /model: lgbm_classifier.yaml
-  - override /transforms: flatten_downsample.yaml
+  - override /transforms: [flatten.yaml, downsample.yaml]

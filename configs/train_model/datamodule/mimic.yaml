@@ -4,5 +4,3 @@ target: sbp_dbp_avg
 bp_targets: ["sbp"]
 batch_size: 64
 num_workers: 8
-train_transform: ${transforms.train_transform}
-inference_transform: ${transforms.inference_transform}

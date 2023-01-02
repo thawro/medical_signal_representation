@@ -2,6 +2,7 @@ import logging
 
 import hydra
 import omegaconf
+from torchvision.transforms import Compose
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -11,8 +12,6 @@ from msr.utils import dataset_to_str, logger_name_to_str, model2str, print_confi
 
 @hydra.main(version_base=None, config_path="../../configs/train_model", config_name="train")
 def main(cfg: omegaconf.DictConfig):
-
-    # cfg.logger.project = dataset_to_str(cfg.dataset)
     if "Module" in cfg.model._target_:  # DL models
         cfg.logger.name = f"{cfg.dataset}__{cfg.representation_type}__{cfg.model.net._target_}"
     cfg.logger.name = logger_name_to_str(cfg.logger.name)
@@ -29,9 +28,16 @@ def main(cfg: omegaconf.DictConfig):
     log.info(f"Logger set config and initialized")
 
     log.info("Training + evaluation started")
-    print_config_tree(cfg, keys=["datamodule", "model", "callbacks", "logger", "plotter"])
-
-    datamodule = hydra.utils.instantiate(cfg.datamodule)
+    print_config_tree(cfg, keys=["datamodule", "model", "callbacks", "logger", "plotter", "transforms"])
+    train_transform = Compose(
+        [hydra.utils.instantiate(transform["train_transform"]) for _, transform in cfg.transforms.items()]
+    )
+    inference_transform = Compose(
+        [hydra.utils.instantiate(transform["inference_transform"]) for _, transform in cfg.transforms.items()]
+    )
+    datamodule = hydra.utils.instantiate(
+        cfg.datamodule, train_transform=train_transform, inference_transform=inference_transform
+    )
     log.info(f"{datamodule} initialized")
     datamodule.setup()
     log.info(f"Datamodule set up")
