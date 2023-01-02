@@ -20,7 +20,7 @@ from msr.training.utils import BasePredictor
 
 class BaseTask:
     @abstractmethod
-    def get_metrics(self):
+    def get_metrics(self, preds, target, metrics):
         pass
 
     @abstractmethod
@@ -36,7 +36,10 @@ class BaseTask:
 
 class Classifier:
     def get_metrics(self, preds, target):
-        return get_classification_metrics(num_classes=self.datamodule.num_classes, preds=preds, target=target)
+        metrics = ["accuracy", "fscore", "auroc", "auc", "roc"]
+        return get_classification_metrics(
+            num_classes=self.datamodule.num_classes, preds=preds, target=target, metrics=metrics
+        )
 
     def plot_evaluation(
         self,
@@ -57,7 +60,8 @@ class Classifier:
 
 class Regressor:
     def get_metrics(self, preds, target):
-        return get_regression_metrics(preds=preds, target=target)
+        metrics = ["mae", "mape", "corr", "r2", "mse"]
+        return get_regression_metrics(preds=preds, target=target, metrics=metrics)
 
     def plot_evaluation(
         self,
@@ -142,6 +146,11 @@ class DLRegressorTrainer(DLTrainer, Regressor):
 
 
 class MLTrainer(BaseTrainer):
+    def __init__(self, model, datamodule, normalize=True):
+        self.model = model
+        self.datamodule = datamodule
+        self.feature_names = datamodule.feature_names
+
     def fit(self):
         self.model.fit(X=self.datamodule.train_data.numpy(), y=self.datamodule.train.targets)
 

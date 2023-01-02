@@ -15,7 +15,7 @@ class BaseModule(pl.LightningModule):
         self.save_hyperparameters(logger=False, ignore=["net"])
 
     @abstractmethod
-    def get_metrics(self, preds, target):
+    def get_metrics(self, preds, target, metrics):
         pass
 
     def forward(self, x):
@@ -41,7 +41,7 @@ class BaseModule(pl.LightningModule):
         preds = torch.cat([output["preds"] for output in outputs], dim=0)
         target = torch.cat([output["target"] for output in outputs], dim=0)
         metrics = self.get_metrics(preds, target)
-        metrics["loss"] = loss
+        metrics["loss"] = loss.item()
         metrics = {f"{stage}/{name}": value for name, value in metrics.items()}
         results = {"metrics": metrics, "y_values": {"preds": preds, "target": target}}
         if self.trainer.sanity_checking or self.trainer.testing:
@@ -95,7 +95,8 @@ class ClassifierModule(BaseModule):
         self.criterion = nn.NLLLoss()
 
     def get_metrics(self, preds, target):
-        return get_classification_metrics(num_classes=self.net.num_classes, preds=preds, target=target)
+        metrics = ["accuracy", "fscore", "auroc"]
+        return get_classification_metrics(num_classes=self.net.num_classes, preds=preds, target=target, metrics=metrics)
 
 
 class RegressorModule(BaseModule):
@@ -104,4 +105,5 @@ class RegressorModule(BaseModule):
         self.criterion = nn.MSELoss()
 
     def get_metrics(self, preds, target):
-        return get_regression_metrics(preds=preds, target=target)
+        metrics = ["mae", "mape", "corr", "r2", "mse"]
+        return get_regression_metrics(preds=preds, target=target, metrics=metrics)
