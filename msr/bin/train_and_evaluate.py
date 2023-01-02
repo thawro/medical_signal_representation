@@ -7,7 +7,7 @@ from torchvision.transforms import Compose
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-from msr.utils import dataset_to_str, logger_name_to_str, model2str, print_config_tree
+from msr.utils import logger_name_to_str, model2str, print_config_tree
 
 
 @hydra.main(version_base=None, config_path="../../configs/train_model", config_name="train")

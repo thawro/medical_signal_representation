@@ -124,12 +124,13 @@ def plot_dwt(data, approximates, details):
         axes[0].set_title(approx_title, fontsize=12)
         axes[1].set_title(detail_title, fontsize=12)
         # axes[1].set_yticklabels([])
+    return fig
 
 
 def extract_dwt_features(data, fs, wavelet="db5", level=None, plot=False):
     approximates, details = get_dwt_coeffs(data, fs, wavelet, level)
     if plot:
-        plot_dwt(data, approximates, details)
+        fig = plot_dwt(data, approximates, details)
     last_approx = approximates[-1]
     features = {}
     energies = []
@@ -140,6 +141,8 @@ def extract_dwt_features(data, fs, wavelet="db5", level=None, plot=False):
     probs = np.array(energies) / sum(energies)
     features[f"approx_{len(details)}_freq_{last_approx['freq']}"] = get_basic_signal_features(last_approx["data"])
     features["wavelet_entropy"] = entropy(probs)
+    if plot:
+        return features, fig
     return features
 
 

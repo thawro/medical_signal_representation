@@ -108,8 +108,9 @@ class PPGSignal(PeriodicSignal):
     def extract_agg_beat_features(self, return_arr=True, plot=False):
         return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
 
-    def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
-        super().explore(start_time, width, window_size, min_hz, max_hz)
+    def explore(self, start_time=0, width=None):
+        figs = super().explore(start_time, width)
+        return figs
 
 
 class PPGBeat(BeatSignal):
@@ -209,5 +210,6 @@ class PPGBeat(BeatSignal):
             return parse_feats_to_array(features)
         return features
 
-    def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
-        super().explore(start_time, width, window_size, min_hz, max_hz)
+    def explore(self, start_time=0, width=None):
+        figs = super().explore(start_time, width)
+        return figs
