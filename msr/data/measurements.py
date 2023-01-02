@@ -12,7 +12,7 @@ class PtbXLMeasurement(MultiChannelECGSignal):
     def __init__(self, *ecg_leads: np.ndarray, fs: float = 100):
         signals = {f"ecg_{i+1}": ECGSignal(f"ecg_{i+1}", ecg_lead, fs) for i, ecg_lead in enumerate(ecg_leads)}
         super().__init__(signals)
-        self.feature_extraction_funcs.update({"some_features": self.extract_some_features})  # TODO
+        # self.feature_extraction_funcs.update({"some_features": self.extract_some_features})  # TODO
 
     def extract_some_features(self, return_arr=True, plot=False):
         # TODO
@@ -30,7 +30,7 @@ class SleepEDFMeasurement(MultiChannelSignal):
             "eog": EOGSignal("eog", eog, fs),  # EOG horizontal
         }
         super().__init__(signals)
-        self.feature_extraction_funcs.update({"some_features": self.extract_some_features})  # TODO
+        # self.feature_extraction_funcs.update({"some_features": self.extract_some_features})  # TODO
 
     def extract_some_features(self, return_arr=True, plot=False):
         # TODO
@@ -47,7 +47,7 @@ class MimicMeasurement(MultiChannelPeriodicSignal):
             "ecg": ECGSignal("ecg", ecg, fs),
         }
         super().__init__(signals)
-        self.feature_extraction_funcs.update({"ptt_features": self.extract_ptt_features})
+        # self.feature_extraction_funcs.update({"ptt_features": self.extract_ptt_features})
 
     def extract_ptt_features(self, return_arr=True, plot=False):
         features = {"ptt": 0}

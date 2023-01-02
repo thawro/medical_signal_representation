@@ -821,11 +821,14 @@ class MultiChannelSignal:
         F - number of features from single signal
         C - number of channels
 
-        If return_arr is True, then `NDArray[Shape["FC"], Float]` is returned
+        If return_arr is True, then `NDArray[Shape["F, C"], Float]` is returned
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
-            return self.extract_features(return_arr=True)
+            return np.array(
+                [func(return_arr=True, plot=False) for name, func in self.feature_extraction_funcs.items()]
+            ).T
+            # return self.extract_features(return_arr=True)
         return {name: func(return_arr=False) for name, func in self.feature_extraction_funcs.items()}
 
     def get_windows_waveforms(
@@ -848,20 +851,18 @@ class MultiChannelSignal:
 
     def get_windows_features(
         self, return_arr=True, **kwargs
-    ) -> Union[NDArray[Shape["B, FC"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
+    ) -> Union[NDArray[Shape["B, F, C"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
         """Return windows features representation, i.e. features extracted for each window.
 
         B - number of windows
         F - number of features in a window
         C - number of channels
 
-        If return_arr is True, then `NDArray[Shape["B, FC"], Float]` is returned
+        If return_arr is True, then `NDArray[Shape["B, F, C"], Float]` is returned
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
-            return np.concatenate(
-                [sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()], axis=1
-            )
+            return np.stack([sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()], axis=-1)
         return {name: sig.get_windows_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_whole_signal_feature_names(self):
@@ -987,19 +988,19 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
 
     def get_beats_features(
         self, return_arr=True, **kwargs
-    ) -> Union[NDArray[Shape["B, FC"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
+    ) -> Union[NDArray[Shape["B, F, C"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
         """Return beats features representation, i.e. features extracted for each beat.
 
         B - number of beats
         F - number of features in a beat
         C - number of channels
 
-        If return_arr is True, then `NDArray[Shape["B, FC"], Float]` is returned
+        If return_arr is True, then `NDArray[Shape["B, F, C"], Float]` is returned
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
 
         if return_arr:
-            return np.concatenate([sig.get_beats_features(return_arr=True) for _, sig in self.signals.items()], axis=1)
+            return np.stack([sig.get_beats_features(return_arr=True) for _, sig in self.signals.items()], axis=-1)
         return {name: sig.get_beats_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_beats_waveforms(
@@ -1043,11 +1044,11 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         F - number of features from single aggregated beat.
         C - number of channels
 
-        If return_arr is True, then `NDArray[Shape["FC"], Float]` is returned
+        If return_arr is True, then `NDArray[Shape["F, C"], Float]` is returned
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
-            return np.concatenate([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()])
+            return np.stack([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()], axis=-1)
         return {name: sig.get_agg_beat_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_beats_feature_names(self):

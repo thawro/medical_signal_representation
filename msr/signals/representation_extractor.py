@@ -14,7 +14,7 @@ class RepresentationExtractor:
 
     def get_representations(self, representation_types: List[str], return_arr: bool = True, **kwargs):
         if representation_types == "all":
-            representation_types = list(self.measurement.representations.keys())
+            representation_types = list(self.measurement.representations_funcs.keys())
         return {
             rep_type: self.measurement.representations_funcs[rep_type](return_arr=return_arr, **kwargs)
             for rep_type in representation_types
@@ -22,7 +22,7 @@ class RepresentationExtractor:
 
     def get_feature_names(self, representation_types: List[str]):
         if representation_types == "all":
-            representation_types = list(self.measurement.representations.keys())
+            representation_types = list(self.measurement.representations_funcs.keys())
         feature_names = {}
         for rep_type in representation_types:
             if rep_type in self.measurement.feature_names_funcs:
