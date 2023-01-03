@@ -38,6 +38,7 @@ class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
         polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
+        self.units = "Voltage [V]"
         # self.nk_signals_df, self.nk_info = nk.ecg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
@@ -165,6 +166,7 @@ class ECGSignal(PeriodicSignal):
 class ECGBeat(BeatSignal):
     def __init__(self, name, data, fs, start_sec, beat_num=0):
         super().__init__(name, data, fs, start_sec, beat_num)
+        self.units = "Voltage [V]"
 
     @lazy_property
     def r_onset_loc(self):

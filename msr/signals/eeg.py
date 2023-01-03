@@ -10,6 +10,7 @@ FREQ_BANDS = {"delta": [0.5, 4.5], "theta": [4.5, 8.5], "alpha": [8.5, 11.5], "s
 class EEGSignal(Signal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
+        self.units = "Voltage [V]"
         self.feature_extraction_funcs.update(
             {
                 "frequency": self.extract_frequency_features,

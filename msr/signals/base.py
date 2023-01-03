@@ -73,6 +73,7 @@ class BaseSignal:
         self.max = self.data.max()
         self.range = self.max - self.min
         self.fs = fs
+        self.units = "Values [a.u.]"
         self.start_sec = start_sec
         self.n_samples = len(data)
         self.duration = self.n_samples / fs
@@ -293,15 +294,16 @@ class BaseSignal:
             plot_kwgs = dict(c=sns.color_palette()[1], lw=1, label=label + "_der")
             first_der_plot = ax2.scatter(x, y, **plot_kwgs) if scatter else ax2.plot(x, y, **plot_kwgs)
             plots.append(first_der_plot)
-            ax2.set_ylabel("First derivative values", fontsize=18)
+            ax2.set_ylabel("First derivative values", fontsize=self.fig_params["label_size"])
             ax2.axhline(y=0, c="black", ls="--", lw=0.5)
         plots = [plot[0] for plot in plots] if line else plots
         labels = [plot.get_label() for plot in plots]
         # ax.legend(plots, labels, loc=0, fontsize=18)
-        ax.legend()
-        ax.set_ylabel("Values", fontsize=18)
-        ax.set_xlabel("Samples" if use_samples else "Time [s]", fontsize=18)
-        ax.set_title(f"{self.name} {title}", fontsize=22)
+        if label is not None and label != "":
+            ax.legend(fontsize=self.fig_params["legend_size"])
+        ax.set_ylabel(self.units, fontsize=self.fig_params["label_size"])
+        ax.set_xlabel("Samples" if use_samples else "Time [s]", fontsize=self.fig_params["label_size"])
+        ax.set_title(f"{self.name} {title}", fontsize=self.fig_params["title_size"])
         if return_fig:
             return fig
 
@@ -340,7 +342,7 @@ class Signal(BaseSignal):
             ]
         )
 
-    def extract_peaks_troughs_features(self, return_arr=True, plot=False):
+    def extract_peaks_troughs_features(self, return_arr=True, plot=False, ax=None):
         peaks_time, peaks_data = self.time[self.peaks], self.cleaned[self.peaks]
         troughs_time, troughs_data = self.time[self.troughs], self.cleaned[self.troughs]
         peaks_new_time = self.time[(self.time >= peaks_time[0]) & (self.time <= peaks_time[-1])]
@@ -354,15 +356,17 @@ class Signal(BaseSignal):
         signals = [peaks_sig, troughs_sig, amplitudes_sig]
 
         features = {sig.name: sig.extract_basic_features(return_arr=False) for sig in signals}
-
+        return_fig = False
         if plot:
-            fig, ax = plt.subplots(figsize=(24, 6))
+            if ax is None:
+                return_fig = True
+                fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
             for sig in [self] + signals:
                 lw = 1 if sig in signals else 3
                 sig.plot(start_time=sig.start_sec, width=sig.duration, ax=ax, label=sig.name, lw=lw)
         if return_arr:
             return parse_feats_to_array(features)
-        if plot:
+        if return_fig:
             return features, fig
         return features
 
@@ -524,11 +528,11 @@ class PeriodicSignal(ABC, Signal):
         return self.agg_beat.data
 
     def plot_beats_segmentation(
-        self, valid=True, invalid=True, use_raw=False, color_validity=False, show_beat_lines=True, axes=None
+        self, valid=True, invalid=True, use_raw=False, color_validity=True, show_beat_lines=True, axes=None
     ):
         return_fig = False
         if axes is None:
-            fig, axes = plt.subplots(1, 2, figsize=(24, 4), gridspec_kw={"width_ratios": [8, 2]})
+            fig, axes = plt.subplots(1, 2, figsize=self.fig_params["fig_size"], gridspec_kw={"width_ratios": [8, 2]})
             return_fig = True
         if use_raw:
             self.plot(ax=axes[0], title="beats segmentation")
@@ -542,9 +546,18 @@ class PeriodicSignal(ABC, Signal):
             bounds = [beat.start_sec, beat.end_sec]
             if color_validity:
                 color = "green" if beat.is_valid else "red"
+                label = "valid" if beat.is_valid else "invalid"
             else:
                 color = "green" if color == "red" else "red"
-            axes[0].fill_between(bounds, data.min(), data.max(), alpha=0.15, color=color)
+                label = None
+
+            axes[0].fill_between(
+                bounds, data.min(), data.max(), alpha=self.fig_params["fill_alpha"], color=color, label=label
+            )
+            handles, labels = axes[0].get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            axes[0].legend(by_label.values(), by_label.keys(), fontsize=self.fig_params["legend_size"])
+
             beats_bounds.extend(bounds)
         if show_beat_lines:
             axes[0].vlines(beats_bounds, data.min(), data.max(), lw=1.5, ec="black", ls="--")
@@ -553,8 +566,8 @@ class PeriodicSignal(ABC, Signal):
         # axes[0].set_ylim([self.data.min(), self.data.max()])
         for ax in axes:
             ax.grid(False)
-            ax.set_xlabel("")
-            ax.set_ylabel("")
+            ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
+            ax.set_ylabel(self.units, fontsize=self.fig_params["label_size"])
         plt.tight_layout()
         if return_fig:
             return fig
@@ -570,14 +583,17 @@ class PeriodicSignal(ABC, Signal):
 
         if same_ax:
             if ax is None:
-                fig, ax = plt.subplots(figsize=(10, 5))
+                fig, ax = plt.subplots(figsize=self.agg_beat.fig_params["fig_size"])
             for i, beat in enumerate(beats_to_plot):
                 palette = valid_palette if beat.is_valid else invalid_palette
                 ax.plot(beat.time, beat.data, color=palette[i])
-            ax.plot(self.agg_beat.time, self.agg_beat.data, lw=8, alpha=0.5, c="black", label="Aggregated beat")
-            ax.set_title(f"{n_beats} beats ({n_valid} valid, {n_invalid} invalid)", fontsize=22)
-            ax.set_ylabel("Values", fontsize=18)
-            ax.set_xlabel("Time [s]", fontsize=18)
+            agg_beat = self.agg_beat
+            ax.plot(agg_beat.time, agg_beat.data, lw=8, alpha=0.5, c="black", label="Aggregated beat")
+            ax.set_title(
+                f"{n_beats} beats ({n_valid} valid, {n_invalid} invalid)", fontsize=agg_beat.fig_params["title_size"]
+            )
+            ax.set_ylabel(agg_beat.units, fontsize=agg_beat.fig_params["label_size"])
+            ax.set_xlabel("Time [s]", fontsize=agg_beat.fig_params["label_size"])
         else:
             ncols = 5
             nrows = int(np.ceil(n_beats / ncols))
@@ -585,7 +601,7 @@ class PeriodicSignal(ABC, Signal):
             for beat, ax in zip(beats_to_plot, axes.flatten()):
                 palette = valid_palette if beat.is_valid else invalid_palette
                 ax.plot(beat.time, beat.data, lw=3, c=palette[int(n_beats / 1.5)])
-                ax.set_title(beat.name, fontsize=18)
+                ax.set_title(beat.name, fontsize=beat.fig_params["title_size"])
             plt.tight_layout()
 
     def explore(self, start_time=0, width=None):
@@ -728,16 +744,22 @@ class BeatSignal(ABC, BaseSignal):
             return parse_feats_to_array(features)
         return features
 
-    def plot_crit_points(self, plot_sig=False, ax=None, **kwargs):
+    def plot_crit_points(self, plot_sig=False, ax=None, crit_points="all", **kwargs):
         t = self.time
         t_range = t[-1] - t[0]
         y_range = self.data.max() - self.data.min()
         offset = 0
+        return_fig = False
         if ax is None:
+            return_fig = True
             fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
         if plot_sig:
             self.plot(ax=ax, title="crit points")
+        if crit_points == "all":
+            crit_points = list(self.crit_points.keys())
         for name, loc in self.crit_points.items():
+            if name not in crit_points:
+                continue
             t_loc = t[loc]
             val = self.data[loc] + offset
             ax.scatter(t_loc, val, label=name, s=self.fig_params["marker_size"])
@@ -747,16 +769,18 @@ class BeatSignal(ABC, BaseSignal):
                 fontweight="bold",
                 fontsize=self.fig_params["annot_size"],
             )
-        return fig
+        if return_fig:
+            return fig
 
-    def plot_area_features(self, ax=None):
+    def plot_area_features(self, ax=None, crit_points="all"):
         return_fig = False
         if ax is None:
             fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
             return_fig = True
         palette = sns.color_palette("pastel", len(self.area_features_crit_points))
-        self.plot_crit_points(ax=ax)
-        ax = plt.gca()
+        if crit_points == "all":
+            crit_points = list(self.crit_points.keys())
+        self.plot_crit_points(ax=ax, crit_points=crit_points)
         self.plot(ax=ax, title="area features")
         areas = []
         for i, point in enumerate(self.area_features_crit_points):
@@ -1102,7 +1126,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             all_feature_names.extend(feature_names)
         return np.array(all_feature_names)
 
-    def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, color_validity=False, **kwargs):
+    def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, color_validity=True, **kwargs):
         fig, axes = plt.subplots(
             self.n_signals, 2, figsize=(24, 1.6 * self.n_signals), sharex="col", gridspec_kw={"width_ratios": [9, 2]}
         )

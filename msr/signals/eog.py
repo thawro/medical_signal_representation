@@ -1,3 +1,5 @@
+import neurokit2 as nk
+
 from msr.signals.base import MultiChannelSignal, Signal
 from msr.signals.utils import parse_feats_to_array, parse_nested_feats
 
@@ -5,19 +7,16 @@ from msr.signals.utils import parse_feats_to_array, parse_nested_feats
 class EOGSignal(Signal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
+        self.units = "Voltage [V]"
         self.feature_extraction_funcs.update(
             {
                 # TODO
             }
         )
 
-    # TODO
-    def extract_xyz_features(self, return_arr=False, **kwargs):
-        features = {}
-        # TODO
-        if return_arr:
-            return parse_feats_to_array(features)
-        return features
+    @property
+    def cleaned(self):
+        return nk.eog_clean(self.data, sampling_rate=self.fs)
 
 
 class MultiChannelEOGSignal(MultiChannelSignal):
