@@ -848,10 +848,10 @@ class MultiChannelSignal:
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
-            return np.array(
-                [func(return_arr=True, plot=False) for name, func in self.feature_extraction_funcs.items()]
-            ).T
-            # return self.extract_features(return_arr=True)
+            # return np.array(
+            #     [func(return_arr=True, plot=False) for name, func in self.feature_extraction_funcs.items()]
+            # ).T
+            return self.extract_features(return_arr=True)
         return {name: func(return_arr=False) for name, func in self.feature_extraction_funcs.items()}
 
     def get_windows_waveforms(
@@ -885,7 +885,9 @@ class MultiChannelSignal:
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
-            return np.stack([sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()], axis=-1)
+            return np.concatenate(
+                [sig.get_windows_features(return_arr=True) for _, sig in self.signals.items()], axis=1
+            )
         return {name: sig.get_windows_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_whole_signal_feature_names(self):
@@ -1025,7 +1027,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         """
 
         if return_arr:
-            return np.stack([sig.get_beats_features(return_arr=True) for _, sig in self.signals.items()], axis=-1)
+            return np.concatenate([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()])
         return {name: sig.get_beats_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_beats_waveforms(
@@ -1073,7 +1075,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
-            return np.stack([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()], axis=-1)
+            return np.concatenate([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()])
         return {name: sig.get_agg_beat_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_beats_feature_names(self):

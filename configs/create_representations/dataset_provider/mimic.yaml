@@ -1,12 +1,12 @@
 _target_: msr.data.dataset_providers.MimicDatasetProvider
 representation_types:
   - whole_signal_waveforms
-  - windows_waveforms
-  - beats_waveforms
+  # - windows_waveforms
+  # - beats_waveforms
   - agg_beat_waveforms
   - whole_signal_features
-  - windows_features
-  - beats_features
+  # - windows_features
+  # - beats_features
   - agg_beat_features
 windows_params:
   win_len_s: 20
