@@ -8,20 +8,22 @@ from scipy.interpolate import PchipInterpolator, interp1d
 from msr.utils import EPSILON
 
 SIGNAL_FIG_PARAMS = dict(
-    fig_size=(24, 5),
-    label_size=16,
+    fig_size=(18, 3.5),
+    label_size=20,
     legend_size=14,
-    title_size=20,
-    annot_size=10,
+    title_size=26,
+    annot_size=16,
+    tick_size=16,
     fill_alpha=0.15,
 )
 BEAT_FIG_PARAMS = dict(
-    fig_size=(7, 4),
-    label_size=14,
+    fig_size=(7, 3.5),
+    label_size=20,
     legend_size=14,
-    title_size=16,
-    annot_size=12,
+    title_size=26,
+    annot_size=16,
     marker_size=135,
+    tick_size=16,
     fill_alpha=0.15,
 )
 

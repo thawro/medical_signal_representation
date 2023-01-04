@@ -9,7 +9,7 @@ from msr.signals.base import (
     BeatSignal,
     MultiChannelPeriodicSignal,
     PeriodicSignal,
-    find_intervals_using_hr,
+    find_intervals_using_most_dominant_freq,
 )
 from msr.signals.features import get_basic_signal_features
 from msr.signals.utils import parse_feats_to_array
@@ -71,13 +71,9 @@ class ECGSignal(PeriodicSignal):
                 if not is_peaks_valid(peaks):
                     raise Exception
             except Exception:  # TODO # both methods raise exceptions
-                intervals = find_intervals_using_hr(self)
+                intervals = find_intervals_using_most_dominant_freq(self)
                 peaks = np.array([self.data[start:end].argmax()] + start for start, end in intervals)
         return peaks
-
-    def find_troughs(self):
-        peaks = zip(self.peaks[:-1], self.peaks[1:])
-        return np.array([self.data[prev_peak : next_peak + 1].argmin() + prev_peak for prev_peak, next_peak in peaks])
 
     def _get_beats_intervals(self, align_to_peak=True):
         try:
@@ -111,7 +107,7 @@ class ECGSignal(PeriodicSignal):
             intervals = np.array(intervals)
         except ZeroDivisionError:
             print("Setting intervals using hr")
-            intervals = find_intervals_using_hr(self)
+            intervals = find_intervals_using_most_dominant_freq(self)
         return intervals
 
     def extract_hrv_features(self, return_arr=True, **kwargs):
@@ -158,9 +154,6 @@ class ECGSignal(PeriodicSignal):
         if return_arr:
             return parse_feats_to_array(features)
         return features
-
-    def extract_agg_beat_features(self, return_arr=True, plot=False):
-        return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
 
 
 class ECGBeat(BeatSignal):

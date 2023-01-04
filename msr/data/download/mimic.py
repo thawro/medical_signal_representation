@@ -18,7 +18,8 @@ from tqdm.auto import tqdm
 
 from msr.data.download.utils import cut_segments_into_samples, validate_signal
 from msr.data.utils import create_train_val_test_split_info
-from msr.signals.ecg import ECGSignal, check_ecg_polarity, find_intervals_using_hr
+from msr.signals.base import find_intervals_using_most_dominant_freq
+from msr.signals.ecg import ECGSignal, check_ecg_polarity
 from msr.signals.utils import resample
 from msr.utils import DATA_PATH, append_txt_to_file, find_true_intervals, load_tensor
 
@@ -520,7 +521,7 @@ def find_sbp_and_dbp_idxs_with_rpeaks(
     rpeaks = nk.ecg_peaks(cleaned, sampling_rate=ecg_fs, correct_artifacts=True)[1]["ECG_R_Peaks"]
     if len(rpeaks) == 0:
         ecg_sig = ECGSignal("ecg", ecg, ecg_fs)
-        intervals = np.array(find_intervals_using_hr(ecg_sig))
+        intervals = np.array(find_intervals_using_most_dominant_freq(ecg_sig))
     else:
         beats_n_samples = np.diff(rpeaks)
         min_n_samples = min(beats_n_samples)

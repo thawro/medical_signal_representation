@@ -7,7 +7,11 @@ import seaborn as sns
 from scipy import integrate
 from scipy.signal import butter, filtfilt
 
-from msr.signals.base import BeatSignal, PeriodicSignal, find_intervals_using_hr
+from msr.signals.base import (
+    BeatSignal,
+    PeriodicSignal,
+    find_intervals_using_most_dominant_freq,
+)
 from msr.signals.utils import moving_average, parse_feats_to_array
 from msr.utils import lazy_property
 
@@ -68,10 +72,6 @@ class PPGSignal(PeriodicSignal):
     def BeatClass(self):
         return PPGBeat
 
-    def find_troughs(self):
-        peaks = zip(self.peaks[:-1], self.peaks[1:])
-        return np.array([self.data[prev_peak:next_peak].argmin() + prev_peak for prev_peak, next_peak in peaks])
-
     def find_peaks(self):
         peaks = find_systolic_peaks_ELGENDI(self.data, self.fs)
         # peaks = self.nk_info['PPG_Peaks'].values
@@ -81,7 +81,7 @@ class PPGSignal(PeriodicSignal):
         try:
             intervals = np.vstack((self.troughs[:-1], self.troughs[1:])).T
         except Exception:
-            intervals = find_intervals_using_hr(self)
+            intervals = find_intervals_using_most_dominant_freq(self)
         return intervals
 
     def extract_hrv_features(self, return_arr=False, plot=False):
@@ -105,9 +105,6 @@ class PPGSignal(PeriodicSignal):
         if return_arr:
             return parse_feats_to_array(features)
         return features
-
-    def extract_agg_beat_features(self, return_arr=True, plot=False):
-        return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
 
     def explore(self, start_time=0, width=None):
         figs = super().explore(start_time, width)
@@ -183,7 +180,7 @@ class PPGBeat(BeatSignal):
                 return_fig = True
                 fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
             # ax.plot(self.time, self.data, "-", lw=3)
-            self.plot(ax=ax, title="pulse width features", label="")
+            self.plot(ax=ax, title="pulse width features", label=None)
             for height in height_pcts:
                 label = f"pw at {height}%"
                 start, end = times[height]
@@ -209,7 +206,7 @@ class PPGBeat(BeatSignal):
             if ax is None:
                 return_fig = True
                 fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
-            self.plot(ax=ax, title="pulse height features", label="")
+            self.plot(ax=ax, title="pulse height features", label=None)
             for i, (width_loc, height_bounds) in enumerate(height_vals.items()):
                 label = f"ph at {width_pcts[i]}%"
                 lower, upper = height_bounds

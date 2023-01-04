@@ -257,23 +257,23 @@
 
 * Features:
     * Common:
-        * [HRV](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5624990/)
+        * X[HRV](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5624990/)
     * PPG:
-        * [pulse width/height features](https://ieeexplore.ieee.org/document/9558767)
+        * X[pulse width/height features](https://ieeexplore.ieee.org/document/9558767)
         * [Wavelet entropy](https://www.scirp.org/journal/paperinformation.aspx?paperid=112523)
-        * [wavelet features](https://ieeexplore.ieee.org/document/6100581)
-        * [HR features](https://www.researchgate.net/publication/319217053_Essential_Feature_Extraction_of_Photoplethysmography_Signal_of_Men_and_Women_in_Their_20s)
+        * X[wavelet features](https://ieeexplore.ieee.org/document/6100581)
+        * X[HR features](https://www.researchgate.net/publication/319217053_Essential_Feature_Extraction_of_Photoplethysmography_Signal_of_Men_and_Women_in_Their_20s)
     * ECG
-        * [ECGBeat features](https://www.sciencedirect.com/science/article/pii/S0169260715003314)
-        * [Wavelet features](https://www.frontiersin.org/articles/10.3389/fncom.2017.00103/full)
+        * X[ECGBeat features](https://www.sciencedirect.com/science/article/pii/S0169260715003314)
+        * X[Wavelet features](https://www.frontiersin.org/articles/10.3389/fncom.2017.00103/full)
     * EEG
-        * [Wavelet features](https://downloads.hindawi.com/archive/2014/730218.pdf)
-        * [Wavelet features](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6721346/)
+        * X[Wavelet features](https://downloads.hindawi.com/archive/2014/730218.pdf)
+        * X[Wavelet features](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6721346/)
         * [Complicated features](https://www.sciencedirect.com/science/article/pii/S1110016821007055)
         * [All features](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8198610/pdf/sensors-21-03786.pdf)
     * EOG
-        * [Statistic features](https://www.hindawi.com/journals/cmmm/2014/713818/)
-        * [Statistic features](https://www.researchgate.net/publication/257724368_Evaluating_Feature_Extraction_Methods_of_Electrooculography_EOG_Signal_for_Human-Computer_Interface)
+        * X[Statistic features](https://www.hindawi.com/journals/cmmm/2014/713818/)
+        * X[Statistic features](https://www.researchgate.net/publication/257724368_Evaluating_Feature_Extraction_Methods_of_Electrooculography_EOG_Signal_for_Human-Computer_Interface)
         * [Statistic features](https://www.rsisinternational.org/journals/ijrsi/digital-library/volume-5-issue-4/287-290.pdf)
 
 * Models
