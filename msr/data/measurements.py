@@ -1,14 +1,14 @@
 import numpy as np
 
 from msr.signals.base import MultiChannelPeriodicSignal, MultiChannelSignal
-from msr.signals.ecg import ECGSignal, MultiChannelECGSignal
+from msr.signals.ecg import ECGSignal
 from msr.signals.eeg import EEGSignal
 from msr.signals.eog import EOGSignal
 from msr.signals.ppg import PPGSignal
 from msr.signals.utils import parse_feats_to_array
 
 
-class PtbXLMeasurement(MultiChannelECGSignal):
+class PtbXLMeasurement(MultiChannelPeriodicSignal):
     def __init__(self, *ecg_leads: np.ndarray, fs: float = 100):
         signals = {f"ecg_{i+1}": ECGSignal(f"ecg_{i+1}", ecg_lead, fs) for i, ecg_lead in enumerate(ecg_leads)}
         super().__init__(signals)

@@ -983,14 +983,26 @@ class MultiChannelSignal:
         title="",
     ):
         kwargs = dict_of(start_time, width, scatter, line, first_der, label, use_samples, title)
+        return_fig = False
+        w, h = SIGNAL_FIG_PARAMS["fig_size"]
         if axes is None:
-            fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1.6 * self.n_signals), sharex=True)
+            return_fig = True
+            fig, axes = plt.subplots(
+                self.n_signals, 1, figsize=(w, 1.6 * self.n_signals + 1 / self.n_signals), sharex=True
+            )
         for ax, (sig_name, sig) in zip(axes, self.signals.items()):
             sig.plot(ax=ax, **kwargs)
-            ax.set(xlabel="", ylabel="", title=sig_name)
-            ax.grid(False)
-            ax.get_legend().remove()
-        return fig
+            ax.set_xlabel("")
+            ax.set_ylabel("")
+            ax.set_title(sig_name, fontsize=sig.fig_params["title_size"])
+            ax.tick_params(axis="both", which="major", labelsize=sig.fig_params["tick_size"])
+            # ax.grid(False)
+            # ax.get_legend().remove()
+        axes[-1].set_xlabel("Time [s]", fontsize=sig.fig_params["label_size"])
+
+        plt.tight_layout()
+        if return_fig:
+            return fig
 
 
 class MultiChannelPeriodicSignal(MultiChannelSignal):
@@ -1163,14 +1175,29 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         return np.array(all_feature_names)
 
     def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, color_validity=True, **kwargs):
-        fig, axes = plt.subplots(
-            self.n_signals, 2, figsize=(24, 1.6 * self.n_signals), sharex="col", gridspec_kw={"width_ratios": [9, 2]}
+        w, h = SIGNAL_FIG_PARAMS["fig_size"]
+        fig, all_axes = plt.subplots(
+            self.n_signals,
+            2,
+            figsize=(w, 1.6 * self.n_signals + 1 / self.n_signals),
+            sharex="col",
+            gridspec_kw={"width_ratios": [8, 2]},
         )
-        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
+        for axes, (sig_name, sig) in zip(all_axes, self.signals.items()):
             sig.plot_beats_segmentation(
-                valid=valid, invalid=invalid, use_raw=use_raw, color_validity=color_validity, axes=ax
+                valid=valid, invalid=invalid, use_raw=use_raw, color_validity=color_validity, axes=axes
             )
-            sig.agg_beat.plot_crit_points(ax=ax[1])
-            ax[0].set_title(sig_name)
-            ax[1].set_title("")
+            for ax in axes:
+                ax.set_xlabel("")
+                ax.set_ylabel("")
+                ax.tick_params(axis="both", which="major", labelsize=sig.fig_params["tick_size"])
+            axes[0].set_title(sig_name, fontsize=sig.fig_params["title_size"])
+            axes[0].get_legend().remove()
+            # ax.grid(False)
+            # ax.get_legend().remove()
+        for ax in all_axes[-1]:
+            ax.set_xlabel("Time [s]", fontsize=sig.fig_params["label_size"])
+
+        plt.tight_layout()
+
         return fig

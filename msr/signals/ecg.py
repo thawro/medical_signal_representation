@@ -321,19 +321,3 @@ class ECGBeat(BeatSignal):
             {"name": "QRS_interval", "start": self.q_loc, "end": self.s_loc},
             {"name": "QT_interval", "start": self.q_loc, "end": self.t_offset_loc},
         ]
-
-
-class MultiChannelECGSignal(MultiChannelPeriodicSignal):
-    def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, color_validity=False, **kwargs):
-        fig, axes = plt.subplots(
-            self.n_signals, 2, figsize=(24, 1.6 * self.n_signals), sharex="col", gridspec_kw={"width_ratios": [9, 2]}
-        )
-        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
-            sig.plot_beats_segmentation(
-                valid=valid, invalid=invalid, use_raw=use_raw, color_validity=color_validity, axes=ax
-            )
-            sig.agg_beat.plot_crit_points(points=["p", "q", "r", "s", "t"], ax=ax[1])
-            ax[0].set_title(sig_name)
-            ax[1].set_title("")
-        plt.tight_layout()
-        return fig

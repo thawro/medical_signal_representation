@@ -3,6 +3,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Callable, List, Literal, Tuple
 
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import torch
 from torch.utils.data import Dataset
@@ -12,6 +13,7 @@ from msr.data.dataset_providers import (
     PtbXLDatasetProvider,
     SleepEDFDatasetProvider,
 )
+from msr.signals.utils import BEAT_FIG_PARAMS
 from msr.utils import align_left
 
 sns.set(style="whitegrid")
@@ -30,6 +32,7 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         self.data = torch.nan_to_num(self.data)  # TODO
         self.targets = dataset["targets"]
         self.info = dataset["info"]
+        self.target_name = "Target"
         if "feature_names" in dataset:
             self.feature_names = dataset["feature_names"]
             if len(self.feature_names.shape) > 1:
@@ -106,12 +109,26 @@ class ClassificationDataset(BaseDataset):
         order = list(self.classes_counts.keys())
         palette = [color[1] for color in sorted(self.classes_colors.items(), key=lambda pair: order.index(pair[0]))]
         sns.countplot(x=self.classes, ax=ax, order=order, palette=palette)
+        ax.set_xlabel(self.target_name, fontsize=BEAT_FIG_PARAMS["label_size"])
+        ax.set_ylabel(ax.get_ylabel(), fontsize=BEAT_FIG_PARAMS["label_size"])
         ax.tick_params(axis="x", labelrotation=75)
+        ax.tick_params(axis="both", labelsize=BEAT_FIG_PARAMS["tick_size"])
+        ax.set_title(f"{self.split} ({len(self)})", fontsize=BEAT_FIG_PARAMS["title_size"])
 
 
 class RegressionDataset(BaseDataset):
+    def __init__(self, split: Literal["train", "val", "test"], representation_type: str, transform: Callable = None):
+        super().__init__(split, representation_type, transform)
+        self.targets_df = None
+
     def plot_targets(self, ax=None):
-        sns.histplot(self.targets, ax=ax)
+        targets = self.targets_df if self.targets_df is not None else self.targets
+        sns.histplot(targets, ax=ax, element="step")
+        ax.set_xlabel(self.target_name, fontsize=BEAT_FIG_PARAMS["label_size"])
+        ax.set_ylabel(ax.get_ylabel(), fontsize=BEAT_FIG_PARAMS["label_size"])
+        ax.tick_params(axis="x", labelrotation=75)
+        ax.tick_params(axis="both", labelsize=BEAT_FIG_PARAMS["tick_size"])
+        ax.set_title(f"{self.split} ({len(self)})", fontsize=BEAT_FIG_PARAMS["title_size"])
 
 
 class PtbXLDataset(ClassificationDataset):
@@ -125,9 +142,11 @@ class PtbXLDataset(ClassificationDataset):
         target: Literal["diagnostic_class", "diagnostic_subclass"],
         transform: Callable = None,
     ):
+
         self.fs = fs
         self.target = target
         super().__init__(split, representation_type, transform)
+        self.target_name = "Diagnostic statement"
 
     @property
     def _dataset_loader(self) -> Callable:
@@ -147,13 +166,16 @@ class MimicDataset(RegressionDataset):
         transform: Callable = None,
     ):
         self.target = target
+
         self.bp_targets = bp_targets
         super().__init__(split, representation_type, transform)
+        self.target_name = "Blood pressure"
         bp_targets_idxs = {"sbp": 0, "dbp": 1}
         bp_targets_idxs = [bp_targets_idxs[target] for target in bp_targets]
         if len(bp_targets) == 1:
             bp_targets_idxs = bp_targets_idxs[0]
         self.targets = self.targets[:, bp_targets_idxs].float()
+        self.targets_df = pd.DataFrame({k: self.targets[:, i] for i, k in enumerate(self.bp_targets)})
 
     @property
     def _dataset_loader(self) -> Callable:
@@ -163,6 +185,10 @@ class MimicDataset(RegressionDataset):
 
 class SleepEDFDataset(ClassificationDataset):
     """Dataset class used for Mimic representations"""
+
+    def __init__(self, split: Literal["train", "val", "test"], representation_type: str, transform: Callable = None):
+        super().__init__(split, representation_type, transform)
+        self.target_name = "Sleep stage"
 
     @property
     def _dataset_loader(self) -> Callable:

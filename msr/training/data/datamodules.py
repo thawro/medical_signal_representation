@@ -123,13 +123,19 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
             y = getattr(self, split).targets
             return X, y
 
-    def plot_targets(self):
+    def plot_targets(self, axes=None):
         ncols = len(self.datasets)
-        fig, axes = plt.subplots(1, ncols, figsize=(ncols * 5, 3.5))
+        return_fig = False
+        if axes is None:
+            return_fig = True
+            fig, axes = plt.subplots(1, ncols, figsize=(ncols * 5, 5))
         for dataset, ax in zip(self.datasets, axes):
             dataset.plot_targets(ax=ax)
-            ax.set_title(dataset.split)
+        axes[1].set_ylabel("")
+        axes[2].set_ylabel("")
         plt.tight_layout()
+        if return_fig:
+            return fig
 
     def train_dataloader(self):
         return DataLoader(
