@@ -200,13 +200,13 @@ def validate_recording(
     """
     # 4.1.1 Filter out measurements with not enough samples (MIN_SIGNAL_LEN_SEC * FS)
     # 4.1.2 Check each signal of the signals (ABP, PPG, ECG) and filter out measurements which dont meet any of the conditions:
-    # 4.1.2.1 ABP values between 0 and 300 and maximum number of repeated samples is less than MAX_N_SAME
+    # 4.1.2.1 ABP values between 40 and 260 and maximum number of repeated samples is less than MAX_N_SAME
     # 4.1.2.2 ECG maximum number of repeated samples is less than MAX_N_SAME
     # 4.1.2.3 PPG maximum number of repeated samples is less than MAX_N_SAME
     valid_sig_len = len(abp) >= sample_len_samples
 
     if valid_sig_len or plot:
-        abp_is_good = validate_signal(abp, low=0, high=300, max_n_same=max_n_same)
+        abp_is_good = validate_signal(abp, low=40, high=260, max_n_same=max_n_same)
         ppg_is_good = validate_signal(ppg, low=None, high=None, max_n_same=max_n_same)
         ecg_is_good = validate_signal(ecg, low=None, high=None, max_n_same=max_n_same)
         is_good = abp_is_good & ppg_is_good & ecg_is_good

@@ -175,7 +175,10 @@ class MimicDataset(RegressionDataset):
         if len(bp_targets) == 1:
             bp_targets_idxs = bp_targets_idxs[0]
         self.targets = self.targets[:, bp_targets_idxs].float()
-        self.targets_df = pd.DataFrame({k: self.targets[:, i] for i, k in enumerate(self.bp_targets)})
+        if len(self.bp_targets) > 1:
+            self.targets_df = pd.DataFrame({k: self.targets[:, i] for i, k in enumerate(self.bp_targets)})
+        else:
+            self.targets_df = pd.DataFrame({self.bp_targets[0]: self.targets})
 
     @property
     def _dataset_loader(self) -> Callable:

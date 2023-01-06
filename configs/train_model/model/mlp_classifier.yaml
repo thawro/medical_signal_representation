@@ -4,11 +4,8 @@ net:
   _partial_: true
   # num_classes
   # input_size
-  hidden_dims:
-    - 128
-    - 256
-    - 512
+  hidden_dims: [128, 256, 512, 256, 128]
   weight_norm: false
   batch_norm: true
-  dropout: 0
+  dropout: 0.2
   activation: ReLU
