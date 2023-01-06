@@ -70,10 +70,11 @@ class BaseSignal:
     def __init__(self, name: str, data: NDArray[Shape["N"], Float], fs: float, start_sec: float = 0):
         self.name = name
         self.data = data
-        self.min = self.data.min()
-        self.max = self.data.max()
-        self.range = self.max - self.min
         self.fs = fs
+        self.min = self.cleaned.min()
+        self.max = self.cleaned.max()
+        self.range = self.max - self.min
+
         self.units = "Values [a.u.]"
         self.start_sec = start_sec
         self.n_samples = len(data)
@@ -90,11 +91,11 @@ class BaseSignal:
         return np.copy(self.data)
 
     def find_peaks(self):
-        return find_peaks(self.data)[0]
+        return find_peaks(self.cleaned)[0]
 
     def find_troughs(self):
         peaks = zip(self.peaks[:-1], self.peaks[1:])
-        return np.array([self.data[prev_peak:next_peak].argmin() + prev_peak for prev_peak, next_peak in peaks])
+        return np.array([self.cleaned[prev_peak:next_peak].argmin() + prev_peak for prev_peak, next_peak in peaks])
 
     @lazy_property
     def troughs(self):
@@ -204,7 +205,7 @@ class BaseSignal:
         return res
 
     def fft(self, plot=False, ax=None) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
-        amps = rfft(self.data)
+        amps = rfft(self.cleaned)
         freqs = rfftfreq(self.n_samples, 1 / self.fs)
         if plot:
             if ax is None:
@@ -215,7 +216,7 @@ class BaseSignal:
     def psd(
         self, fmin=0, fmax=10, plot=False, ax=None, normalize=True
     ) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
-        freqs, pxx = welch(self.data, self.fs)
+        freqs, pxx = welch(self.cleaned, self.fs)
         mask = (freqs >= fmin) & (freqs <= fmax)
         freqs, pxx = freqs[mask], pxx[mask]
         if normalize:
@@ -239,7 +240,7 @@ class BaseSignal:
     ) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
         if ax is None:
             fig, ax = plt.subplots(figsize=(20, 8))
-        spectrum, freqs, t, img = ax.specgram(self.data, Fs=self.fs, NFFT=NFFT, noverlap=noverlap, cmap="viridis")
+        spectrum, freqs, t, img = ax.specgram(self.cleaned, Fs=self.fs, NFFT=NFFT, noverlap=noverlap, cmap="viridis")
         cbar = plt.gcf().colorbar(img, ax=ax)
         cbar.ax.set_title("Intensity", fontsize=self.fig_params["title_size"])
         ax.set_ylabel("Frequency [Hz]", fontsize=self.fig_params["label_size"])
@@ -248,10 +249,10 @@ class BaseSignal:
         return spectrum, freqs, t
 
     def get_whole_signal_waveform(self) -> NDArray[Shape["N"], Float]:
-        return self.data
+        return self.cleaned
 
     def extract_basic_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = get_basic_signal_features(self.data)
+        features = get_basic_signal_features(self.cleaned)
         if return_arr:
             return np.array(list(features.values()))
         return features
@@ -285,18 +286,18 @@ class BaseSignal:
         if width == -1:
             width = self.time[-1] - start_time
         end_time = start_time + width
-
-        if end_time - start_time >= self.duration:
-            signal_slice = self
-        else:
-            signal_slice = self.get_slice(start_time, end_time)
+        signal_slice = self.get_slice(start_time, end_time)
         if label is not None:
             label = signal_slice.name if label == "" else label
-        x = np.arange(signal_slice.n_samples) if use_samples else signal_slice.time
-        x = x + start_time
+        if use_samples:
+            x = np.arange(signal_slice.n_samples) + int(start_time * self.fs)
+        else:
+            x = signal_slice.time + start_time + signal_slice.start_sec
         y = signal_slice.data if use_raw else signal_slice.cleaned
         plot_kwgs = dict(lw=lw, label=label)
-        sig_plot = ax.scatter(x, y, **plot_kwgs) if scatter else ax.plot(x, y, **plot_kwgs)
+        sig_plot = (
+            ax.scatter(x, y, **plot_kwgs, s=self.fig_params["marker_size"]) if scatter else ax.plot(x, y, **plot_kwgs)
+        )
         plots = [sig_plot]
         if first_der:
             ax2 = ax.twinx()
@@ -318,6 +319,11 @@ class BaseSignal:
         if title is not None:
             ax.set_title(f"{self.name} {title}", fontsize=self.fig_params["title_size"])
         ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])
+        # step = int(2 * self.fs) if use_samples else 2
+        # if step > x[-1] - x[0]:
+        #     step = (x[-1] - x[0]) / 3
+
+        # ax.set_xticks((np.arange(x[0], x[-1] + step / 2, step)).round(2))
         if return_fig:
             return fig
 
@@ -398,7 +404,7 @@ class Signal(BaseSignal):
 
     def get_CWT(self, wavelet="morl", freq_dim_scale=256, fmin=None, fmax=None, plot=False):
         """Contiunous wavelet transform"""
-        freqs, cwt_matrix = get_cwt_img(data=self.data, fs=self.fs, freq_dim_scale=freq_dim_scale, wavelet=wavelet)
+        freqs, cwt_matrix = get_cwt_img(data=self.cleaned, fs=self.fs, freq_dim_scale=freq_dim_scale, wavelet=wavelet)
         fmin = fmin or min(freqs)
         fmax = fmax or max(freqs)
         mask = (freqs >= fmin) & (freqs <= fmax)
@@ -455,7 +461,13 @@ class PeriodicSignal(ABC, Signal):
         return most_dominant_freq
 
     def extract_agg_beat_features(self, return_arr=False, plot=False):
-        return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
+        try:
+            return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
+        except AttributeError:
+            if return_arr:
+                return np.array([])
+            else:
+                return {}
 
     @abstractmethod
     def _get_beats_intervals(self, **kwargs):
@@ -562,6 +574,36 @@ class PeriodicSignal(ABC, Signal):
         if return_fig:
             return fig
 
+    def plot_segmentation(self, mode="windows", use_raw=False, show_lines=True, use_samples=False):
+        w, h = self.fig_params["fig_size"]
+        fig = plt.figure(figsize=(w, h * 2), layout="constrained")
+        signals = self.windows if mode == "windows" else self.beats
+        spec = fig.add_gridspec(2, len(signals))
+        ax0 = fig.add_subplot(spec[0, :])
+        # fig, ax = plt.subplots(1, 1, figsize=self.fig_params["fig_size"])
+        self.plot(0, -1, ax=ax0, use_raw=use_raw, title=None, label=None, use_samples=use_samples)
+        axes = []
+        for j in range(len(signals)):
+            axes.append(fig.add_subplot(spec[1, j], sharey=axes[-1] if j != 0 else None))
+        axes = np.array(axes)
+        data = self.data if use_raw else self.cleaned
+        min_v, max_v = data.min(), data.max()
+        signals_bounds = []
+        color = "green"
+        for i, (ax, signal) in enumerate(zip(axes, signals)):
+            bounds = [signal.start_sec, signal.end_sec]
+            ax0.fill_between(bounds, min_v, max_v, alpha=self.fig_params["fill_alpha"], color=color)
+            signals_bounds.extend(bounds)
+            color = "green" if color == "red" else "red"
+            signal.plot(0, -1, ax=ax, use_raw=use_raw, label=None, title=None, use_samples=use_samples)
+            if i != 0:
+                ax.set_ylabel("")
+                plt.setp(ax.get_yticklabels(), visible=False)
+        if show_lines:
+            ax0.vlines(signals_bounds, min_v, max_v, lw=1.5, alpha=0.6, ec="black", ls="--")
+        ax0.set_xlim([self.time[0], self.time[-1]])
+        return fig
+
     def plot_beats_segmentation(
         self, valid=True, invalid=True, use_raw=False, color_validity=True, show_beat_lines=True, axes=None
     ):
@@ -598,7 +640,6 @@ class PeriodicSignal(ABC, Signal):
             axes[0].vlines(beats_bounds, data.min(), data.max(), lw=1.5, alpha=0.6, ec="black", ls="--")
         self.plot_beats(valid=valid, invalid=invalid, ax=axes[1])
         axes[0].set_xlim([self.time.min(), self.time.max()])
-        # axes[0].set_ylim([self.data.min(), self.data.max()])
         axes[0].grid(False)
         for ax in axes:
             ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
@@ -720,7 +761,7 @@ class BeatSignal(ABC, BaseSignal):
         for name, loc in self.crit_points.items():
             features[f"{name}_loc"] = loc
             features[f"{name}_time"] = self.time[loc]
-            features[f"{name}_val"] = self.data[loc]
+            features[f"{name}_val"] = self.cleaned[loc]
         if plot:
             fig = self.plot_crit_points(plot_sig=True, ax=ax)
         if return_arr:
@@ -731,7 +772,7 @@ class BeatSignal(ABC, BaseSignal):
 
     def extract_energy_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = {
-            point["name"]: calculate_energy(self.data, point["start"], point["end"])
+            point["name"]: calculate_energy(self.cleaned, point["start"], point["end"])
             for point in self.energy_features_crit_points
         }
         if return_arr:
@@ -742,7 +783,7 @@ class BeatSignal(ABC, BaseSignal):
         self, return_arr=True, method="trapz", plot=False, **kwargs
     ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = {
-            point["name"]: calculate_area(self.data, self.fs, point["start"], point["end"], method=method)
+            point["name"]: calculate_area(self.cleaned, self.fs, point["start"], point["end"], method=method)
             for point in self.area_features_crit_points
         }
         if plot:
@@ -757,7 +798,7 @@ class BeatSignal(ABC, BaseSignal):
         self, return_arr=True, plot=False, ax=None
     ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = {
-            point["name"]: calculate_slope(self.time, self.data, point["start"], point["end"])
+            point["name"]: calculate_slope(self.time, self.cleaned, point["start"], point["end"])
             for point in self.slope_features_crit_points
         }
         if return_arr:
@@ -773,7 +814,7 @@ class BeatSignal(ABC, BaseSignal):
         }
 
         val_diff_features = {
-            f"{point['name']}_val_diff": self.data[point["end"]] - self.data[point["start"]]
+            f"{point['name']}_val_diff": self.cleaned[point["end"]] - self.cleaned[point["start"]]
             for point in self.intervals_features_crit_points
         }
         features = {**time_features, **val_diff_features}
@@ -784,7 +825,6 @@ class BeatSignal(ABC, BaseSignal):
     def plot_crit_points(self, plot_sig=False, ax=None, crit_points="all", **kwargs):
         t = self.time
         t_range = t[-1] - t[0]
-        y_range = self.data.max() - self.data.min()
         offset = 0
         return_fig = False
         if ax is None:
@@ -798,11 +838,11 @@ class BeatSignal(ABC, BaseSignal):
             if name not in crit_points:
                 continue
             t_loc = t[loc]
-            val = self.data[loc] + offset
+            val = self.cleaned[loc] + offset
             ax.scatter(t_loc, val, label=name, s=self.fig_params["marker_size"])
             ax.annotate(
                 name.upper(),
-                (t_loc + 0.012 * t_range, val + 0.012 * y_range),
+                (t_loc + 0.012 * t_range, val + 0.012 * self.range),
                 fontweight="bold",
                 fontsize=self.fig_params["annot_size"],
             )
@@ -821,11 +861,11 @@ class BeatSignal(ABC, BaseSignal):
         self.plot(ax=ax, title="area features", label=None)
         areas = []
         for i, point in enumerate(self.area_features_crit_points):
-            offset = min([self.data[point["start"]], self.data[point["end"]]])
+            offset = min([self.cleaned[point["start"]], self.cleaned[point["end"]]])
             mask = (np.arange(self.n_samples) >= point["start"]) & (np.arange(self.n_samples) <= point["end"])
             a = ax.fill_between(
                 self.time[mask],
-                self.data[mask],
+                self.cleaned[mask],
                 offset,
                 alpha=0.4,
                 color=palette[i],

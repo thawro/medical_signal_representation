@@ -19,9 +19,9 @@ class EEGSignal(Signal):
             }
         )
 
-    def extract_frequency_features(self, return_arr=False, fmin=0.5, fmax=30, plot=False, ax=None, **kwargs):
+    def extract_frequency_features(self, return_arr=True, fmin=0.5, fmax=30, plot=False, ax=None, **kwargs):
         return_fig = False
-        if ax is None:
+        if plot and ax is None:
             fig, ax = plt.subplots(figsize=BEAT_FIG_PARAMS["fig_size"])
             return_fig = True
         freqs, pxx = self.psd(fmin, fmax, normalize=True, plot=plot, ax=ax)

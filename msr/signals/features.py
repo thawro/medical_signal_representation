@@ -102,7 +102,7 @@ def get_dwt_coeffs(data, fs, wavelet="db5", level=None):
     return approximates, details
 
 
-def plot_dwt(data, approximates, details, units="Value [a.u.]"):
+def plot_dwt(data, approximates, details):
     level = len(details)
     w, h = SIGNAL_FIG_PARAMS["fig_size"]
     h = int(0.7 * h * len(details))
@@ -133,7 +133,6 @@ def plot_dwt(data, approximates, details, units="Value [a.u.]"):
     for ax in all_axes.flatten():
         ax.tick_params(axis="both", which="major", labelsize=SIGNAL_FIG_PARAMS["tick_size"])
         ax.set_xlabel("Sample [-]", fontsize=SIGNAL_FIG_PARAMS["label_size"])
-        # ax.set_ylabel(units, fontsize=SIGNAL_FIG_PARAMS['label_size'])
 
     return fig
 
@@ -142,7 +141,7 @@ def extract_dwt_features(signal, wavelet="db5", level=None, plot=False):
     data, fs = signal.cleaned, signal.fs
     approximates, details = get_dwt_coeffs(data, fs, wavelet, level)
     if plot:
-        fig = plot_dwt(data, approximates, details, units=signal.units)
+        fig = plot_dwt(data, approximates, details)
     last_approx = approximates[-1]
     features = {}
     energies = []

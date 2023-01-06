@@ -14,6 +14,7 @@ SIGNAL_FIG_PARAMS = dict(
     title_size=26,
     annot_size=16,
     tick_size=16,
+    marker_size=2,
     fill_alpha=0.15,
 )
 BEAT_FIG_PARAMS = dict(

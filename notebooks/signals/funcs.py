@@ -145,6 +145,26 @@ def plot_ppg_beat_features(signal, crit_points=["systolic_peak"], axes=None):
         return fig
 
 
+def plot_zoomed_samples(signal):
+    fig, axes = plt.subplots(1, 2, figsize=signal.fig_params["fig_size"], gridspec_kw={"width_ratios": [2, 2]})
+    sig = signal.get_slice(0, 10)
+    s, w = 3, 0.8
+    e = s + w
+    s, e = int(s * sig.fs), int(e * sig.fs)
+
+    sig.plot(0, 10, scatter=True, line=False, use_samples=True, ax=axes[0], label=None, title=None, lw=2.5)
+    sig.plot(3, 1, scatter=True, line=False, use_samples=True, ax=axes[1], label=None, title=None, lw=2.5)
+
+    axes[0].fill_between(
+        [s, e], sig.min, sig.max, alpha=sig.fig_params["fill_alpha"], color="green", label="Zoomed segment"
+    )
+    axes[1].set_ylabel("")
+    axes[0].legend()
+    plt.tight_layout()
+    plt.close()
+    return fig
+
+
 def get_figs_for_thesis_periodic(signal, prefix="ecg_"):
     signal.set_beats()
     signal.set_agg_beat()
