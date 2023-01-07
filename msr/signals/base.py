@@ -500,8 +500,9 @@ class PeriodicSignal(ABC, Signal):
                 peak_diff = start + data[start:end].argmax() - peak_loc
                 intervals[i][0] = max(0, start + peak_diff)
                 intervals[i][1] = min(self.n_samples, end + peak_diff)
+        min_beat_n_samples = int(60 / (MAX_HR + 30) * self.fs)
         intervals = np.array(
-            [(start, end) for start, end in intervals if (end - start) > 1]
+            [(start, end) for start, end in intervals if (end - start) > min_beat_n_samples]
         )  # TODO Check if works fine
         beats = []
         for i, (start, end) in enumerate(intervals):

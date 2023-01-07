@@ -2,6 +2,7 @@ from typing import List, Type, Union
 
 import numpy as np
 
+from msr.data.namespace import get_setters_mask
 from msr.signals.base import MultiChannelPeriodicSignal, MultiChannelSignal
 
 
@@ -56,6 +57,7 @@ class PeriodicRepresentationExtractor(RepresentationExtractor):
 
 def create_representation_extractor(
     multichannel_signal: Type[Union[MultiChannelPeriodicSignal, MultiChannelSignal]],
+    representation_types: List[str],
     windows_params: dict,
     beats_params: dict = {},
     agg_beat_params: dict = {},
@@ -63,10 +65,11 @@ def create_representation_extractor(
     is_periodic = isinstance(multichannel_signal, MultiChannelPeriodicSignal)
     RepExtractorClass = PeriodicRepresentationExtractor if is_periodic else RepresentationExtractor
     rep_extractor = RepExtractorClass(multichannel_signal)
-    if windows_params:
+    set_beats, set_windows, set_agg_beat = get_setters_mask(representation_types)
+    if windows_params and set_windows:
         rep_extractor.set_windows(**windows_params)
-    if beats_params and is_periodic:
+    if beats_params and is_periodic and set_beats:
         rep_extractor.set_beats(**beats_params)
-        if agg_beat_params:
+        if agg_beat_params and set_agg_beat:
             rep_extractor.set_agg_beat(**agg_beat_params)
     return rep_extractor

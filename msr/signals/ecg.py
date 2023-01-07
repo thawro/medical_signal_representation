@@ -36,9 +36,7 @@ def check_ecg_polarity(data):
 
 class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
-        # polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
-        polarity = 1
-        # print(polarity)
+        polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
         self.units = "Voltage [V]"
         # self.nk_signals_df, self.nk_info = nk.ecg_process(self.data, sampling_rate=self.fs)

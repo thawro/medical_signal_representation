@@ -16,7 +16,6 @@ from msr.data.measurements import (
     PtbXLMeasurement,
     SleepEDFMeasurement,
 )
-from msr.data.namespace import get_setters_mask
 from msr.signals.representation_extractor import create_representation_extractor
 
 log = logging.getLogger(__name__)
@@ -47,8 +46,9 @@ class DatasetProvider:
 
     def get_representations(self, data, return_feature_names: bool = False, **kwargs):
         measurement = self.MeasurementFactory(*data, fs=self.fs)
-        set_beats, set_windows, set_agg_beat = get_setters_mask(self.representation_types)
-        rep_extractor = create_representation_extractor(measurement, **self.representation_extractor_params)
+        rep_extractor = create_representation_extractor(
+            measurement, representation_types=self.representation_types, **self.representation_extractor_params
+        )
         representations = rep_extractor.get_representations(representation_types=self.representation_types, **kwargs)
         if return_feature_names:
             feature_representation_types = [

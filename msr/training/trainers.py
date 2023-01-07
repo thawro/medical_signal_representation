@@ -36,7 +36,7 @@ class BaseTask:
 
 class Classifier:
     def get_metrics(self, preds, target):
-        metrics = ["accuracy", "fscore", "auroc", "auc", "roc"]
+        metrics = ["accuracy", "fscore", "auroc", "roc"]
         return get_classification_metrics(
             num_classes=self.datamodule.num_classes, preds=preds, target=target, metrics=metrics
         )
