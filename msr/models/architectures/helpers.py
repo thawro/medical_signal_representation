@@ -1,10 +1,11 @@
 from typing import Literal
 
+import omegaconf
 from torch import nn
 
 
 def get_ith_element(obj, i):
-    return obj[i] if isinstance(obj, list) else obj
+    return obj[i] if isinstance(obj, (list, omegaconf.ListConfig)) else obj
 
 
 def get_ith_layer_kwargs(i, **kwargs):

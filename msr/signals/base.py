@@ -390,7 +390,7 @@ class Signal(BaseSignal):
             return features, fig
         return features
 
-    def extract_DWT_features(self, return_arr=True, wavelet="db5", level=None, plot=False):
+    def extract_DWT_features(self, return_arr=True, wavelet="db8", level=None, plot=False):
         """Discrete wavelet transform"""
         if plot:
             features, fig = extract_dwt_features(self, wavelet, level, plot=True)
@@ -410,9 +410,15 @@ class Signal(BaseSignal):
         mask = (freqs >= fmin) & (freqs <= fmax)
         freqs, cwt_matrix = freqs[mask], cwt_matrix[mask]
         if plot:
-            fig, ax = plt.subplots(figsize=(14, 8))
-            im = ax.contourf(self.time, freqs, cwt_matrix, cmap=plt.cm.seismic)
-            fig.colorbar(im)
+            fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
+            im = ax.contourf(self.time, freqs, cwt_matrix, cmap=plt.cm.seismic)  # PRGn
+            ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
+            ax.set_ylabel("Frequency [Hz]", fontsize=self.fig_params["label_size"])
+            ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])
+            cb = fig.colorbar(im)
+            cb.ax.set_title("CWT coefficients", fontsize=self.fig_params["label_size"] // 1.5)
+            cb.ax.tick_params(labelsize=self.fig_params["tick_size"])
+
             return freqs, cwt_matrix, fig
         return freqs, cwt_matrix
 
@@ -622,16 +628,16 @@ class PeriodicSignal(ABC, Signal):
         color = "green"
         for beat in self.beats:
             bounds = [beat.start_sec, beat.end_sec]
-            if color_validity:
+            if color_validity is not None and color_validity:
                 color = "green" if beat.is_valid else "red"
                 label = "valid" if beat.is_valid else "invalid"
             else:
-                color = "green" if color == "red" else "red"
+                color = "green"  # if color == "red" else "red"
                 label = None
-
-            axes[0].fill_between(
-                bounds, data.min(), data.max(), alpha=self.fig_params["fill_alpha"], color=color, label=label
-            )
+            if color_validity is not None:
+                axes[0].fill_between(
+                    bounds, data.min(), data.max(), alpha=self.fig_params["fill_alpha"], color=color, label=label
+                )
             handles, labels = axes[0].get_legend_handles_labels()
             by_label = dict(zip(labels, handles))
             axes[0].legend(by_label.values(), by_label.keys(), fontsize=self.fig_params["legend_size"])
@@ -667,10 +673,11 @@ class PeriodicSignal(ABC, Signal):
                 ax.plot(beat.time, beat.data, color=palette[i])
             agg_beat = self.agg_beat
             ax.plot(agg_beat.time, agg_beat.data, lw=8, alpha=0.5, c="black", label="Aggregated beat")
-            ax.set_title(
-                f"{n_beats} beats ({n_valid} valid, {n_invalid} invalid)",
-                fontsize=int(agg_beat.fig_params["title_size"] / 1.5),
-            )
+            if valid is False or invalid is False:
+                ax.set_title(
+                    f"{n_beats} beats ({n_valid} valid, {n_invalid} invalid)",
+                    fontsize=int(agg_beat.fig_params["title_size"] / 1.5),
+                )
             ax.set_ylabel(agg_beat.units, fontsize=agg_beat.fig_params["label_size"])
             ax.set_xlabel("Time [s]", fontsize=agg_beat.fig_params["label_size"])
             ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])

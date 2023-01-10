@@ -1,0 +1,11 @@
+_target_: msr.models.modules.RegressorModule
+net:
+  _target_: msr.models.architectures.networks.lstm.LSTMRegressor
+  _partial_: true
+  # num_classes
+  # in_dim
+  hidden_dim: 64
+  num_layers: 3
+  dropout: 0.1
+  bidirectional: True
+  hidden_dims: [128, 128]

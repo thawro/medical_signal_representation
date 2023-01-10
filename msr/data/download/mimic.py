@@ -206,7 +206,7 @@ def validate_recording(
     valid_sig_len = len(abp) >= sample_len_samples
 
     if valid_sig_len or plot:
-        abp_is_good = validate_signal(abp, low=40, high=260, max_n_same=max_n_same)
+        abp_is_good = validate_signal(abp, low=50, high=220, max_n_same=max_n_same)
         ppg_is_good = validate_signal(ppg, low=None, high=None, max_n_same=max_n_same)
         ecg_is_good = validate_signal(ecg, low=None, high=None, max_n_same=max_n_same)
         is_good = abp_is_good & ppg_is_good & ecg_is_good

@@ -4,8 +4,10 @@ from typing import Callable, List, Literal
 
 import matplotlib.pyplot as plt
 import torch
+from joblib import Parallel, delayed
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from msr.training.data.datasets import MimicDataset, PtbXLDataset, SleepEDFDataset
 from msr.training.data.utils import StratifiedBatchSampler
@@ -28,6 +30,7 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         self.train_transform = train_transform
         self.inference_transform = inference_transform
         self.datasets = []
+        self.train, self.val, self.test = None, None, None
 
     def describe(self, ds_fields=["data_shape", "classes_counts"], dm_fields=["info"]):
         dm_connector = "\n" if dm_fields else ""
@@ -49,18 +52,22 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train = self.DatasetFactory(
-                split="train", representation_type=self.representation_type, transform=self.train_transform
-            )
-            self.val = self.DatasetFactory(
-                split="val", representation_type=self.representation_type, transform=self.inference_transform
-            )
-            self.datasets.extend([self.train, self.val])
+            if self.train is None:
+                self.train = self.DatasetFactory(
+                    split="train", representation_type=self.representation_type, transform=self.train_transform
+                )
+                self.datasets.append(self.train)
+            if self.val is None:
+                self.val = self.DatasetFactory(
+                    split="val", representation_type=self.representation_type, transform=self.inference_transform
+                )
+                self.datasets.append(self.val)
         if stage == "test" or stage is None:
-            self.test = self.DatasetFactory(
-                split="test", representation_type=self.representation_type, transform=self.inference_transform
-            )
-            self.datasets.append(self.test)
+            if self.test is None:
+                self.test = self.DatasetFactory(
+                    split="test", representation_type=self.representation_type, transform=self.inference_transform
+                )
+                self.datasets.append(self.test)
 
     @property
     def input_shape(self):
@@ -96,7 +103,11 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         split_dataset = getattr(self, split)
         split_data = split_dataset.data
         if split_dataset.transform is not None:
-            return torch.stack([split_dataset.transform(sample) for sample in split_data])
+            # _split_data = Parallel(n_jobs=-3)(delayed(split_dataset.transform)(sample) for sample in tqdm(split_data, desc=f"Transforming {split} data"))
+            # return torch.stack(_split_data)
+            return torch.stack(
+                [split_dataset.transform(sample) for sample in tqdm(split_data, desc=f"Transforming {split} data")]
+            )
         else:
             return split_data
 
@@ -147,9 +158,7 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def val_dataloader(self):
         return DataLoader(
             self.val,
-            batch_sampler=StratifiedBatchSampler(
-                self.val.targets.int(), batch_size=10 * self.batch_size, shuffle=False
-            ),
+            batch_sampler=StratifiedBatchSampler(self.val.targets.int(), batch_size=5 * self.batch_size, shuffle=False),
             num_workers=self.num_workers,
         )
 
@@ -157,7 +166,7 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         return DataLoader(
             self.test,
             batch_sampler=StratifiedBatchSampler(
-                self.test.targets.int(), batch_size=10 * self.batch_size, shuffle=False
+                self.test.targets.int(), batch_size=5 * self.batch_size, shuffle=False
             ),
             num_workers=self.num_workers,
         )
@@ -205,6 +214,30 @@ class MimicDataModule(BaseDataModule):
     @property
     def DatasetFactory(self):
         return partial(MimicDataset, target=self.target, bp_targets=self.bp_targets)
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val,
+            batch_size=5 * self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test,
+            batch_size=5 * self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
 
 
 class SleepEDFDataModule(BaseDataModule):

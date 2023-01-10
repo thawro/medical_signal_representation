@@ -7,4 +7,4 @@ defaults:
   - override /trainer: dl_classifier_trainer.yaml
   - override /datamodule: sleep_edf.yaml
   - override /model: cnn_classifier.yaml
-  - override /transforms: [downsample.yaml, permute_channels.yaml]
+  - override /transforms: [permute_channels.yaml]

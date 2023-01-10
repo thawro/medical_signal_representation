@@ -6,7 +6,7 @@ mimic_create_representations:
 
 mimic_experiments:
 	python msr/bin/train_and_evaluate.py \
-		experiment=mimic/lgbm,mimic/decision_tree,mimic/regression,mimic/mlp \
+		experiment=mimic/lgbm,mimic/decision_tree,mimic/regression,mimic/mlp,mimic/cnn \
 		representation_type=whole_signal_waveforms,whole_signal_features,agg_beat_waveforms,agg_beat_features \
 		--multirun
 
@@ -20,7 +20,7 @@ ptbxl_create_representations:
 
 ptbxl_experiments:
 	python msr/bin/train_and_evaluate.py \
-		experiment=ptbxl/lgbm,ptbxl/decision_tree,ptbxl/regression,ptbxl/mlp \
+		experiment=ptbxl/lgbm,ptbxl/decision_tree,ptbxl/regression,ptbxl/mlp,ptbxl/cnn \
 		representation_type=whole_signal_waveforms,whole_signal_features,agg_beat_waveforms,agg_beat_features \
 		--multirun
 
@@ -34,6 +34,6 @@ sleep_edf_create_representations:
 
 sleep_edf_experiments:
 	python msr/bin/train_and_evaluate.py \
-		experiment=sleep_edf/lgbm,sleep_edf/decision_tree,sleep_edf/regression,sleep_edf/mlp \
-		representation_type=whole_signal_features \
+		experiment=sleep_edf/lgbm,sleep_edf/decision_tree,sleep_edf/regression,sleep_edf/mlp,sleep_edf/cnn \
+		representation_type=whole_signal_waveforms,whole_signal_features \
 		--multirun

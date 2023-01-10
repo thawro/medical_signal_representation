@@ -17,7 +17,10 @@ class Permute:
         self.dims = list(dims)
 
     def __call__(self, sample: torch.Tensor):
-        return torch.permute(sample, self.dims)
+        try:
+            return torch.permute(sample, self.dims)
+        except RuntimeError:  # features are flattened, so exception is raised
+            return sample.unsqueeze(0)
 
 
 class Downsample:

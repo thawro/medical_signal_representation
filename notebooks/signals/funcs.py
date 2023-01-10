@@ -29,7 +29,7 @@ def plot_signal_and_agg_beat(signal):
 
 
 def plot_beat_segmentation(signal):
-    fig = signal.plot_beats_segmentation()
+    fig = signal.plot_beats_segmentation(color_validity=False, invalid=False)
     plt.close()
     return fig
 
@@ -165,6 +165,12 @@ def plot_zoomed_samples(signal):
     return fig
 
 
+def plot_cwt(signal):
+    freqs, cwt_matrix, fig = signal.get_CWT(plot=True)
+    plt.close()
+    return fig
+
+
 def get_figs_for_thesis_periodic(signal, prefix="ecg_"):
     signal.set_beats()
     signal.set_agg_beat()
@@ -177,6 +183,7 @@ def get_figs_for_thesis_periodic(signal, prefix="ecg_"):
         # f"{prefix}beat_features": plot_ecg_beat_features(signal) if prefix == "ecg_" else plot_ppg_beat_features(signal),
         # f"{prefix}peaks_troughs_features": plot_peaks_troughs_features(signal),
         f"{prefix}DWT_features": plot_DWT_features(signal),
+        f"{prefix}CWT_image": plot_cwt(signal),
     }
     if prefix == "ecg_":
         figs[f"{prefix}features"] = plot_ecg_features(signal)
@@ -191,6 +198,7 @@ def get_figs_for_thesis_no_periodic(signal, prefix="eeg_"):
         f"{prefix}cleaning": plot_raw_vs_cleaned(signal),
         # f"{prefix}peaks_troughs_features": plot_peaks_troughs_features(signal),
         f"{prefix}DWT_features": plot_DWT_features(signal),
+        f"{prefix}CWT_image": plot_cwt(signal),
     }
     if prefix == "eeg_":
         figs[f"{prefix}features"] = plot_eeg_features(signal)

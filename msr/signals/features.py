@@ -83,7 +83,7 @@ def get_basic_signal_features(arr):
     return {**entropy, **zerocross, **meancross, **statistics}
 
 
-def get_dwt_coeffs(data, fs, wavelet="db5", level=None):
+def get_dwt_coeffs(data, fs, wavelet="db8", level=None):
     approximates = []
     details = []
     dt = 1 / fs
@@ -105,39 +105,46 @@ def get_dwt_coeffs(data, fs, wavelet="db5", level=None):
 def plot_dwt(data, approximates, details):
     level = len(details)
     w, h = SIGNAL_FIG_PARAMS["fig_size"]
-    h = int(0.7 * h * len(details))
+    h = int(0.3 * h * len(details))
+    w = w // 3
     fig = plt.figure(figsize=(w, h), layout="constrained")
     spec = fig.add_gridspec(level + 1, 2)
 
     ax0 = fig.add_subplot(spec[0, :])
-    ax0.tick_params(axis="both", which="major", labelsize=SIGNAL_FIG_PARAMS["tick_size"])
+    ax0.tick_params(axis="both", which="major", labelsize=SIGNAL_FIG_PARAMS["tick_size"] // 2)
     all_axes = np.array([[fig.add_subplot(spec[i + 1, j]) for j in range(2)] for i in range(level)])
 
     # fig.suptitle("Discrete wavelet transform", fontsize=SIGNAL_FIG_PARAMS['title_size'])
     ax0.plot(data, lw=3)
-    ax0.set_title("Original signal", fontsize=SIGNAL_FIG_PARAMS["title_size"])
+    ax0.set_title("Original signal", fontsize=SIGNAL_FIG_PARAMS["title_size"] // 3)
     for i, (axes, detail, approx) in enumerate(zip(all_axes, details, approximates)):
-        axes[0].plot(approx["data"], "r")
-        axes[1].plot(detail["data"], "g")
-        axes[0].set_ylabel(f"Level {i+1}", fontsize=SIGNAL_FIG_PARAMS["label_size"], rotation=90)
+        approx_label = f"{' - '.join([str(round(f, 1)) for f in approx['freq']])} Hz"
+        detail_label = f"{' - '.join([str(round(f, 1)) for f in detail['freq']])} Hz"
+        axes[0].plot(approx["data"], "r", label=approx_label)
+        axes[1].plot(detail["data"], "g", label=detail_label)
+        axes[0].set_ylabel(f"Level {i+1}", fontsize=SIGNAL_FIG_PARAMS["label_size"] // 2, rotation=90)
         # axes[0].set_yticklabels([])
-        approx_title = f"{' - '.join([str(round(f, 2)) for f in approx['freq']])} Hz"
-        detail_title = f"{' - '.join([str(round(f, 2)) for f in detail['freq']])} Hz"
+        # axes[0].legend(fontsize=SIGNAL_FIG_PARAMS["tick_size"] // 2)
+        # axes[1].legend(fontsize=SIGNAL_FIG_PARAMS["tick_size"] // 2)
         if i == 0:
-            approx_title = "Approximation coefficients" + f"\n{approx_title}"
-            detail_title = "Detail coefficients" + f"\n{detail_title}"
-        axes[0].set_title(approx_title, fontsize=SIGNAL_FIG_PARAMS["title_size"])
-        axes[1].set_title(detail_title, fontsize=SIGNAL_FIG_PARAMS["title_size"])
+            approx_title = "Approximation coefficients"
+            detail_title = "Detail coefficients"
+            axes[0].set_title(approx_title, fontsize=SIGNAL_FIG_PARAMS["title_size"] // 3)
+            axes[1].set_title(detail_title, fontsize=SIGNAL_FIG_PARAMS["title_size"] // 3)
+
         # axes[1].set_yticklabels([])
 
     for ax in all_axes.flatten():
-        ax.tick_params(axis="both", which="major", labelsize=SIGNAL_FIG_PARAMS["tick_size"])
-        ax.set_xlabel("Sample [-]", fontsize=SIGNAL_FIG_PARAMS["label_size"])
+        ax.tick_params(axis="both", which="major", labelsize=SIGNAL_FIG_PARAMS["tick_size"] // 3)
+
+    all_axes[-1][0].set_xlabel("Sample [-]", fontsize=SIGNAL_FIG_PARAMS["label_size"] // 2)
+    all_axes[-1][1].set_xlabel("Sample [-]", fontsize=SIGNAL_FIG_PARAMS["label_size"] // 2)
+    plt.tight_layout()
 
     return fig
 
 
-def extract_dwt_features(signal, wavelet="db5", level=None, plot=False):
+def extract_dwt_features(signal, wavelet="db8", level=None, plot=False):
     data, fs = signal.cleaned, signal.fs
     approximates, details = get_dwt_coeffs(data, fs, wavelet, level)
     if plot:

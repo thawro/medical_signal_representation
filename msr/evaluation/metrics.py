@@ -1,3 +1,6 @@
+import os
+import pickle
+import time
 from functools import partial
 from typing import Callable, Dict, List
 
@@ -14,6 +17,7 @@ from torchmetrics.functional import (
     r2_score,
     roc,
 )
+from tqdm.auto import tqdm
 
 
 def get_metrics(metrics_funcs: Dict[str, Callable], preds: torch.Tensor, target: torch.Tensor, metrics: List[str]):
@@ -50,3 +54,52 @@ def get_regression_metrics(preds, target, metrics):
         mse=mean_squared_error,
     )
     return get_metrics(metrics_funcs=regression_metrics, preds=preds, target=target, metrics=metrics)
+
+
+def get_dl_computational_complexity(model, dummy_input, n_iter=300):
+    starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    timings = np.zeros((n_iter, 1))
+    # GPU-WARM-UP
+    for _ in range(10):
+        _ = model(dummy_input)
+    # MEASURE PERFORMANCE
+    with torch.no_grad():
+        for rep in tqdm(range(n_iter), desc="Measuring computational complexity"):
+            starter.record()
+            _ = model(dummy_input)
+            ender.record()
+            # WAIT FOR GPU SYNC
+            torch.cuda.synchronize()
+            curr_time = starter.elapsed_time(ender)
+            timings[rep] = curr_time
+    mean = np.sum(timings) / n_iter
+    std = np.std(timings)
+    return mean, std
+
+
+def get_ml_computational_complexity(model, dummy_input, n_iter=300):
+    timings = np.zeros((n_iter, 1))
+    for _ in range(10):
+        _ = model.predict(dummy_input)
+    for rep in tqdm(range(n_iter), desc="Measuring computational complexity"):
+        start = time.time()
+        _ = model.predict(dummy_input)
+        end = time.time()
+        duration = end - start  # in seconds
+        duration = duration * 1000  # in miliseconds
+        timings[rep] = duration
+    mean = np.sum(timings) / n_iter
+    std = np.std(timings)
+    return mean, std
+
+
+def get_memory_complexity(model, is_dl):
+    if is_dl:
+        path = "model.pt"
+        torch.save(model, path)
+    else:
+        path = "model.pickle"
+        pickle.dump(model, open(path, "wb"))
+    size = os.path.getsize(path)
+    os.remove(path)
+    return size

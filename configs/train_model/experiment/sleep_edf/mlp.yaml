@@ -7,4 +7,16 @@ defaults:
   - override /trainer: dl_classifier_trainer.yaml
   - override /datamodule: sleep_edf.yaml
   - override /model: mlp_classifier.yaml
-  - override /transforms: [flatten.yaml, downsample.yaml]
+  - override /transforms: [flatten.yaml] #, downsample.yaml]
+
+# transforms:
+#   downsaple:
+#     train_transform:
+#       _target_: msr.training.data.transforms.Downsample
+#       dim: 0
+#       ratio: 2
+
+#     inference_transform:
+#       _target_: msr.training.data.transforms.Downsample
+#       dim: 0
+#       ratio: 2

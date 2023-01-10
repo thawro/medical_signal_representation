@@ -1,11 +1,14 @@
+import logging
 from abc import abstractmethod
-from functools import partial
 from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+import torch
+import wandb
 from torch import nn
+from tqdm.auto import tqdm
 
 from msr.evaluation.metrics import get_classification_metrics, get_regression_metrics
 from msr.evaluation.plotters import (
@@ -13,9 +16,9 @@ from msr.evaluation.plotters import (
     plot_classifier_evaluation,
     plot_regressor_evaluation,
 )
-from msr.training.data.datamodules import BaseDataModule
 from msr.training.loggers import MLWandbLogger
-from msr.training.utils import BasePredictor
+
+log = logging.getLogger(__name__)
 
 
 class BaseTask:
@@ -93,12 +96,29 @@ class BaseTrainer:
     def predict(self, data):
         pass
 
-    @abstractmethod
-    def evaluate(self, plotter: BasePlotter = None, logger: MLWandbLogger = None):
+    def batched_predict(self, split):
+        dataloader = getattr(self.datamodule, f"{split}_dataloader")()
+        preds = []
+        targets = []
+        for data, target in tqdm(dataloader, desc=f"Running batched predict for {split} split"):
+            batch_pred = self.predict(data)
+            preds.append(batch_pred)
+            targets.append(target)
+        if isinstance(batch_pred, np.ndarray):
+            preds = np.concatenate(preds)
+            targets = np.concatenate(targets)
+        else:
+            preds = torch.concatenate(preds)
+            targets = torch.concatenate(targets)
+        return preds, targets
+
+    def evaluate(self, plotter: BasePlotter = None):
+        log.info("Started evaluation")
+        val_preds, val_targets = self.batched_predict("val")
+        test_preds, test_targets = self.batched_predict("test")
         all_y_values = {
-            # "train": {"preds": self.predict(self.datamodule.train.data), "target": self.datamodule.train.targets},
-            "val": {"preds": self.predict(self.datamodule.val_data), "target": self.datamodule.val.targets.detach()},
-            "test": {"preds": self.predict(self.datamodule.test_data), "target": self.datamodule.test.targets.detach()},
+            "val": {"preds": val_preds, "target": val_targets},
+            "test": {"preds": test_preds, "target": test_targets},
         }
 
         metrics = {split: self.get_metrics(**y_values) for split, y_values in all_y_values.items()}
@@ -112,14 +132,14 @@ class BaseTrainer:
                 plotter=plotter,
                 feature_importances=getattr(self.model, "feature_importances_", None),
             )
-        if logger is not None:
-            for name, results in evaluation_results.items():
-                blacklist = ["/roc"]
-                filtered_results = {
-                    name: value for name, value in results.items() if all([key not in name for key in blacklist])
-                }
-                logger.log(filtered_results)
-            logger.finish()
+        for name, results in evaluation_results.items():
+            blacklist = ["/roc"]
+            filtered_results = {
+                name: value for name, value in results.items() if all([key not in name for key in blacklist])
+            }
+            wandb.log(filtered_results)
+        log.info("Finished evaluation")
+        # logger.finish()
         return evaluation_results
 
 
@@ -158,7 +178,7 @@ class MLTrainer(BaseTrainer):
         self.model.fit(X=self.datamodule.train_data.numpy(), y=self.datamodule.train.targets)
 
     def predict(self, X):
-        return self.model.predict(X).flatten()
+        return self.model.predict(X)
 
 
 class MLClassifierTrainer(MLTrainer, Classifier):
@@ -172,3 +192,6 @@ class MLClassifierTrainer(MLTrainer, Classifier):
 class MLRegressorTrainer(MLTrainer, Regressor):
     def __init__(self, model, datamodule: pl.LightningDataModule):
         super().__init__(model, datamodule)
+
+    def predict(self, X):
+        return self.model.predict(X).flatten()

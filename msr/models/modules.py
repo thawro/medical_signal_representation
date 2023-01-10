@@ -75,8 +75,8 @@ class BaseModule(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
-            factor=0.1,
-            patience=10,
+            factor=0.7,
+            patience=5,
             threshold=0.0001,
         )
         return {
