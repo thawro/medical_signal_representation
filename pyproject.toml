@@ -42,6 +42,7 @@ torchvision = "^0.14.1"
 fastai = "1.0.61"
 thop = "^0.1.1.post2209072238"
 mat73 = "^0.59"
+hurry-filesize = "^0.9"
 
 [tool.black]
 experimental-string-processing = true
