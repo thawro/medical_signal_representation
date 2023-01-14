@@ -598,7 +598,13 @@ class PeriodicSignal(ABC, Signal):
         signals_bounds = []
         color = "green"
         for i, (ax, signal) in enumerate(zip(axes, signals)):
-            bounds = [signal.start_sec, signal.end_sec]
+            if use_samples:
+                bounds = [int(signal.start_sec * self.fs), int(signal.end_sec * self.fs)]
+            else:
+                bounds = [signal.start_sec, signal.end_sec]
+            title = "Window " if mode == "windows" else "Beat "
+            title += str(i + 1)
+            ax.set_title(title, fontsize=BEAT_FIG_PARAMS["title_size"])
             ax0.fill_between(bounds, min_v, max_v, alpha=self.fig_params["fill_alpha"], color=color)
             signals_bounds.extend(bounds)
             color = "green" if color == "red" else "red"
@@ -608,7 +614,10 @@ class PeriodicSignal(ABC, Signal):
                 plt.setp(ax.get_yticklabels(), visible=False)
         if show_lines:
             ax0.vlines(signals_bounds, min_v, max_v, lw=1.5, alpha=0.6, ec="black", ls="--")
-        ax0.set_xlim([self.time[0], self.time[-1]])
+        if not use_samples:
+            ax0.set_xlim([self.time[0], self.time[-1]])
+        else:
+            ax0.set_xlim([0, len(self.time)])
         return fig
 
     def plot_beats_segmentation(

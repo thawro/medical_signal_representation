@@ -101,7 +101,6 @@ class ResNet1d(nn.Sequential):
         block,
         layers,
         kernel_size=3,
-        num_classes=2,
         input_channels=3,
         inplanes=64,
         fix_feature_dim=True,
@@ -109,12 +108,6 @@ class ResNet1d(nn.Sequential):
         stride_stem=2,
         pooling_stem=True,
         stride=2,
-        lin_ftrs_head=None,
-        ps_head=0.5,
-        bn_final_head=False,
-        bn_head=True,
-        act_head="relu",
-        concat_pooling=True,
     ):
         self.inplanes = inplanes
 
@@ -151,15 +144,6 @@ class ResNet1d(nn.Sequential):
                         kernel_size=kernel_size,
                     )
                 )
-
-        # head
-        # layers_tmp.append(nn.AdaptiveAvgPool1d(1))
-        # layers_tmp.append(Flatten())
-        # layers_tmp.append(nn.Linear((inplanes if fix_feature_dim else (2**len(layers)*inplanes)) * block.expansion, num_classes))
-
-        # head = create_head1d((inplanes if fix_feature_dim else (2**len(layers)*inplanes)) * block.expansion, nc=num_classes, lin_ftrs=lin_ftrs_head, ps=ps_head, bn_final=bn_final_head, bn=bn_head, act=act_head, concat_pooling=concat_pooling)
-        # layers_tmp.append(head)
-
         super().__init__(*layers_tmp)
 
     def _make_layer(self, block, planes, blocks, stride=1, kernel_size=3):

@@ -145,23 +145,48 @@ def plot_ppg_beat_features(signal, crit_points=["systolic_peak"], axes=None):
         return fig
 
 
-def plot_zoomed_samples(signal):
-    fig, axes = plt.subplots(1, 2, figsize=signal.fig_params["fig_size"], gridspec_kw={"width_ratios": [2, 2]})
-    sig = signal.get_slice(0, 10)
-    s, w = 3, 0.8
-    e = s + w
-    s, e = int(s * sig.fs), int(e * sig.fs)
+def plot_zoomed_samples(signal, axes=None):
+    return_fig = False
+    if axes is None:
+        fig, axes = plt.subplots(1, 2, figsize=signal.fig_params["fig_size"])
+        return_fig = True
+    sig = signal.get_slice(0, 5)
+
+    st, wt = 0.6, 0.75
+    et = st + wt
+    s, e = int(st * sig.fs), int(et * sig.fs)
 
     sig.plot(0, 10, scatter=True, line=False, use_samples=True, ax=axes[0], label=None, title=None, lw=2.5)
-    sig.plot(3, 1, scatter=True, line=False, use_samples=True, ax=axes[1], label=None, title=None, lw=2.5)
+    samples = np.arange(s, e)
+    # sig.plot(st, wt, scatter=True, line=False, use_samples=True, ax=axes[1], label=None, title=None, lw=2.5)
+    axes[1].scatter(samples, sig.cleaned[s:e], lw=2.5, s=sig.fig_params["marker_size"])
+    axes[0].plot(sig.cleaned, lw=0.25, color="black")
 
     axes[0].fill_between(
         [s, e], sig.min, sig.max, alpha=sig.fig_params["fill_alpha"], color="green", label="Zoomed segment"
     )
     axes[1].set_ylabel("")
+    axes[1].plot(samples, sig.cleaned[s:e], lw=0.25, color="black")
     axes[0].legend()
+
+    axes[1].set_xlabel("Samples", fontsize=sig.fig_params["label_size"])
+    axes[1].tick_params(axis="both", which="major", labelsize=sig.fig_params["tick_size"])
+
     plt.tight_layout()
     plt.close()
+    if return_fig:
+        return fig
+
+
+def plot_zoomed_samples_for_signals(signals):
+    nrows = len(signals)
+    w, h = signals[0].fig_params["fig_size"]
+    fig, all_axes = plt.subplots(nrows, 2, figsize=(w, h * nrows))
+    for signal, axes in zip(signals, all_axes):
+        plot_zoomed_samples(signal, axes=axes)
+    all_axes[0][0].set_xlabel("")
+    all_axes[0][1].set_xlabel("")
+
     return fig
 
 

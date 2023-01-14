@@ -14,7 +14,7 @@ SIGNAL_FIG_PARAMS = dict(
     title_size=26,
     annot_size=16,
     tick_size=16,
-    marker_size=2,
+    marker_size=30,
     fill_alpha=0.15,
 )
 
