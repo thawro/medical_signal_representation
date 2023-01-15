@@ -1,15 +1,13 @@
 _target_: sklearn.linear_model.LogisticRegression
-penalty: l2
-dual: False
+penalty: null
 tol: 0.0001
 C: 1.0
 fit_intercept: True
 intercept_scaling: 1
-class_weight: null
+class_weight: balanced
 random_state: ${seed}
 solver: lbfgs
 max_iter: 100
 multi_class: auto
 n_jobs: -1
-l1_ratio: null
 warm_start: False
