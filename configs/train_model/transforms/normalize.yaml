@@ -1,8 +1,0 @@
-normalize:
-  train_transform:
-    _target_: msr.training.data.transforms.Normalize
-    dim: 0
-
-  inference_transform:
-    _target_: msr.training.data.transforms.Normalize
-    dim: 0

@@ -1,0 +1,19 @@
+_target_: msr.data.dataset_providers.MimicCleanDatasetProvider
+representation_types:
+  - whole_signal_waveforms
+  # - windows_waveforms
+  # - beats_waveforms
+  # - agg_beat_waveforms
+  # - whole_signal_features
+  # - windows_features
+  # - beats_features
+  # - agg_beat_features
+windows_params:
+  win_len_s: 6
+  step_s: 2
+beats_params:
+  source_channel: ecg
+  align_peaks_loc: True
+agg_beat_params:
+  valid_only: False
+n_beats: 7

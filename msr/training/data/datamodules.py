@@ -9,7 +9,12 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-from msr.training.data.datasets import MimicDataset, PtbXLDataset, SleepEDFDataset
+from msr.training.data.datasets import (
+    MimicCleanDataset,
+    MimicDataset,
+    PtbXLDataset,
+    SleepEDFDataset,
+)
 from msr.training.data.utils import StratifiedBatchSampler
 from msr.utils import align_left
 
@@ -238,6 +243,12 @@ class MimicDataModule(BaseDataModule):
             shuffle=False,
             num_workers=self.num_workers,
         )
+
+
+class MimicCleanDataModule(MimicDataModule):
+    @property
+    def DatasetFactory(self):
+        return partial(MimicCleanDataset, target=self.target, bp_targets=self.bp_targets)
 
 
 class SleepEDFDataModule(BaseDataModule):

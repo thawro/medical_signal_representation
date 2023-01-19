@@ -248,7 +248,9 @@ class BaseSignal:
         ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])
         return spectrum, freqs, t
 
-    def get_whole_signal_waveform(self) -> NDArray[Shape["N"], Float]:
+    def get_whole_signal_waveform(self, raw=True) -> NDArray[Shape["N"], Float]:
+        if raw:
+            return self.data
         return self.cleaned
 
     def extract_basic_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
@@ -427,11 +429,11 @@ class Signal(BaseSignal):
             window.plot(**kwargs)
 
     def get_windows_waveforms(
-        self, return_arr=True
+        self, return_arr=True, raw=True
     ) -> Union[NDArray[Shape["B, N"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         if return_arr:
-            return np.array([window.get_whole_signal_waveform() for window in self.windows])
-        return {f"window_{i}": window.get_whole_signal_waveform() for i, window in enumerate(self.windows)}
+            return np.array([window.get_whole_signal_waveform(raw=raw) for window in self.windows])
+        return {f"window_{i}": window.get_whole_signal_waveform(raw=raw) for i, window in enumerate(self.windows)}
 
     def get_windows_features(
         self, return_arr=True
@@ -556,11 +558,11 @@ class PeriodicSignal(ABC, Signal):
         return {f"beat_{beat.beat_num}": beat.extract_features(return_arr=False) for beat in self.beats}
 
     def get_beats_waveforms(
-        self, return_arr=True
+        self, return_arr=True, raw=True
     ) -> Union[NDArray[Shape["B, N"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         if return_arr:
-            return np.array([beat.get_whole_signal_waveform() for beat in self.beats])
-        return {f"beat_{beat.beat_num}": beat.get_whole_signal_waveform() for beat in self.beats}
+            return np.array([beat.get_whole_signal_waveform(raw=raw) for beat in self.beats])
+        return {f"beat_{beat.beat_num}": beat.get_whole_signal_waveform(raw=raw) for beat in self.beats}
 
     def get_agg_beat_features(self, return_arr=True) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         return self.agg_beat.extract_features(return_arr=return_arr)
@@ -940,7 +942,7 @@ class MultiChannelSignal:
         self.windows = {name: sig.set_windows(win_len_s, step_s) for name, sig in self.signals.items()}
 
     def get_whole_signal_waveforms(
-        self, return_arr=True, **kwargs
+        self, return_arr=True, raw=True, **kwargs
     ) -> Union[NDArray[Shape["N, C"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         """Return whole signal waveforms representation, i.e. timeseries signals data.
 
@@ -951,8 +953,8 @@ class MultiChannelSignal:
         If return_arr if False, then signal for each channel is returned in dict form (`Dict[str, NDArray[Shape["N"], Float]]`)
         """
         if return_arr:
-            return np.array([sig.get_whole_signal_waveform() for name, sig in self.signals.items()]).T
-        return {name: sig.get_whole_signal_waveform() for name, sig in self.signals.items()}
+            return np.array([sig.get_whole_signal_waveform(raw=raw) for name, sig in self.signals.items()]).T
+        return {name: sig.get_whole_signal_waveform(raw=raw) for name, sig in self.signals.items()}
 
     def get_whole_signal_features(
         self, return_arr=True, **kwargs
@@ -973,7 +975,7 @@ class MultiChannelSignal:
         return {name: func(return_arr=False) for name, func in self.feature_extraction_funcs.items()}
 
     def get_windows_waveforms(
-        self, return_arr=True, **kwargs
+        self, return_arr=True, raw=True, **kwargs
     ) -> Union[NDArray[Shape["W, N, C"], Float], Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]:
         """Return windows waveforms representation, i.e. timeseries data for each window.
 
@@ -985,10 +987,10 @@ class MultiChannelSignal:
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]`)
         """
         if return_arr:
-            return np.array([sig.get_windows_waveforms(return_arr=True) for _, sig in self.signals.items()]).transpose(
-                1, 2, 0
-            )
-        return {name: sig.get_windows_waveforms(return_arr=False) for name, sig in self.signals.items()}
+            return np.array(
+                [sig.get_windows_waveforms(return_arr=True, raw=raw) for _, sig in self.signals.items()]
+            ).transpose(1, 2, 0)
+        return {name: sig.get_windows_waveforms(return_arr=False, raw=raw) for name, sig in self.signals.items()}
 
     def get_windows_features(
         self, return_arr=True, **kwargs
@@ -1160,7 +1162,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         return {name: sig.get_beats_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_beats_waveforms(
-        self, return_arr=True, **kwargs
+        self, return_arr=True, raw=True, **kwargs
     ) -> Union[NDArray[Shape["W, N, C"], Float], Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]:
         """Return beats waveforms representation, i.e. timeseries data for each beat.
 
@@ -1172,13 +1174,13 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]`)
         """
         if return_arr:
-            return np.array([sig.get_beats_waveforms(return_arr=True) for _, sig in self.signals.items()]).transpose(
-                1, 2, 0
-            )
-        return {name: sig.get_beats_waveforms(return_arr=False) for name, sig in self.signals.items()}
+            return np.array(
+                [sig.get_beats_waveforms(return_arr=True, raw=raw) for _, sig in self.signals.items()]
+            ).transpose(1, 2, 0)
+        return {name: sig.get_beats_waveforms(return_arr=False, raw=raw) for name, sig in self.signals.items()}
 
     def get_agg_beat_waveforms(
-        self, return_arr=True, **kwargs
+        self, return_arr=True, raw=True, **kwargs
     ) -> Union[NDArray[Shape["N, C"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         """Return aggregated beat waveforms representation, i.e. timeseries data for each aggregated beat.
 
@@ -1189,8 +1191,8 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         If return_arr if False, then signal for each channel is returned in dict form (`Dict[str, NDArray[Shape["N"], Float]]`)
         """
         if return_arr:
-            return np.array([sig.get_agg_beat_waveform() for _, sig in self.signals.items()]).T
-        return {name: sig.get_agg_beat_waveform() for name, sig in self.signals.items()}
+            return np.array([sig.get_agg_beat_waveform(raw=raw) for _, sig in self.signals.items()]).T
+        return {name: sig.get_agg_beat_waveform(raw=raw) for name, sig in self.signals.items()}
 
     def get_agg_beat_features(
         self, return_arr=True, **kwargs

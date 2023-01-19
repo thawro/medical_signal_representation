@@ -41,6 +41,7 @@ EPSILON = np.finfo(float).eps
 datamodule2str = {  # dm
     "PtbXLDataModule": "ptbxl",
     "MimicDataModule": "mimic",
+    "MimicCleanDataModule": "mimic_clean",
     "SleepEDFDataModule": "sleep_edf",
 }
 

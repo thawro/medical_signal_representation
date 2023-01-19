@@ -37,3 +37,10 @@ sleep_edf_experiments:
 		experiment=sleep_edf/lgbm,sleep_edf/decision_tree,sleep_edf/regression,sleep_edf/mlp,sleep_edf/cnn \
 		representation_type=whole_signal_waveforms,whole_signal_features \
 		--multirun
+
+
+experiments:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn representation_type=whole_signal_waveforms
+	python msr/bin/train_and_evaluate.py experiment=mimic/cnn representation_type=whole_signal_waveforms
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/cnn representation_type=whole_signal_waveforms
+	python msr/bin/train_and_evaluate.py experiment=mimic/cnn datamodule=mimic_clean representation_type=whole_signal_waveforms

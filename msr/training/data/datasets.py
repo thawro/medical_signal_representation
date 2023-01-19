@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import Dataset
 
 from msr.data.dataset_providers import (
+    MimicCleanDatasetProvider,
     MimicDatasetProvider,
     PtbXLDatasetProvider,
     SleepEDFDatasetProvider,
@@ -190,6 +191,13 @@ class MimicDataset(RegressionDataset):
     @property
     def _dataset_loader(self) -> Callable:
         ds_provider = MimicDatasetProvider(None, None, None, None, None, target=self.target)
+        return ds_provider.load_split
+
+
+class MimicCleanDataset(MimicDataset):
+    @property
+    def _dataset_loader(self) -> Callable:
+        ds_provider = MimicCleanDatasetProvider(None, None, None, None, None)
         return ds_provider.load_split
 
 

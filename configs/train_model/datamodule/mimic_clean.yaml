@@ -1,0 +1,6 @@
+_target_: msr.training.data.datamodules.MimicCleanDataModule
+representation_type: ${representation_type}
+target: sbp_dbp_avg
+bp_targets: ["sbp"]
+batch_size: 32
+num_workers: 8

@@ -39,7 +39,7 @@ class Downsample:
             return sample[..., :: self.ratio]
 
 
-class Normalize:
+class Standardize:
     def __init__(self, dim: int = 0):
         self.dim = dim
 
