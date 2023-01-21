@@ -1,11 +1,11 @@
 _target_: msr.models.modules.ClassifierModule
 net:
   _target_: msr.models.architectures.networks.mlp.MLPClassifier
-  _partial_: true
+  _partial_: True
   # num_classes
   # input_size
   hidden_dims: [128, 256, 512, 256, 128]
-  weight_norm: false
-  batch_norm: true
+  weight_norm: False
+  batch_norm: True
   dropout: 0.2
   activation: ReLU

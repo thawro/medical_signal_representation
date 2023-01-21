@@ -76,6 +76,7 @@ def create_model(cfg: DictConfig, datamodule: LightningDataModule, ckpt_path=Non
             model = model.__class__.load_from_checkpoint(ckpt_path)
     else:  # ML models
         model = instantiate(cfg.model)
+    log.info(model)
     log.info(f"{model.__class__.__name__} initialized")
     return model
 

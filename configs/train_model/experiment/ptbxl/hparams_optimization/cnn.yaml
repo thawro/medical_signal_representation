@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - override /callbacks: default.yaml
+  - override /logger: dl_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+  - override /trainer: dl_classifier_trainer.yaml
+  - override /datamodule: ptbxl.yaml
+  - override /model: cnn_classifier.yaml
+  - override /transforms: [downsample.yaml, standardize.yaml, permute_channels.yaml]
+
+
+logger_project: medical_signals_representation #${datamodule._target_}
+logger_run_name: ${dataset}__${representation_type}__${model._target_}

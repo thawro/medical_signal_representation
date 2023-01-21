@@ -39,8 +39,73 @@ sleep_edf_experiments:
 		--multirun
 
 
-experiments:
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn representation_type=whole_signal_waveforms
-	python msr/bin/train_and_evaluate.py experiment=mimic/cnn representation_type=whole_signal_waveforms
-	python msr/bin/train_and_evaluate.py experiment=sleep_edf/cnn representation_type=whole_signal_waveforms
-	python msr/bin/train_and_evaluate.py experiment=mimic/cnn datamodule=mimic_clean representation_type=whole_signal_waveforms
+decision_tree_hparams:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/decision_tree \
+		representation_type=agg_beat_waveforms model.max_features=0.1,0.3,0.5,0.7,0.9,1.0 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/decision_tree \
+		representation_type=agg_beat_waveforms model.min_samples_split=2,4,8,16 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/decision_tree \
+		representation_type=agg_beat_waveforms model.max_depth=4,16,32,64,null --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/decision_tree \
+		representation_type=agg_beat_waveforms model.min_samples_leaf=1,2,4,8,16 --multirun
+
+
+lgbm_hparams:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/lgbm \
+		representation_type=whole_signal_waveforms model.colsample_bytree=0.1,0.3,0.5,0.7,0.9,1.0 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/lgbm \
+		representation_type=whole_signal_waveforms model.max_depth=4,16,32,64,-1 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/lgbm \
+		representation_type=whole_signal_waveforms model.num_leaves=7,15,31,63 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/lgbm \
+		representation_type=whole_signal_waveforms model.n_estimators=100,250,600,1000 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/lgbm \
+		representation_type=whole_signal_waveforms model.learning_rate=0.001,0.005,0.01,0.1 --multirun
+
+
+mlp_hparams:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/mlp \
+		representation_type=agg_beat_features model.net.hidden_dims=[512],[256, 512],[256, 512, 256],[128, 256, 512, 256, 128] --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/mlp \
+		representation_type=agg_beat_features model.net.dropout=0,0.1,0.3,0.5 --multirun
+
+
+
+
+
+# TODO after all hparams optimizations
+regression_experiments:
+	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=whole_signal_waveforms
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression,sleep_edf/regression representation_type=whole_signal_waveforms \
+		model.C=10 model.solver=lbfgs model.max_iter=2000 --multirun
+	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=whole_signal_features
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression,sleep_edf/regression representation_type=whole_signal_features \
+		model.C=0.001 model.solver=newton-cg model.max_iter=2000 --multirun
+	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=agg_beat_waveforms
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=agg_beat_waveforms \
+		model.C=0.1 model.solver=sag model.max_iter=2000 --multirun
+	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=agg_beat_features
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=agg_beat_features \
+		model.C=0.1 model.solver=newton-cg model.max_iter=2000 --multirun
+
+
+decision_tree_experiments:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree,sleep_edf/decision_tree,mimic/decision_tree representation_type=whole_signal_waveforms \
+		model.max_depth=64 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.7 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree,sleep_edf/decision_tree,mimic/decision_tree representation_type=whole_signal_features \
+		model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=4 model.max_features=0.5 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree,mimic/decision_tree representation_type=agg_beat_waveforms \
+		model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.1 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree,mimic/decision_tree representation_type=agg_beat_features \
+		model.max_depth=16 model.min_samples_split=8 model.min_samples_leaf=1 model.max_features=0.7 --multirun
+
+
+lgbm_experiments:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,sleep_edf/lgbm,mimic/lgbm representation_type=whole_signal_waveforms \
+		model.colsample_bytree=0.1 model.max_depth=4 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,sleep_edf/lgbm,mimic/lgbm representation_type=whole_signal_features \
+		model.colsample_bytree=0.1 model.max_depth=64 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,mimic/lgbm representation_type=agg_beat_waveforms \
+		model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,mimic/lgbm representation_type=agg_beat_features \
+		model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun

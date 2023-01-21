@@ -4,8 +4,8 @@ from typing import Callable, List, Literal
 
 import matplotlib.pyplot as plt
 import torch
-from joblib import Parallel, delayed
 from pytorch_lightning import LightningDataModule
+from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
@@ -27,6 +27,7 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         num_workers: int = 8,
         train_transform: Callable = None,
         inference_transform: Callable = None,
+        standardize: bool = False,
     ):
         super().__init__()
         self.batch_size = batch_size
@@ -36,6 +37,9 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
         self.inference_transform = inference_transform
         self.datasets = []
         self.train, self.val, self.test = None, None, None
+        self.standardize = standardize
+        if standardize:
+            self.data_standardizer = StandardScaler()
 
     def describe(self, ds_fields=["data_shape", "classes_counts"], dm_fields=["info"]):
         dm_connector = "\n" if dm_fields else ""
@@ -61,17 +65,26 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
                 self.train = self.DatasetFactory(
                     split="train", representation_type=self.representation_type, transform=self.train_transform
                 )
+                if self.standardize:
+                    self.data_standardizer.fit(self.train.data.flatten(1, -1))
+                    self.train.data = torch.from_numpy(self.data_standardizer.transform(self.train.data.flatten(1, -1)))
                 self.datasets.append(self.train)
+
             if self.val is None:
                 self.val = self.DatasetFactory(
                     split="val", representation_type=self.representation_type, transform=self.inference_transform
                 )
+                if self.standardize:
+                    self.val.data = torch.from_numpy(self.data_standardizer.transform(self.val.data.flatten(1, -1)))
                 self.datasets.append(self.val)
+
         if stage == "test" or stage is None:
             if self.test is None:
                 self.test = self.DatasetFactory(
                     split="test", representation_type=self.representation_type, transform=self.inference_transform
                 )
+                if self.standardize:
+                    self.test.data = torch.from_numpy(self.data_standardizer.transform(self.test.data.flatten(1, -1)))
                 self.datasets.append(self.test)
 
     @property
@@ -189,8 +202,11 @@ class PtbXLDataModule(BaseDataModule):
         num_workers=8,
         train_transform: Callable = None,
         inference_transform: Callable = None,
+        standardize: bool = False,
     ):
-        super().__init__(representation_type, batch_size, num_workers, train_transform, inference_transform)
+        super().__init__(
+            representation_type, batch_size, num_workers, train_transform, inference_transform, standardize
+        )
         self.fs = fs
         self.target = target
 
@@ -211,8 +227,11 @@ class MimicDataModule(BaseDataModule):
         num_workers=8,
         train_transform: Callable = None,
         inference_transform: Callable = None,
+        standardize: bool = False,
     ):
-        super().__init__(representation_type, batch_size, num_workers, train_transform, inference_transform)
+        super().__init__(
+            representation_type, batch_size, num_workers, train_transform, inference_transform, standardize
+        )
         self.target = target
         self.bp_targets = bp_targets
 
