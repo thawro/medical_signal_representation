@@ -9,9 +9,11 @@ from msr.evaluation.metrics import get_classification_metrics, get_regression_me
 
 
 class BaseModule(pl.LightningModule):
-    def __init__(self, net: nn.Module):
+    def __init__(self, net: nn.Module, learning_rate: float = 0.01, weight_decay: float = 0.01):
         super().__init__()
         self.net = net
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
         self.save_hyperparameters(logger=False)
 
     @abstractmethod
@@ -68,15 +70,15 @@ class BaseModule(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             params=self.parameters(),
-            lr=0.001,
+            lr=self.learning_rate,
             betas=(0.9, 0.999),
-            weight_decay=0.01,
+            weight_decay=self.weight_decay,
         )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
             factor=0.7,
-            patience=5,
+            patience=7,
             threshold=0.0001,
         )
         return {
@@ -91,8 +93,8 @@ class BaseModule(pl.LightningModule):
 
 
 class ClassifierModule(BaseModule):
-    def __init__(self, net: nn.Module):
-        super().__init__(net)
+    def __init__(self, net: nn.Module, learning_rate: float = 0.01, weight_decay: float = 0.01):
+        super().__init__(net, learning_rate, weight_decay)
         self.criterion = nn.NLLLoss()
 
     def get_metrics(self, preds, target):
@@ -101,8 +103,8 @@ class ClassifierModule(BaseModule):
 
 
 class RegressorModule(BaseModule):
-    def __init__(self, net: nn.Module):
-        super().__init__(net)
+    def __init__(self, net: nn.Module, learning_rate: float = 0.01, weight_decay: float = 0.01):
+        super().__init__(net, learning_rate, weight_decay)
         self.criterion = nn.MSELoss()
 
     def get_metrics(self, preds, target):

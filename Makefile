@@ -62,12 +62,35 @@ lgbm_hparams:
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/lgbm \
 		representation_type=whole_signal_waveforms model.learning_rate=0.001,0.005,0.01,0.1 --multirun
 
-
+# TODO
 mlp_hparams:
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/mlp \
-		representation_type=agg_beat_features model.net.hidden_dims=[512],[256, 512],[256, 512, 256],[128, 256, 512, 256, 128] --multirun
+		representation_type=whole_signal_waveforms model.learning_rate=0.001,0.01,0.05,0.1 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/mlp \
-		representation_type=agg_beat_features model.net.dropout=0,0.1,0.3,0.5 --multirun
+		representation_type=whole_signal_waveforms model.net.hidden_dims='[512]','[256, 512]','[512, 256]','[256, 512, 256]','[128, 256, 512, 256, 128]' --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/mlp \
+		representation_type=whole_signal_waveforms model.net.dropout=0,0.1,0.2,0.3,0.4 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/mlp \
+		representation_type=whole_signal_waveforms model.weight_decay=0.0001,0.001,0.01,0.1 --multirun
+
+
+
+cnn_hparams:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
+		representation_type=agg_beat_features model.learning_rate=0.001,0.01,0.1 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
+		representation_type=agg_beat_features model.net.conv0_kernel_size=5,7,9 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
+		representation_type=agg_beat_features model.net.conv0_channels=64,128,256 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
+		representation_type=agg_beat_features model.net.layers='[1]','[1, 1]','[1, 1, 1]','[1, 1, 1, 1]' --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
+		representation_type=agg_beat_features model.net.ff_hidden_dims='[64]','[128]','[128, 128]','[128, 64]' --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
+		representation_type=agg_beat_features model.net.ff_dropout=0,0.1,0.2,0.3 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
+		representation_type=agg_beat_features model.weight_decay=0.0001,0.001,0.01 --multirun
+
 
 
 
@@ -109,3 +132,14 @@ lgbm_experiments:
 		model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,mimic/lgbm representation_type=agg_beat_features \
 		model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
+
+
+mlp_experiments:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,sleep_edf/mlp,mimic/mlp representation_type=whole_signal_waveforms \
+		TODO --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,sleep_edf/mlp,mimic/mlp representation_type=whole_signal_features \
+		TODO --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,mimic/mlp representation_type=agg_beat_waveforms \
+		TODO --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,mimic/mlp representation_type=agg_beat_features \
+		TODO --multirun

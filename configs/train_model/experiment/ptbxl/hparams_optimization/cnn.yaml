@@ -7,8 +7,18 @@ defaults:
   - override /trainer: dl_classifier_trainer.yaml
   - override /datamodule: ptbxl.yaml
   - override /model: cnn_classifier.yaml
-  - override /transforms: [downsample.yaml, standardize.yaml, permute_channels.yaml]
+  - override /transforms: [permute_channels.yaml]
 
 
-logger_project: medical_signals_representation #${datamodule._target_}
+logger_project: ptbxl_optimization #${datamodule._target_}
 logger_run_name: ${dataset}__${representation_type}__${model._target_}
+
+model:
+  learning_rate: 0.001            # 0.001, 0.01, 0.05, 0.1                | 0.01
+  net:
+    conv0_kernel_size: 7          # 5, 7, 9                               |  7
+    conv0_channels:  128          # 64, 128, 256                          | 128
+    layers: [1, 1, 1]             # [1], [1, 1], [1, 1, 1], [1, 1, 1, 1]  | [1, 1, 1]
+    ff_hidden_dims: [128, 128]    # [64], [128], [128, 128], [128, 64]    | [128, 128]
+    ff_dropout: 0.2               # 0, 0.1, 0.2, 0.3                      | 0.2
+  weight_decay: 0.001             # 0.0001, 0.001, 0.01, 0.1              | 0.001

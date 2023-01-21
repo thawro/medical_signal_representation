@@ -8,6 +8,7 @@ import wandb
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import LightningDataModule
+from pytorch_lightning.utilities.seed import seed_everything
 from thop import profile
 from torchinfo import summary
 from torchvision.transforms import Compose
@@ -119,7 +120,7 @@ def main(cfg: DictConfig):
     cfg = parse_cfg(cfg)
     is_dl = "Module" in cfg.model._target_  # DL models
     print_config_tree(cfg, keys=["datamodule", "model", "callbacks", "logger", "plotter", "transforms"])
-
+    seed_everything(cfg.seed, workers=True)
     logger = create_logger(cfg)
     datamodule = create_datamodule(cfg)
     model = create_model(cfg, datamodule)

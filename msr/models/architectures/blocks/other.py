@@ -100,13 +100,13 @@ class ResNet1d(nn.Sequential):
         self,
         block,
         layers,
-        kernel_size=3,
+        kernel_size=[5, 3],
+        kernel_size_stem=7,
+        stride_stem=1,
+        pooling_stem=False,
+        inplanes=128,
         input_channels=3,
-        inplanes=64,
         fix_feature_dim=True,
-        kernel_size_stem=None,
-        stride_stem=2,
-        pooling_stem=True,
         stride=2,
     ):
         self.inplanes = inplanes
