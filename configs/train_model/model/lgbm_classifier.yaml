@@ -3,7 +3,7 @@ boosting_type: dart
 num_leaves: 31
 max_depth: -1
 learning_rate: 0.1
-n_estimators: 100
+n_estimators: 600
 subsample_for_bin: 200000
 objective: null
 class_weight: balanced

@@ -77,19 +77,19 @@ mlp_hparams:
 
 cnn_hparams:
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=agg_beat_features model.learning_rate=0.001,0.01,0.1 --multirun
+		representation_type=whole_signal_waveforms model.learning_rate=0.001,0.01,0.1 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=agg_beat_features model.net.conv0_kernel_size=5,7,9 --multirun
+		representation_type=whole_signal_waveforms model.net.conv0_kernel_size=5,7,9 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=agg_beat_features model.net.conv0_channels=64,128,256 --multirun
+		representation_type=whole_signal_waveforms model.net.conv0_channels=64,128,256 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=agg_beat_features model.net.layers='[1]','[1, 1]','[1, 1, 1]','[1, 1, 1, 1]' --multirun
+		representation_type=whole_signal_waveforms model.net.layers='[1]','[1, 1]','[1, 1, 1]','[1, 1, 1, 1]' --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=agg_beat_features model.net.ff_hidden_dims='[64]','[128]','[128, 128]','[128, 64]' --multirun
+		representation_type=whole_signal_waveforms model.net.ff_hidden_dims='[64]','[128]','[128, 128]','[128, 64]' --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=agg_beat_features model.net.ff_dropout=0,0.1,0.2,0.3 --multirun
+		representation_type=whole_signal_waveforms model.net.ff_dropout=0,0.1,0.2,0.3 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=agg_beat_features model.weight_decay=0.0001,0.001,0.01 --multirun
+		representation_type=whole_signal_waveforms model.weight_decay=0.0001,0.001,0.01 --multirun
 
 
 
@@ -136,10 +136,25 @@ lgbm_experiments:
 
 mlp_experiments:
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,sleep_edf/mlp,mimic/mlp representation_type=whole_signal_waveforms \
-		TODO --multirun
+		model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,sleep_edf/mlp,mimic/mlp representation_type=whole_signal_features \
-		TODO --multirun
+		model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,mimic/mlp representation_type=agg_beat_waveforms \
-		TODO --multirun
+		model.net.hidden_dims='[512]' model.net.dropout=0.2 model.learning_rate=0.01 model.weight_decay=0.0001 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,mimic/mlp representation_type=agg_beat_features \
-		TODO --multirun
+		model.net.hidden_dims='[256,512]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001 --multirun
+
+
+cnn_experiments:
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn,sleep_edf/cnn,mimic/cnn representation_type=whole_signal_waveforms \
+		model.net.conv0_kernel_size=TODO model.net.conv0_channels=TODO model.net.layers=TODO model.net.ff_hidden_dims=TODO \
+		model.net.ff_dropout=TODO model.learning_rate=TODO model.weight_decay=TODO --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn,sleep_edf/cnn,mimic/cnn representation_type=whole_signal_features \
+		model.net.conv0_kernel_size=TODO model.net.conv0_channels=TODO model.net.layers=TODO model.net.ff_hidden_dims=TODO \
+		model.net.ff_dropout=TODO model.learning_rate=TODO model.weight_decay=TODO --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn,mimic/cnn representation_type=agg_beat_waveforms \
+		model.net.conv0_kernel_size=TODO model.net.conv0_channels=TODO model.net.layers=TODO model.net.ff_hidden_dims=TODO \
+		model.net.ff_dropout=TODO model.learning_rate=TODO model.weight_decay=TODO --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn,mimic/cnn representation_type=agg_beat_features \
+		model.net.conv0_kernel_size=TODO model.net.conv0_channels=TODO model.net.layers=TODO model.net.ff_hidden_dims=TODO \
+		model.net.ff_dropout=TODO model.learning_rate=TODO model.weight_decay=TODO --multirun

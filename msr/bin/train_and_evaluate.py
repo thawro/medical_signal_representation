@@ -7,8 +7,7 @@ import hydra
 import wandb
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning import LightningDataModule
-from pytorch_lightning.utilities.seed import seed_everything
+from pytorch_lightning import LightningDataModule, seed_everything
 from thop import profile
 from torchinfo import summary
 from torchvision.transforms import Compose
