@@ -7,8 +7,8 @@ defaults:
   - override /trainer: ml_classifier_trainer.yaml
   - override /datamodule: sleep_edf.yaml
   - override /model: logistic_regression.yaml
-  - override /transforms: [flatten.yaml, downsample.yaml]
+  - override /transforms: [flatten.yaml]
 
 
 datamodule:
-  standardize: True
+  standardize: False

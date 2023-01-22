@@ -7,4 +7,4 @@ defaults:
   - override /trainer: dl_regressor_trainer.yaml
   - override /datamodule: mimic.yaml
   - override /model: cnn_regressor.yaml
-  - override /transforms: [standardize.yaml, permute_channels.yaml]
+  - override /transforms: [permute_channels.yaml]

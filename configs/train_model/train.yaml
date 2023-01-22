@@ -16,7 +16,7 @@ defaults:
 representation_type: agg_beat_features
 dataset: ${datamodule._target_}
 
-logger_project: medical_signals_representation #${datamodule._target_}
+logger_project: msr_experiments #${datamodule._target_}
 logger_run_name: ${dataset}__${representation_type}__${model._target_}
 
 task_name: train_model/${datamodule._target_}/${datamodule.representation_type}/${model._target_}
