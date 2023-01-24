@@ -119,7 +119,7 @@ def main(cfg: DictConfig):
     cfg = parse_cfg(cfg)
     is_dl = "Module" in cfg.model._target_  # DL models
     print_config_tree(cfg, keys=["datamodule", "model", "callbacks", "logger", "plotter", "transforms"])
-    seed_everything(cfg.seed, workers=True)
+    # seed_everything(cfg.seed, workers=True)
     logger = create_logger(cfg)
     datamodule = create_datamodule(cfg)
     model = create_model(cfg, datamodule)
