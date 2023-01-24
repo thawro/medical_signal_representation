@@ -942,7 +942,7 @@ class MultiChannelSignal:
         self.windows = {name: sig.set_windows(win_len_s, step_s) for name, sig in self.signals.items()}
 
     def get_whole_signal_waveforms(
-        self, return_arr=True, raw=True, **kwargs
+        self, return_arr=True, raw=False, **kwargs
     ) -> Union[NDArray[Shape["N, C"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         """Return whole signal waveforms representation, i.e. timeseries signals data.
 

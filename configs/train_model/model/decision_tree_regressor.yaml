@@ -8,5 +8,4 @@ min_weight_fraction_leaf: 0
 max_features: 1.0
 max_leaf_nodes: null
 min_impurity_decrease: 0
-class_weight: balanced
 random_state: ${seed}

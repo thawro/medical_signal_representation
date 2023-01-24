@@ -77,84 +77,105 @@ mlp_hparams:
 
 cnn_hparams:
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=whole_signal_waveforms model.learning_rate=0.001,0.01,0.1 --multirun
+		representation_type=whole_signal_features model.learning_rate=0.001,0.01,0.1 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=whole_signal_waveforms model.net.conv0_kernel_size=5,7,9 --multirun
+		representation_type=whole_signal_features model.net.conv0_kernel_size=5,7,9 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=whole_signal_waveforms model.net.conv0_channels=64,128,256 --multirun
+		representation_type=whole_signal_features model.net.conv0_channels=64,128,256 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=whole_signal_waveforms model.net.layers='[1]','[1, 1]','[1, 1, 1]','[1, 1, 1, 1]' --multirun
+		representation_type=whole_signal_features model.net.layers='[1]','[1, 1]','[1, 1, 1]','[1, 1, 1, 1]' --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=whole_signal_waveforms model.net.ff_hidden_dims='[64]','[128]','[128, 128]','[128, 64]' --multirun
+		representation_type=whole_signal_features model.net.ff_hidden_dims='[64]','[128]','[128, 128]','[128, 64]' --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=whole_signal_waveforms model.net.ff_dropout=0,0.1,0.2,0.3 --multirun
+		representation_type=whole_signal_features model.net.ff_dropout=0,0.1,0.2,0.3 --multirun
 	python msr/bin/train_and_evaluate.py experiment=ptbxl/hparams_optimization/cnn \
-		representation_type=whole_signal_waveforms model.weight_decay=0.0001,0.001,0.01 --multirun
+		representation_type=whole_signal_features model.weight_decay=0.0001,0.001,0.01 --multirun
 
 
 
 
 
 
-# TODO after all hparams optimizations
+# TODO after all hparams optimizations change other according to regression (no multiruns)
 regression_experiments:
 	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=whole_signal_waveforms
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression,sleep_edf/regression representation_type=whole_signal_waveforms \
-		model.C=10 model.solver=lbfgs model.max_iter=2000 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=whole_signal_waveforms model.C=10 model.solver=lbfgs model.max_iter=2000
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/regression representation_type=whole_signal_waveforms transforms='[flatten, downsample]' model.C=10 model.solver=lbfgs model.max_iter=2000
 	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=whole_signal_features
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression,sleep_edf/regression representation_type=whole_signal_features \
-		model.C=0.001 model.solver=newton-cg model.max_iter=2000 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=whole_signal_features model.C=0.001 model.solver=newton-cg model.max_iter=2000
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/regression representation_type=whole_signal_features model.C=0.001 model.solver=lbfgs model.max_iter=2000
 	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=agg_beat_waveforms
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=agg_beat_waveforms \
-		model.C=0.1 model.solver=sag model.max_iter=2000 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=agg_beat_waveforms model.C=0.1 model.solver=sag model.max_iter=2000
 	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=agg_beat_features
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=agg_beat_features \
-		model.C=0.1 model.solver=newton-cg model.max_iter=2000 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=agg_beat_features model.C=0.1 model.solver=newton-cg model.max_iter=2000
 
 
 decision_tree_experiments:
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree,sleep_edf/decision_tree,mimic/decision_tree representation_type=whole_signal_waveforms \
-		model.max_depth=64 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.7 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree,sleep_edf/decision_tree,mimic/decision_tree representation_type=whole_signal_features \
-		model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=4 model.max_features=0.5 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree,mimic/decision_tree representation_type=agg_beat_waveforms \
-		model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.1 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree,mimic/decision_tree representation_type=agg_beat_features \
-		model.max_depth=16 model.min_samples_split=8 model.min_samples_leaf=1 model.max_features=0.7 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree representation_type=whole_signal_waveforms model.max_depth=64 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.7
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/decision_tree representation_type=whole_signal_waveforms transforms='[flatten, downsample]' model.max_depth=64 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.7
+	python msr/bin/train_and_evaluate.py experiment=mimic/decision_tree representation_type=whole_signal_waveforms model.max_depth=64 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.7
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree representation_type=whole_signal_features model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=4 model.max_features=0.5
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/decision_tree representation_type=whole_signal_features model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=4 model.max_features=0.5
+	python msr/bin/train_and_evaluate.py experiment=mimic/decision_tree representation_type=whole_signal_features model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=4 model.max_features=0.5
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree representation_type=agg_beat_waveforms model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.1
+	python msr/bin/train_and_evaluate.py experiment=mimic/decision_tree representation_type=agg_beat_waveforms model.max_depth=16 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.1
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree representation_type=agg_beat_features model.max_depth=16 model.min_samples_split=8 model.min_samples_leaf=1 model.max_features=0.7
+	python msr/bin/train_and_evaluate.py experiment=mimic/decision_tree representation_type=agg_beat_features model.max_depth=16 model.min_samples_split=8 model.min_samples_leaf=1 model.max_features=0.7
 
 
 lgbm_experiments:
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,sleep_edf/lgbm,mimic/lgbm representation_type=whole_signal_waveforms \
-		model.colsample_bytree=0.1 model.max_depth=4 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,sleep_edf/lgbm,mimic/lgbm representation_type=whole_signal_features \
-		model.colsample_bytree=0.1 model.max_depth=64 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,mimic/lgbm representation_type=agg_beat_waveforms \
-		model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm,mimic/lgbm representation_type=agg_beat_features \
-		model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm representation_type=whole_signal_waveforms model.colsample_bytree=0.1 model.max_depth=4 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/lgbm representation_type=whole_signal_waveforms transforms='[flatten, downsample]' model.colsample_bytree=0.1 model.max_depth=4 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=mimic/lgbm representation_type=whole_signal_waveforms model.colsample_bytree=0.1 model.max_depth=4 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm representation_type=whole_signal_features model.colsample_bytree=0.1 model.max_depth=64 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/lgbm representation_type=whole_signal_features model.colsample_bytree=0.1 model.max_depth=64 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=mimic/lgbm representation_type=whole_signal_features model.colsample_bytree=0.1 model.max_depth=64 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm representation_type=agg_beat_waveforms model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=mimic/lgbm representation_type=agg_beat_waveforms model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm representation_type=agg_beat_features model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=mimic/lgbm representation_type=agg_beat_features model.colsample_bytree=0.9 model.max_depth=32 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
 
 
 mlp_experiments:
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,sleep_edf/mlp,mimic/mlp representation_type=whole_signal_waveforms \
-		model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,sleep_edf/mlp,mimic/mlp representation_type=whole_signal_features \
-		model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,mimic/mlp representation_type=agg_beat_waveforms \
-		model.net.hidden_dims='[512]' model.net.dropout=0.2 model.learning_rate=0.01 model.weight_decay=0.0001 --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp,mimic/mlp representation_type=agg_beat_features \
-		model.net.hidden_dims='[256,512]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001 --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp representation_type=whole_signal_waveforms model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/mlp representation_type=whole_signal_waveforms model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=mimic/mlp representation_type=whole_signal_waveforms model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp representation_type=whole_signal_features model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/mlp representation_type=whole_signal_features model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=mimic/mlp representation_type=whole_signal_features model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp representation_type=agg_beat_waveforms model.net.hidden_dims='[512]' model.net.dropout=0.2 model.learning_rate=0.01 model.weight_decay=0.0001
+	python msr/bin/train_and_evaluate.py experiment=mimic/mlp representation_type=agg_beat_waveforms model.net.hidden_dims='[512]' model.net.dropout=0.2 model.learning_rate=0.01 model.weight_decay=0.0001
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp representation_type=agg_beat_features model.net.hidden_dims='[256,512]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=mimic/mlp representation_type=agg_beat_features model.net.hidden_dims='[256,512]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
 
 
 cnn_experiments:
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn,sleep_edf/cnn,mimic/cnn representation_type=whole_signal_waveforms \
-		model.net.conv0_kernel_size=TODO model.net.conv0_channels=TODO model.net.layers=TODO model.net.ff_hidden_dims=TODO \
-		model.net.ff_dropout=TODO model.learning_rate=TODO model.weight_decay=TODO --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn,sleep_edf/cnn,mimic/cnn representation_type=whole_signal_features \
-		model.net.conv0_kernel_size=TODO model.net.conv0_channels=TODO model.net.layers=TODO model.net.ff_hidden_dims=TODO \
-		model.net.ff_dropout=TODO model.learning_rate=TODO model.weight_decay=TODO --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn,mimic/cnn representation_type=agg_beat_waveforms \
-		model.net.conv0_kernel_size=TODO model.net.conv0_channels=TODO model.net.layers=TODO model.net.ff_hidden_dims=TODO \
-		model.net.ff_dropout=TODO model.learning_rate=TODO model.weight_decay=TODO --multirun
-	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn,mimic/cnn representation_type=agg_beat_features \
-		model.net.conv0_kernel_size=TODO model.net.conv0_channels=TODO model.net.layers=TODO model.net.ff_hidden_dims=TODO \
-		model.net.ff_dropout=TODO model.learning_rate=TODO model.weight_decay=TODO --multirun
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn representation_type=whole_signal_waveforms model.learning_rate=0.001 model.net.conv0_kernel_size=9 model.net.conv0_channels=256 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/cnn representation_type=whole_signal_waveforms model.learning_rate=0.001 model.net.conv0_kernel_size=9 model.net.conv0_channels=256 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=mimic/cnn representation_type=whole_signal_waveforms model.learning_rate=0.001 model.net.conv0_kernel_size=9 model.net.conv0_channels=256 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn representation_type=whole_signal_features model.learning_rate=0.001 model.net.conv0_kernel_size=7 model.net.conv0_channels=64 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/cnn representation_type=whole_signal_features model.learning_rate=0.001 model.net.conv0_kernel_size=7 model.net.conv0_channels=64 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=mimic/cnn representation_type=whole_signal_features model.learning_rate=0.001 model.net.conv0_kernel_size=7 model.net.conv0_channels=64 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn representation_type=agg_beat_waveforms model.learning_rate=0.001 model.net.conv0_kernel_size=5 model.net.conv0_channels=128 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0 model.weight_decay=0.01
+	python msr/bin/train_and_evaluate.py experiment=mimic/cnn representation_type=agg_beat_waveforms model.learning_rate=0.001 model.net.conv0_kernel_size=5 model.net.conv0_channels=128 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0 model.weight_decay=0.01
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn representation_type=agg_beat_features model.learning_rate=0.001 model.net.conv0_kernel_size=9 model.net.conv0_channels=256 model.net.layers='[1,1,1,1]' model.net.ff_hidden_dims='[128,64]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=mimic/cnn representation_type=agg_beat_features model.learning_rate=0.001 model.net.conv0_kernel_size=9 model.net.conv0_channels=256 model.net.layers='[1,1,1,1]' model.net.ff_hidden_dims='[128,64]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+
+
+
+raw_waveforms:
+	python msr/bin/train_and_evaluate.py experiment=mimic/regression representation_type=whole_signal_waveforms_clean
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/regression representation_type=whole_signal_waveforms_clean model.C=10 model.solver=lbfgs model.max_iter=2000
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/regression representation_type=whole_signal_waveforms_clean transforms='[flatten, downsample]' model.C=10 model.solver=lbfgs model.max_iter=2000
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/decision_tree representation_type=whole_signal_waveforms_clean model.max_depth=64 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.7
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/decision_tree representation_type=whole_signal_waveforms_clean transforms='[flatten, downsample]' model.max_depth=64 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.7
+	python msr/bin/train_and_evaluate.py experiment=mimic/decision_tree representation_type=whole_signal_waveforms_clean model.max_depth=64 model.min_samples_split=2 model.min_samples_leaf=1 model.max_features=0.7
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/lgbm representation_type=whole_signal_waveforms_clean model.colsample_bytree=0.1 model.max_depth=4 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/lgbm representation_type=whole_signal_waveforms_clean transforms='[flatten, downsample]' model.colsample_bytree=0.1 model.max_depth=4 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=mimic/lgbm representation_type=whole_signal_waveforms_clean model.colsample_bytree=0.1 model.max_depth=4 model.num_leaves=31 model.n_estimators=600 model.learning_rate=0.1
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/mlp representation_type=whole_signal_waveforms_clean model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/mlp representation_type=whole_signal_waveforms_clean model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=mimic/mlp representation_type=whole_signal_waveforms_clean model.net.hidden_dims='[256,512,256]' model.net.dropout=0.2 model.learning_rate=0.001 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=ptbxl/cnn representation_type=whole_signal_waveforms_clean model.learning_rate=0.001 model.net.conv0_kernel_size=9 model.net.conv0_channels=256 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=sleep_edf/cnn representation_type=whole_signal_waveforms_clean model.learning_rate=0.001 model.net.conv0_kernel_size=9 model.net.conv0_channels=256 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
+	python msr/bin/train_and_evaluate.py experiment=mimic/cnn representation_type=whole_signal_waveforms_clean model.learning_rate=0.001 model.net.conv0_kernel_size=9 model.net.conv0_channels=256 model.net.layers='[1,1,1]' model.net.ff_hidden_dims='[128,128]' model.net.ff_dropout=0.2 model.weight_decay=0.001
