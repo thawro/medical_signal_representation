@@ -175,9 +175,9 @@ class MimicDataset(RegressionDataset):
         bp_targets_idxs = [bp_targets_idxs[target] for target in bp_targets]
 
         # TODO
-        sbp_mask = (self.targets[:, bp_targets.index("sbp")] >= 80) & (self.targets[:, bp_targets.index("sbp")] <= 180)
-        self.targets = self.targets[sbp_mask]
-        self.data = self.data[sbp_mask]
+        # sbp_mask = (self.targets[:, bp_targets.index("sbp")] >= 80) & (self.targets[:, bp_targets.index("sbp")] <= 180)
+        # self.targets = self.targets[sbp_mask]
+        # self.data = self.data[sbp_mask]
         # dbp_mask = (self.targets[:, bp_targets_idxs['sbp']] >= 80) & (self.targets[:, bp_targets_idxs['sbp']] <= 180)
 
         if len(bp_targets) == 1:

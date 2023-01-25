@@ -850,13 +850,16 @@ class BeatSignal(ABC, BaseSignal):
             return_fig = True
             fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
         if plot_sig:
-            self.plot(ax=ax, title="crit points")
+            self.plot(ax=ax, title="crit points", **kwargs)
         if crit_points == "all":
             crit_points = list(self.crit_points.keys())
         for name, loc in self.crit_points.items():
             if name not in crit_points:
                 continue
-            t_loc = t[loc]
+            if "use_samples" in kwargs and kwargs["use_samples"]:
+                t_loc = loc
+            else:
+                t_loc = t[loc]
             val = self.cleaned[loc] + offset
             ax.scatter(t_loc, val, label=name, s=self.fig_params["marker_size"])
             ax.annotate(
