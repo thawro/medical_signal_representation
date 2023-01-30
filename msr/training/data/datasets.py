@@ -99,6 +99,7 @@ class ClassificationDataset(BaseDataset):
             {target: count for target, count in zip(*np.unique(self.classes, return_counts=True))}
         )
         self.classes_counts = dict(sorted(self.classes_counts.items(), key=lambda item: item[1], reverse=True))
+        self.classes_counts = {class_name: count for class_name, count in self.classes_counts.items() if count > 0}
         self.class_names = sorted([class_name for class_name, count in self.classes_counts.items() if count > 0])
         self.classes_colors = {class_name: color for class_name, color in zip(self.class_names, sns.color_palette())}
 
