@@ -7,7 +7,11 @@ import seaborn as sns
 from scipy import integrate
 from scipy.signal import butter, filtfilt
 
-from msr.signals.base import BeatSignal, PeriodicSignal, find_intervals_using_hr
+from msr.signals.base import (
+    BeatSignal,
+    PeriodicSignal,
+    find_intervals_using_most_dominant_freq,
+)
 from msr.signals.utils import moving_average, parse_feats_to_array
 from msr.utils import lazy_property
 
@@ -52,6 +56,7 @@ def find_systolic_peaks_ELGENDI(
 class PPGSignal(PeriodicSignal):
     def __init__(self, name: str, data: np.ndarray, fs: float, start_sec: float = 0):
         super().__init__(name, data, fs, start_sec)
+        self.units = "PPG [a.u.]"
         # self.nk_signals_df, self.nk_info = nk.ppg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
@@ -67,10 +72,6 @@ class PPGSignal(PeriodicSignal):
     def BeatClass(self):
         return PPGBeat
 
-    def find_troughs(self):
-        peaks = zip(self.peaks[:-1], self.peaks[1:])
-        return np.array([self.data[prev_peak:next_peak].argmin() + prev_peak for prev_peak, next_peak in peaks])
-
     def find_peaks(self):
         peaks = find_systolic_peaks_ELGENDI(self.data, self.fs)
         # peaks = self.nk_info['PPG_Peaks'].values
@@ -80,7 +81,7 @@ class PPGSignal(PeriodicSignal):
         try:
             intervals = np.vstack((self.troughs[:-1], self.troughs[1:])).T
         except Exception:
-            intervals = find_intervals_using_hr(self)
+            intervals = find_intervals_using_most_dominant_freq(self)
         return intervals
 
     def extract_hrv_features(self, return_arr=False, plot=False):
@@ -105,16 +106,15 @@ class PPGSignal(PeriodicSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_agg_beat_features(self, return_arr=True, plot=False):
-        return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
-
-    def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
-        super().explore(start_time, width, window_size, min_hz, max_hz)
+    def explore(self, start_time=0, width=None):
+        figs = super().explore(start_time, width)
+        return figs
 
 
 class PPGBeat(BeatSignal):
     def __init__(self, name, data, fs, start_sec, beat_num=0):
         super().__init__(name, data, fs, start_sec, beat_num)
+        self.units = "PPG [a.u.]"
         self.feature_extraction_funcs.update(
             {
                 "pulse_width": self.extract_pulse_width_features,
@@ -166,28 +166,34 @@ class PPGBeat(BeatSignal):
             {"name": "SysOffsetSlope", "start": self.systolic_peak_loc, "end": self.n_samples - 1},
         ]
 
-    def extract_pulse_width_features(self, return_arr=False, height_pcts=[10, 25, 33, 50, 66, 75], plot=False):
+    def extract_pulse_width_features(self, return_arr=False, height_pcts=[10, 25, 33, 50, 66, 75], plot=False, ax=None):
         """https://ieeexplore.ieee.org/document/9558767"""
         heights = np.array([pct / 100 * (self.range) + self.min for pct in height_pcts])
         idxs = [np.argwhere(np.diff(np.sign(height - self.data))).flatten() for height in heights]
+        idxs = [idx if len(idx) >= 2 else [idx[0], self.n_samples - 1] for idx in idxs]
         widths = np.array([idx[-1] - idx[0] for idx in idxs])
         times = {height_pcts[i]: [self.time[idxs[i][0]], self.time[idxs[i][-1]]] for i in range(len(heights))}
         features = {f"pulse_width_{height_pct}%": width / self.fs for height_pct, width in zip(height_pcts, widths)}
+        return_fig = False
         if plot:
-            fig, ax = plt.subplots(figsize=(6, 4))
+            if ax is None:
+                return_fig = True
+                fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
             # ax.plot(self.time, self.data, "-", lw=3)
-            self.plot(ax=ax, title="pulse width features")
+            self.plot(ax=ax, title="pulse width features", label=None)
             for height in height_pcts:
                 label = f"pw at {height}%"
                 start, end = times[height]
                 height_val = height / 100 * self.range + self.min
                 ax.hlines(height_val, start, end, ls="--", color="black")
-                ax.annotate(label, (end, height_val), size=14)
+                ax.annotate(label, (end, height_val), size=self.fig_params["annot_size"])
         if return_arr:
             return parse_feats_to_array(features)
+        if return_fig:
+            return features, fig
         return features
 
-    def extract_pulse_height_features(self, return_arr=False, width_pcts=[10, 25, 33, 50, 66, 75], plot=False):
+    def extract_pulse_height_features(self, return_arr=False, width_pcts=[10, 25, 33, 50, 66, 75], plot=False, ax=None):
         """https://ieeexplore.ieee.org/document/9558767"""
         width_sample_locs = [int(self.n_samples * pct / 100) for pct in width_pcts]
         height_vals = [self.data[loc] - self.min for loc in width_sample_locs]
@@ -195,19 +201,23 @@ class PPGBeat(BeatSignal):
         height_vals = {
             width_sample_loc: [self.min, self.data[width_sample_loc]] for width_sample_loc in width_sample_locs
         }
-
+        return_fig = False
         if plot:
-            fig, ax = plt.subplots(figsize=(6, 4))
-            # ax.plot(self.time, self.data, "-", lw=3)
-            self.plot(ax=ax, title="pulse height features")
+            if ax is None:
+                return_fig = True
+                fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
+            self.plot(ax=ax, title="pulse height features", label=None)
             for i, (width_loc, height_bounds) in enumerate(height_vals.items()):
                 label = f"ph at {width_pcts[i]}%"
                 lower, upper = height_bounds
                 ax.vlines(width_loc / self.fs, lower, upper, ls="--", color="black")
-                ax.annotate(label, (width_loc / self.fs, upper), size=14)
+                ax.annotate(label, (width_loc / self.fs, upper), size=self.fig_params["annot_size"])
         if return_arr:
             return parse_feats_to_array(features)
+        if return_fig:
+            return features, fig
         return features
 
-    def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
-        super().explore(start_time, width, window_size, min_hz, max_hz)
+    def explore(self, start_time=0, width=None):
+        figs = super().explore(start_time, width)
+        return figs

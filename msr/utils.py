@@ -41,19 +41,37 @@ EPSILON = np.finfo(float).eps
 datamodule2str = {  # dm
     "PtbXLDataModule": "ptbxl",
     "MimicDataModule": "mimic",
+    "MimicCleanDataModule": "mimic_clean",
     "SleepEDFDataModule": "sleep_edf",
 }
 
+model2str = {
+    "LogisticRegression": "Regression",
+    "LinearRegression": "Regression",
+    "DecisionTreeClassifier": "Decision Tree",
+    "DecisionTreeRegressor": "Decision Tree",
+    "RandomForestClassifier": "Random Forest",
+    "RandomForestRegressor": "Random Forest",
+    "LGBMClassifier": "LGBM",
+    "LGBMRegressor": "LGBM",
+    "MLPClassifier": "MLP",
+    "MLPRegressor": "MLP",
+    "CNNClassifier": "CNN",
+    "CNNRegressor": "CNN",
+    "LSTMClassifier": "LSTM",
+    "LSTMRegressor": "LSTM",
+}
 
-def logger_project_to_str(project):
+
+def dataset_to_str(project):
     datamodule = project.split(".")[-1]
     return datamodule2str[datamodule]
 
 
 def logger_name_to_str(name):
-    rep_type, model_target = name.split("__")
+    dataset, rep_type, model_target = name.split("__")
     model_classname = model_target.split(".")[-1]
-    return f"{rep_type}__{model_classname}"
+    return f"{dataset_to_str(dataset)}__{rep_type}__{model_classname}"
 
 
 def get_corr_matrix(df: pd.DataFrame):

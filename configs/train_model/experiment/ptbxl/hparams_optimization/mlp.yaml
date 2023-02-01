@@ -1,0 +1,22 @@
+# @package _global_
+
+defaults:
+  - override /callbacks: default.yaml
+  - override /logger: dl_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+  - override /trainer: dl_classifier_trainer.yaml
+  - override /datamodule: ptbxl.yaml
+  - override /model: mlp_classifier.yaml
+  - override /transforms: [flatten.yaml]
+
+
+logger_project: ptbxl_optimization #${datamodule._target_}
+logger_run_name: ${dataset}__${representation_type}__${model._target_}
+
+
+model:
+  learning_rate: 0.001            # 0.001, 0.01, 0.05, 0.1     | 0.01
+  net:
+    hidden_dims: [256, 512, 256]  # [512], [256, 512], [512, 256], [256, 512, 256], [128, 256, 512, 256, 128]  |  [256, 512, 256]
+    dropout: 0.2                  # 0, 0.1, 0.2, 0.3, 0.4      | 0.2
+  weight_decay: 0.001             # 0.0001, 0.001, 0.01, 0.1   | 0.001

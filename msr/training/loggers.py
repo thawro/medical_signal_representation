@@ -1,6 +1,6 @@
 import omegaconf
-
 import wandb
+from pytorch_lightning.loggers import WandbLogger
 
 PROJECT = "medical-signals-representation"
 
@@ -27,5 +27,13 @@ class MLWandbLogger:
     def log(self, data, commit=False):
         wandb.log(data, commit=commit)
 
-    def finish(self, quiet: bool = True):
+    def finish(self, quiet: bool = False):
         wandb.finish(quiet=quiet)
+
+
+class DLWandbLogger(WandbLogger):
+    def log(self, data):
+        self.experiment.log(data)
+
+    def finish(self, quiet: bool = True):
+        self.experiment.finish(quiet=quiet)

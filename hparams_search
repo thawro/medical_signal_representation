@@ -1,0 +1,31 @@
+LogR:
+	C: 0.01, 0.1, 1, 10
+	solver: newton-cg, sag, saga, lbfgs
+	max_iter: 100, 1000, 5000
+
+LinR:
+
+
+DT:
+	max_depth: 4, 32, 64, None
+	min_samples_split: 2, 4, 8, 16
+	min_samples_leaf: 1, 2, 3, 4
+	max_features: None, 0.5, sqrt, log2
+
+LGBM:
+	boosting_type: gbdt, dart, rf
+	num_leaves: 31, 63, 127, 255
+	max_depth: 4, 32, 64, -1
+	learning_rate: 0.001, 0.005, 0.01, 0.1
+	n_estimators: 100, 250, 600, 1000
+
+MLP:
+	hidden_dims: [512], [256, 512], [256, 512, 256], [128, 256, 512, 256, 128],
+	dropout: 0, 0.1, 0.3, 0.5
+
+CNN:
+	conv0_kernel_size: 3, 5, 7, 9
+	conv0_channels: 32, 64, 128, 256
+	layers = [1], [1, 1], [1, 1, 1], [1, 1, 1, 1]
+	ff_hidden_dims: [64], [128], [128, 128], [128, 64]
+	ff_dropout: 0.1, 0.2

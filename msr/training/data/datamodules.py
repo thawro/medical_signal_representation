@@ -5,24 +5,41 @@ from typing import Callable, List, Literal
 import matplotlib.pyplot as plt
 import torch
 from pytorch_lightning import LightningDataModule
+from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
-from msr.training.data.datasets import MimicDataset, PtbXLDataset, SleepEDFDataset
+from msr.training.data.datasets import (
+    MimicCleanDataset,
+    MimicDataset,
+    PtbXLDataset,
+    SleepEDFDataset,
+)
 from msr.training.data.utils import StratifiedBatchSampler
 from msr.utils import align_left
 
 
 class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def __init__(
-        self, representation_type: str, batch_size: int = 64, num_workers: int = 8, transform: Callable = None
+        self,
+        representation_type: str,
+        batch_size: int = 64,
+        num_workers: int = 8,
+        train_transform: Callable = None,
+        inference_transform: Callable = None,
+        standardize: bool = False,
     ):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.representation_type = representation_type
-        self.transform = transform
-        self.dataset_params = dict(representation_type=representation_type, transform=transform)
+        self.train_transform = train_transform
+        self.inference_transform = inference_transform
         self.datasets = []
+        self.train, self.val, self.test = None, None, None
+        self.standardize = standardize
+        if standardize:
+            self.data_standardizer = StandardScaler()
 
     def describe(self, ds_fields=["data_shape", "classes_counts"], dm_fields=["info"]):
         dm_connector = "\n" if dm_fields else ""
@@ -44,24 +61,71 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            self.train = self.DatasetFactory(split="train", **self.dataset_params)
-            self.val = self.DatasetFactory(split="val", **self.dataset_params)
-            self.datasets.extend([self.train, self.val])
-        if stage == "test" or stage is None:
-            self.test = self.DatasetFactory(split="test", **self.dataset_params)
-            self.datasets.append(self.test)
+            if self.train is None:
+                self.train = self.DatasetFactory(
+                    split="train", representation_type=self.representation_type, transform=self.train_transform
+                )
+                if self.standardize:
+                    self.data_standardizer.fit(self.train.data.flatten(1, -1))
+                    self.train.data = torch.from_numpy(self.data_standardizer.transform(self.train.data.flatten(1, -1)))
+                self.datasets.append(self.train)
 
-        for dataset in self.datasets:
-            if hasattr(dataset, "feature_names"):
-                self.feature_names = dataset.feature_names
-            if hasattr(dataset, "class_names"):
-                self.class_names = dataset.class_names
-                self.num_classes = len(self.class_names)
+            if self.val is None:
+                self.val = self.DatasetFactory(
+                    split="val", representation_type=self.representation_type, transform=self.inference_transform
+                )
+                if self.standardize:
+                    self.val.data = torch.from_numpy(self.data_standardizer.transform(self.val.data.flatten(1, -1)))
+                self.datasets.append(self.val)
+
+        if stage == "test" or stage is None:
+            if self.test is None:
+                self.test = self.DatasetFactory(
+                    split="test", representation_type=self.representation_type, transform=self.inference_transform
+                )
+                if self.standardize:
+                    self.test.data = torch.from_numpy(self.data_standardizer.transform(self.test.data.flatten(1, -1)))
+                self.datasets.append(self.test)
+
+    @property
+    def input_shape(self):
+        for ds in self.datasets:
+            return ds.input_shape
+
+    @property
+    def transformed_input_shape(self):
+        for ds in self.datasets:
+            return ds.transformed_input_shape
+
+    @property
+    def num_classes(self):
+        try:
+            return len(self.class_names)
+        except TypeError:
+            return
+
+    @property
+    def class_names(self):
+        for ds in self.datasets:
+            try:
+                return ds.class_names
+            except AttributeError:
+                return
+
+    @property
+    def feature_names(self):
+        for ds in self.datasets:
+            return ds.feature_names
 
     def get_transformed_data(self, split):
-        split_data = getattr(self, split).data
-        if self.transform is not None:
-            return torch.stack([self.transform(sample) for sample in split_data])
+        split_dataset = getattr(self, split)
+        split_data = split_dataset.data
+        if split_dataset.transform is not None:
+            # _split_data = Parallel(n_jobs=-3)(delayed(split_dataset.transform)(sample) for sample in tqdm(split_data, desc=f"Transforming {split} data"))
+            # return torch.stack(_split_data)
+            return torch.stack(
+                [split_dataset.transform(sample) for sample in tqdm(split_data, desc=f"Transforming {split} data")]
+            )
         else:
             return split_data
 
@@ -77,32 +141,51 @@ class BaseDataModule(LightningDataModule, metaclass=ABCMeta):
     def test_data(self):
         return self.get_transformed_data("test")
 
-    def plot_targets(self):
+    def get_X_y(self, split="all"):
+        if split == "all":
+            data = []
+            for _split in ["train", "val", "test"]:
+                data.extend(self.get_X_y(_split))
+            return data
+        else:
+            X = getattr(self, f"{split}_data")
+            y = getattr(self, split).targets
+            return X, y
+
+    def plot_targets(self, axes=None):
         ncols = len(self.datasets)
-        fig, axes = plt.subplots(1, ncols, figsize=(ncols * 5, 3.5))
+        return_fig = False
+        if axes is None:
+            return_fig = True
+            fig, axes = plt.subplots(1, ncols, figsize=(ncols * 5, 5))
         for dataset, ax in zip(self.datasets, axes):
             dataset.plot_targets(ax=ax)
-            ax.set_title(dataset.split)
+        axes[1].set_ylabel("")
+        axes[2].set_ylabel("")
         plt.tight_layout()
+        if return_fig:
+            return fig
 
     def train_dataloader(self):
         return DataLoader(
             self.train,
-            batch_sampler=StratifiedBatchSampler(self.train[:][1], batch_size=self.batch_size, shuffle=True),
+            batch_sampler=StratifiedBatchSampler(self.train.targets.int(), batch_size=self.batch_size, shuffle=True),
             num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
         return DataLoader(
             self.val,
-            batch_sampler=StratifiedBatchSampler(self.val[:][1], batch_size=10 * self.batch_size, shuffle=False),
+            batch_sampler=StratifiedBatchSampler(self.val.targets.int(), batch_size=5 * self.batch_size, shuffle=False),
             num_workers=self.num_workers,
         )
 
     def test_dataloader(self):
         return DataLoader(
             self.test,
-            batch_sampler=StratifiedBatchSampler(self.test[:][1], batch_size=10 * self.batch_size, shuffle=False),
+            batch_sampler=StratifiedBatchSampler(
+                self.test.targets.int(), batch_size=5 * self.batch_size, shuffle=False
+            ),
             num_workers=self.num_workers,
         )
 
@@ -117,9 +200,13 @@ class PtbXLDataModule(BaseDataModule):
         target: str = "diagnostic_class",
         batch_size: int = 64,
         num_workers=8,
-        transform: Callable = None,
+        train_transform: Callable = None,
+        inference_transform: Callable = None,
+        standardize: bool = False,
     ):
-        super().__init__(representation_type, batch_size, num_workers, transform)
+        super().__init__(
+            representation_type, batch_size, num_workers, train_transform, inference_transform, standardize
+        )
         self.fs = fs
         self.target = target
 
@@ -138,15 +225,49 @@ class MimicDataModule(BaseDataModule):
         bp_targets: List[Literal["sbp", "dbp"]] = ["sbp"],
         batch_size: int = 64,
         num_workers=8,
-        transform: Callable = None,
+        train_transform: Callable = None,
+        inference_transform: Callable = None,
+        standardize: bool = False,
     ):
-        super().__init__(representation_type, batch_size, num_workers, transform)
+        super().__init__(
+            representation_type, batch_size, num_workers, train_transform, inference_transform, standardize
+        )
         self.target = target
         self.bp_targets = bp_targets
 
     @property
     def DatasetFactory(self):
         return partial(MimicDataset, target=self.target, bp_targets=self.bp_targets)
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val,
+            batch_size=5 * self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test,
+            batch_size=5 * self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+
+class MimicCleanDataModule(MimicDataModule):
+    @property
+    def DatasetFactory(self):
+        return partial(MimicCleanDataset, target=self.target, bp_targets=self.bp_targets)
 
 
 class SleepEDFDataModule(BaseDataModule):

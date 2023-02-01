@@ -138,3 +138,4 @@ writing_tips
 outputs/
 wandb/
 logs/
+checkpoints/

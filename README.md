@@ -112,29 +112,29 @@
 # Signals
 
 1. ECG (Electrocardiogram)
-    * [A novel ECG signal classification method using DEA-ELM](https://www.sciencedirect.com/science/article/pii/S0306987719312381#b0085)
-    * [A survey on ECG analysis](https://www.sciencedirect.com/science/article/pii/S1746809418300636#bib0175)
-    * [Interpretable deep learning for automatic diagnosis of 12-lead electrocardiogram](https://www.sciencedirect.com/science/article/pii/S2589004221003412)
-    * [Automatic diagnosis of the 12-lead ECG using a deep neural network](https://www.nature.com/articles/s41467-020-15432-4)
+    * X [A novel ECG signal classification method using DEA-ELM](https://www.sciencedirect.com/science/article/pii/S0306987719312381#b0085)
+    * X [A survey on ECG analysis](https://www.sciencedirect.com/science/article/pii/S1746809418300636#bib0175)
+    * X [Interpretable deep learning for automatic diagnosis of 12-lead electrocardiogram](https://www.sciencedirect.com/science/article/pii/S2589004221003412)
+    * X [Automatic diagnosis of the 12-lead ECG using a deep neural network](https://www.nature.com/articles/s41467-020-15432-4)
 
 2. PPG (Photopletysmogram)
-    * [Continuous PPG-Based Blood Pressure Monitoring Using Multi-Linear Regression](https://arxiv.org/abs/2011.02231)
-    * [Assessment of Non-Invasive Blood Pressure Prediction from PPG and rPPG Signals Using Deep Learning](https://www.mdpi.com/1424-8220/21/18/6022)
-    * [End-to-End Blood Pressure Prediction via Fully Convolutional Networks](https://ieeexplore.ieee.org/abstract/document/8936850)
-    * [A Benchmark Study of Machine Learning for Analysis of Signal Feature Extraction Techniques for Blood Pressure Estimation Using Photoplethysmography (PPG)](https://ieeexplore.ieee.org/document/9558767)
-    * [A Deep Learning Approach to Predict Blood Pressure from PPG Signals](https://arxiv.org/abs/2108.00099)
-    * [A Comparison of Deep Learning Techniques for Arterial Blood Pressure Prediction ](https://link.springer.com/article/10.1007/s12559-021-09910-0)
-    * [BP-Net: Efficient Deep Learning for Continuous Arterial Blood Pressure Estimation using Photoplethysmogram](https://arxiv.org/abs/2111.14558)
-    * [PPG2ABP: Translating Photoplethysmogram (PPG) Signals to Arterial Blood Pressure (ABP) Waveforms using Fully Convolutional Neural Networks](https://arxiv.org/abs/2005.01669)
-    * [Beat-to-Beat Continuous Blood Pressure Estimation Using Bidirectional Long Short-Term Memory Network](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7795062/)
-    * [Cuffless Blood Pressure Estimation Algorithms for Continuous Health-Care Monitoring](https://pubmed.ncbi.nlm.nih.gov/27323356/)
-    * [Continuous Blood Pressure Estimation Using Exclusively Photopletysmography by LSTM-Based Signal-to-Signal Translation](https://www.mdpi.com/1424-8220/21/9/2952)
-    * [Generalized Deep Neural Network Model for Cuffless Blood Pressure Estimation with Photoplethysmogram Signal Only](https://www.mdpi.com/1424-8220/20/19/5668)
+    * X [Continuous PPG-Based Blood Pressure Monitoring Using Multi-Linear Regression](https://arxiv.org/abs/2011.02231)
+    * X [Assessment of Non-Invasive Blood Pressure Prediction from PPG and rPPG Signals Using Deep Learning](https://www.mdpi.com/1424-8220/21/18/6022)
+    * X [End-to-End Blood Pressure Prediction via Fully Convolutional Networks](https://ieeexplore.ieee.org/abstract/document/8936850)
+    * X [A Benchmark Study of Machine Learning for Analysis of Signal Feature Extraction Techniques for Blood Pressure Estimation Using Photoplethysmography (PPG)](https://ieeexplore.ieee.org/document/9558767)
+    * X [A Deep Learning Approach to Predict Blood Pressure from PPG Signals](https://arxiv.org/abs/2108.00099)
+    * X [A Comparison of Deep Learning Techniques for Arterial Blood Pressure Prediction ](https://link.springer.com/article/10.1007/s12559-021-09910-0)
+    * X [BP-Net: Efficient Deep Learning for Continuous Arterial Blood Pressure Estimation using Photoplethysmogram](https://arxiv.org/abs/2111.14558)
+    * X [PPG2ABP: Translating Photoplethysmogram (PPG) Signals to Arterial Blood Pressure (ABP) Waveforms using Fully Convolutional Neural Networks](https://arxiv.org/abs/2005.01669)
+    * X [Beat-to-Beat Continuous Blood Pressure Estimation Using Bidirectional Long Short-Term Memory Network](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7795062/)
+    * X [Cuffless Blood Pressure Estimation Algorithms for Continuous Health-Care Monitoring](https://pubmed.ncbi.nlm.nih.gov/27323356/)
+    * X [Continuous Blood Pressure Estimation Using Exclusively Photopletysmography by LSTM-Based Signal-to-Signal Translation](https://www.mdpi.com/1424-8220/21/9/2952)
+    * X [Generalized Deep Neural Network Model for Cuffless Blood Pressure Estimation with Photoplethysmogram Signal Only](https://www.mdpi.com/1424-8220/20/19/5668)
 
 3. EEG (Encephalogram)
-    * [Automatic Human Sleep Stage Scoring Using Deep Neural Networks](https://www.frontiersin.org/articles/10.3389/fnins.2018.00781/full)
-    * [SleepEEGNet: Automated sleep stage scoring with sequence to sequence deep learning approach](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6504038/) (https://arxiv.org/abs/1903.02108)
-    * [Analysis and visualization of sleep stages based on deep neural networks](https://www.sciencedirect.com/science/article/pii/S2451994421000055)
+    * X [Automatic Human Sleep Stage Scoring Using Deep Neural Networks](https://www.frontiersin.org/articles/10.3389/fnins.2018.00781/full)
+    * X [SleepEEGNet: Automated sleep stage scoring with sequence to sequence deep learning approach](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6504038/) (https://arxiv.org/abs/1903.02108)
+    * X [Analysis and visualization of sleep stages based on deep neural networks](https://www.sciencedirect.com/science/article/pii/S2451994421000055)
     * [https://towardsdatascience.com/sleep-stage-classification-from-single-channel-eeg-using-convolutional-neural-networks-5c710d92d38e](https://towardsdatascience.com/sleep-stage-classification-from-single-channel-eeg-using-convolutional-neural-networks-5c710d92d38e)
     * [DeepSleepNet: a Model for Automatic Sleep Stage Scoring based on Raw Single-Channel EEG](https://arxiv.org/abs/1703.04046)
 
@@ -257,23 +257,23 @@
 
 * Features:
     * Common:
-        * [HRV](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5624990/)
+        * X[HRV](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5624990/)
     * PPG:
-        * [pulse width/height features](https://ieeexplore.ieee.org/document/9558767)
+        * X[pulse width/height features](https://ieeexplore.ieee.org/document/9558767)
         * [Wavelet entropy](https://www.scirp.org/journal/paperinformation.aspx?paperid=112523)
-        * [wavelet features](https://ieeexplore.ieee.org/document/6100581)
-        * [HR features](https://www.researchgate.net/publication/319217053_Essential_Feature_Extraction_of_Photoplethysmography_Signal_of_Men_and_Women_in_Their_20s)
+        * X[wavelet features](https://ieeexplore.ieee.org/document/6100581)
+        * X[HR features](https://www.researchgate.net/publication/319217053_Essential_Feature_Extraction_of_Photoplethysmography_Signal_of_Men_and_Women_in_Their_20s)
     * ECG
-        * [ECGBeat features](https://www.sciencedirect.com/science/article/pii/S0169260715003314)
-        * [Wavelet features](https://www.frontiersin.org/articles/10.3389/fncom.2017.00103/full)
+        * X[ECGBeat features](https://www.sciencedirect.com/science/article/pii/S0169260715003314)
+        * X[Wavelet features](https://www.frontiersin.org/articles/10.3389/fncom.2017.00103/full)
     * EEG
-        * [Wavelet features](https://downloads.hindawi.com/archive/2014/730218.pdf)
-        * [Wavelet features](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6721346/)
+        * X[Wavelet features](https://downloads.hindawi.com/archive/2014/730218.pdf)
+        * X[Wavelet features](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6721346/)
         * [Complicated features](https://www.sciencedirect.com/science/article/pii/S1110016821007055)
         * [All features](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8198610/pdf/sensors-21-03786.pdf)
     * EOG
-        * [Statistic features](https://www.hindawi.com/journals/cmmm/2014/713818/)
-        * [Statistic features](https://www.researchgate.net/publication/257724368_Evaluating_Feature_Extraction_Methods_of_Electrooculography_EOG_Signal_for_Human-Computer_Interface)
+        * X[Statistic features](https://www.hindawi.com/journals/cmmm/2014/713818/)
+        * X[Statistic features](https://www.researchgate.net/publication/257724368_Evaluating_Feature_Extraction_Methods_of_Electrooculography_EOG_Signal_for_Human-Computer_Interface)
         * [Statistic features](https://www.rsisinternational.org/journals/ijrsi/digital-library/volume-5-issue-4/287-290.pdf)
 
 * Models

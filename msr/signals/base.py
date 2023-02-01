@@ -52,15 +52,16 @@ log = logging.getLogger(__name__)
 MIN_HR, MAX_HR = 30, 200
 
 
-def find_intervals_using_hr(signal: Type[PeriodicSignal]):
-    T_in_samples = int(1 / signal.hr * signal.fs)
+def find_intervals_using_most_dominant_freq(signal: Type[PeriodicSignal]):
+    T_in_samples = int(1 / signal.most_dominant_freq * signal.fs)
     x = signal.cleaned
     neg_x_minmax = -(x - x.min()) / (x.max() - x.min()) + 1
-    troughs, _ = find_peaks(neg_x_minmax, height=0.9)
-    intervals = [(troughs[0], find_closest_element(troughs, troughs[0] + T_in_samples))]
+    troughs, _ = find_peaks(neg_x_minmax, height=0.5)
+    # troughs = signal.troughs
+    intervals = [(troughs[0], find_closest_element(troughs, troughs[0] + T_in_samples)[1])]
     while intervals[-1][1] + T_in_samples < signal.n_samples:
         prev_end = intervals[-1][1]
-        next_end = find_closest_element(troughs, prev_end + T_in_samples)
+        next_end = find_closest_element(troughs, prev_end + T_in_samples)[1]
         intervals.append((prev_end, next_end))
     return np.array(intervals)
 
@@ -69,10 +70,12 @@ class BaseSignal:
     def __init__(self, name: str, data: NDArray[Shape["N"], Float], fs: float, start_sec: float = 0):
         self.name = name
         self.data = data
-        self.min = self.data.min()
-        self.max = self.data.max()
-        self.range = self.max - self.min
         self.fs = fs
+        self.min = self.cleaned.min()
+        self.max = self.cleaned.max()
+        self.range = self.max - self.min
+
+        self.units = "Values [a.u.]"
         self.start_sec = start_sec
         self.n_samples = len(data)
         self.duration = self.n_samples / fs
@@ -88,10 +91,11 @@ class BaseSignal:
         return np.copy(self.data)
 
     def find_peaks(self):
-        return find_peaks(self.data)[0]
+        return find_peaks(self.cleaned)[0]
 
     def find_troughs(self):
-        return find_peaks(-self.data)[0]
+        peaks = zip(self.peaks[:-1], self.peaks[1:])
+        return np.array([self.cleaned[prev_peak:next_peak].argmin() + prev_peak for prev_peak, next_peak in peaks])
 
     @lazy_property
     def troughs(self):
@@ -201,7 +205,7 @@ class BaseSignal:
         return res
 
     def fft(self, plot=False, ax=None) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
-        amps = rfft(self.data)
+        amps = rfft(self.cleaned)
         freqs = rfftfreq(self.n_samples, 1 / self.fs)
         if plot:
             if ax is None:
@@ -210,36 +214,47 @@ class BaseSignal:
         return freqs, amps
 
     def psd(
-        self, window_size, min_hz=0, max_hz=10, plot=False, ax=None
+        self, fmin=0, fmax=10, plot=False, ax=None, normalize=True
     ) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
-        freqs, amps = welch(self.data, self.fs, nperseg=self.fs * window_size)
+        freqs, pxx = welch(self.cleaned, self.fs)
+        mask = (freqs >= fmin) & (freqs <= fmax)
+        freqs, pxx = freqs[mask], pxx[mask]
+        if normalize:
+            pxx /= sum(pxx)
+        return_fig = False
         if plot:
             if ax is None:
-                fig, ax = plt.subplots(figsize=(16, 8))
-            mask = (freqs >= min_hz) & (freqs <= max_hz)
-            ax.plot(freqs[mask], amps[mask], lw=2)
-            ax.set_xlabel("Frequency [Hz]", fontsize=18)
-            ax.set_ylabel("Power Spectral Density", fontsize=18)
+                return_fig = True
+                fig, ax = plt.subplots(figsize=BEAT_FIG_PARAMS["fig_size"])
 
-        return freqs, amps
+            ax.semilogy(freqs, pxx, lw=2)
+            ax.set_xlabel("Frequency [Hz]", fontsize=BEAT_FIG_PARAMS["label_size"])
+            ax.set_ylabel("PSD", fontsize=BEAT_FIG_PARAMS["label_size"])
+            ax.tick_params(axis="both", which="major", labelsize=BEAT_FIG_PARAMS["tick_size"])
+        if return_fig:
+            return freqs, pxx, fig
+        return freqs, pxx
 
     def spectrogram(
         self, NFFT=256, noverlap=128, ax=None
     ) -> Tuple[NDArray[Shape["N"], Float], NDArray[Shape["N"], Float], NDArray[Shape["N"], Float]]:
         if ax is None:
             fig, ax = plt.subplots(figsize=(20, 8))
-        spectrum, freqs, t, img = ax.specgram(self.data, Fs=self.fs, NFFT=NFFT, noverlap=noverlap, cmap="viridis")
+        spectrum, freqs, t, img = ax.specgram(self.cleaned, Fs=self.fs, NFFT=NFFT, noverlap=noverlap, cmap="viridis")
         cbar = plt.gcf().colorbar(img, ax=ax)
-        cbar.ax.set_title("Intensity", fontsize=14)
-        ax.set_ylabel("Frequency [Hz]", fontsize=18)
-        ax.set_xlabel("Time [s]", fontsize=18)
+        cbar.ax.set_title("Intensity", fontsize=self.fig_params["title_size"])
+        ax.set_ylabel("Frequency [Hz]", fontsize=self.fig_params["label_size"])
+        ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
+        ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])
         return spectrum, freqs, t
 
-    def get_whole_signal_waveform(self) -> NDArray[Shape["N"], Float]:
-        return self.data
+    def get_whole_signal_waveform(self, raw=True) -> NDArray[Shape["N"], Float]:
+        if raw:
+            return self.data
+        return self.cleaned
 
     def extract_basic_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
-        features = get_basic_signal_features(self.data)
+        features = get_basic_signal_features(self.cleaned)
         if return_arr:
             return np.array(list(features.values()))
         return features
@@ -260,28 +275,31 @@ class BaseSignal:
         scatter=False,
         line=True,
         first_der=False,
-        label=None,
+        label="",
         use_samples=False,
         ax=None,
         title="",
         lw=3,
     ):
+        return_fig = False
         if ax is None:
             fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
+            return_fig = True
         if width == -1:
             width = self.time[-1] - start_time
         end_time = start_time + width
-
-        if end_time - start_time >= self.duration:
-            signal_slice = self
+        signal_slice = self.get_slice(start_time, end_time)
+        if label is not None:
+            label = signal_slice.name if label == "" else label
+        if use_samples:
+            x = np.arange(signal_slice.n_samples) + int(start_time * self.fs)
         else:
-            signal_slice = self.get_slice(start_time, end_time)
-        label = label if label is not None else signal_slice.name
-        x = np.arange(signal_slice.n_samples) if use_samples else signal_slice.time
-        x = x + start_time
+            x = signal_slice.time + start_time + signal_slice.start_sec
         y = signal_slice.data if use_raw else signal_slice.cleaned
         plot_kwgs = dict(lw=lw, label=label)
-        sig_plot = ax.scatter(x, y, **plot_kwgs) if scatter else ax.plot(x, y, **plot_kwgs)
+        sig_plot = (
+            ax.scatter(x, y, **plot_kwgs, s=self.fig_params["marker_size"]) if scatter else ax.plot(x, y, **plot_kwgs)
+        )
         plots = [sig_plot]
         if first_der:
             ax2 = ax.twinx()
@@ -291,45 +309,33 @@ class BaseSignal:
             plot_kwgs = dict(c=sns.color_palette()[1], lw=1, label=label + "_der")
             first_der_plot = ax2.scatter(x, y, **plot_kwgs) if scatter else ax2.plot(x, y, **plot_kwgs)
             plots.append(first_der_plot)
-            ax2.set_ylabel("First derivative values", fontsize=18)
+            ax2.set_ylabel("First derivative values", fontsize=self.fig_params["label_size"])
             ax2.axhline(y=0, c="black", ls="--", lw=0.5)
         plots = [plot[0] for plot in plots] if line else plots
         labels = [plot.get_label() for plot in plots]
         # ax.legend(plots, labels, loc=0, fontsize=18)
-        ax.legend()
-        ax.set_ylabel("Values", fontsize=18)
-        ax.set_xlabel("Samples" if use_samples else "Time [s]", fontsize=18)
-        ax.set_title(f"{self.name} {title}", fontsize=22)
+        if label is not None and label != "":
+            ax.legend(fontsize=self.fig_params["legend_size"])
+        ax.set_ylabel(self.units, fontsize=self.fig_params["label_size"])
+        ax.set_xlabel("Samples" if use_samples else "Time [s]", fontsize=self.fig_params["label_size"])
+        if title is not None:
+            ax.set_title(f"{self.name} {title}", fontsize=self.fig_params["title_size"])
+        ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])
+        # step = int(2 * self.fs) if use_samples else 2
+        # if step > x[-1] - x[0]:
+        #     step = (x[-1] - x[0]) / 3
 
-    def explore(self, start_time, width=None, window_size=4, min_hz=0, max_hz=20):
+        # ax.set_xticks((np.arange(x[0], x[-1] + step / 2, step)).round(2))
+        if return_fig:
+            return fig
+
+    def explore(self, start_time, width=None):
         if width is None:
             width = self.time[-1] - start_time
 
-        signal_slice = self.get_slice(start_time, start_time + width)
-        fig = plt.figure(figsize=(40, 20), constrained_layout=True)
-        spec = fig.add_gridspec(8, 8, wspace=0.8, hspace=0.8)
-
-        ax00 = fig.add_subplot(spec[:4, :6])
-        ax01 = fig.add_subplot(spec[:4, 6:])
-        ax11 = fig.add_subplot(spec[4:, :4])
-        ax12 = fig.add_subplot(spec[4:, 4:])
-
-        signal_slice.plot(start_time, width, ax=ax00)
-        sns.kdeplot(signal_slice.data, ax=ax01, lw=3)
-        signal_slice.psd(window_size=window_size, min_hz=min_hz, max_hz=max_hz, plot=True, ax=ax11)
-        signal_slice.spectrogram(ax=ax12)
-
-        axes_params = [
-            (ax00, "Signal"),
-            (ax01, "Kernel Density Estimation"),
-            (ax11, "Power Spectral Density"),
-            (ax12, "Spectrogram"),
-        ]
-
-        for ax, title in axes_params:
-            ax.set_title(title, fontsize=26, fontweight="bold")
-            ax.tick_params(axis="both", which="major", labelsize=18)
-            ax.margins(0.01)
+        figs = {}
+        figs["signal"] = self.plot(start_time=start_time, width=width)
+        return figs
 
 
 class Signal(BaseSignal):
@@ -358,7 +364,7 @@ class Signal(BaseSignal):
             ]
         )
 
-    def extract_peaks_troughs_features(self, return_arr=True, plot=False):
+    def extract_peaks_troughs_features(self, return_arr=True, plot=False, ax=None):
         peaks_time, peaks_data = self.time[self.peaks], self.cleaned[self.peaks]
         troughs_time, troughs_data = self.time[self.troughs], self.cleaned[self.troughs]
         peaks_new_time = self.time[(self.time >= peaks_time[0]) & (self.time <= peaks_time[-1])]
@@ -372,34 +378,50 @@ class Signal(BaseSignal):
         signals = [peaks_sig, troughs_sig, amplitudes_sig]
 
         features = {sig.name: sig.extract_basic_features(return_arr=False) for sig in signals}
-
+        return_fig = False
         if plot:
-            fig, ax = plt.subplots(figsize=(24, 6))
+            if ax is None:
+                return_fig = True
+                fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
             for sig in [self] + signals:
-                lw = 1 if sig in signals else 3
+                lw = 2 if sig in signals else 3
                 sig.plot(start_time=sig.start_sec, width=sig.duration, ax=ax, label=sig.name, lw=lw)
         if return_arr:
             return parse_feats_to_array(features)
+        if return_fig:
+            return features, fig
         return features
 
-    def extract_DWT_features(self, return_arr=True, wavelet="db5", level=None, plot=False):
+    def extract_DWT_features(self, return_arr=True, wavelet="db8", level=None, plot=False):
         """Discrete wavelet transform"""
-        features = extract_dwt_features(self.cleaned, self.fs, wavelet, level, plot=plot)
+        if plot:
+            features, fig = extract_dwt_features(self, wavelet, level, plot=True)
+        else:
+            features = extract_dwt_features(self, wavelet, level, plot=False)
         if return_arr:
             return parse_feats_to_array(features)
+        if plot:
+            return features, fig
         return features
 
     def get_CWT(self, wavelet="morl", freq_dim_scale=256, fmin=None, fmax=None, plot=False):
         """Contiunous wavelet transform"""
-        freqs, cwt_matrix = get_cwt_img(data=self.data, fs=self.fs, freq_dim_scale=freq_dim_scale, wavelet=wavelet)
+        freqs, cwt_matrix = get_cwt_img(data=self.cleaned, fs=self.fs, freq_dim_scale=freq_dim_scale, wavelet=wavelet)
         fmin = fmin or min(freqs)
         fmax = fmax or max(freqs)
         mask = (freqs >= fmin) & (freqs <= fmax)
         freqs, cwt_matrix = freqs[mask], cwt_matrix[mask]
         if plot:
-            fig, ax = plt.subplots(figsize=(14, 8))
-            im = ax.contourf(self.time, freqs, cwt_matrix, cmap=plt.cm.seismic)
-            fig.colorbar(im)
+            fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
+            im = ax.contourf(self.time, freqs, cwt_matrix, cmap=plt.cm.seismic)  # PRGn
+            ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
+            ax.set_ylabel("Frequency [Hz]", fontsize=self.fig_params["label_size"])
+            ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])
+            cb = fig.colorbar(im)
+            cb.ax.set_title("CWT coefficients", fontsize=self.fig_params["label_size"] // 1.5)
+            cb.ax.tick_params(labelsize=self.fig_params["tick_size"])
+
+            return freqs, cwt_matrix, fig
         return freqs, cwt_matrix
 
     def plot_windows(self, **kwargs):
@@ -407,11 +429,11 @@ class Signal(BaseSignal):
             window.plot(**kwargs)
 
     def get_windows_waveforms(
-        self, return_arr=True
+        self, return_arr=True, raw=True
     ) -> Union[NDArray[Shape["B, N"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         if return_arr:
-            return np.array([window.get_whole_signal_waveform() for window in self.windows])
-        return {f"window_{i}": window.get_whole_signal_waveform() for i, window in enumerate(self.windows)}
+            return np.array([window.get_whole_signal_waveform(raw=raw) for window in self.windows])
+        return {f"window_{i}": window.get_whole_signal_waveform(raw=raw) for i, window in enumerate(self.windows)}
 
     def get_windows_features(
         self, return_arr=True
@@ -419,6 +441,15 @@ class Signal(BaseSignal):
         if return_arr:
             return np.array([window.extract_features(return_arr=True) for window in self.windows])
         return {f"window_{i}": window.extract_features(return_arr=False) for i, window in enumerate(self.windows)}
+
+    def explore(self, start_time=0, width=None):
+        figs = super().explore(start_time, width)
+        _, dwt_fig = self.extract_DWT_features(return_arr=False, plot=True)
+        _, peaks_troughs_fig = self.extract_peaks_troughs_features(return_arr=False, plot=True)
+
+        figs["DWT"] = dwt_fig
+        figs["peaks_troughs"] = peaks_troughs_fig
+        return figs
 
 
 class PeriodicSignal(ABC, Signal):
@@ -432,16 +463,19 @@ class PeriodicSignal(ABC, Signal):
         )
 
     @property
-    def hr(self):
-        freqs, amps = self.psd(window_size=10, plot=False)
-        hr = freqs[amps.argmax()] * 60
-        if not MIN_HR <= hr <= MAX_HR:
-            hr = 60
-        return hr
+    def most_dominant_freq(self):
+        freqs, amps = self.psd(plot=False)
+        most_dominant_freq = freqs[amps.argmax()]
+        return most_dominant_freq
 
-    @abstractmethod
     def extract_agg_beat_features(self, return_arr=False, plot=False):
-        pass
+        try:
+            return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
+        except AttributeError:
+            if return_arr:
+                return np.array([])
+            else:
+                return {}
 
     @abstractmethod
     def _get_beats_intervals(self, **kwargs):
@@ -452,7 +486,15 @@ class PeriodicSignal(ABC, Signal):
         return BeatSignal
 
     def set_beats(
-        self, intervals=None, align_peaks_loc=None, resample=True, n_samples=100, plot=False, use_raw=False, **kwargs
+        self,
+        intervals=None,
+        align_peaks_loc=None,
+        resample=True,
+        n_samples=100,
+        plot=False,
+        use_raw=False,
+        normalize=False,
+        **kwargs,
     ):
         if intervals is None:
             intervals = self._get_beats_intervals(**kwargs)
@@ -466,14 +508,18 @@ class PeriodicSignal(ABC, Signal):
                 peak_diff = start + data[start:end].argmax() - peak_loc
                 intervals[i][0] = max(0, start + peak_diff)
                 intervals[i][1] = min(self.n_samples, end + peak_diff)
+        min_beat_n_samples = int(60 / (MAX_HR + 30) * self.fs)
         intervals = np.array(
-            [(start, end) for start, end in intervals if (end - start) > 1]
+            [(start, end) for start, end in intervals if (end - start) > min_beat_n_samples]
         )  # TODO Check if works fine
         beats = []
         for i, (start, end) in enumerate(intervals):
             start_sec = start / self.fs
+            beat_data = data[start:end]
+            if normalize:
+                beat_data = z_score(beat_data)
             beat = self.BeatClass(
-                name=f"{self.name}_beat_{i}", data=data[start:end], fs=self.fs, start_sec=start_sec, beat_num=i
+                name=f"{self.name}_beat_{i}", data=beat_data, fs=self.fs, start_sec=start_sec, beat_num=i
             )
             if resample:
                 beat = beat.resample_with_interpolation(n_samples=100, kind="pchip")
@@ -512,11 +558,11 @@ class PeriodicSignal(ABC, Signal):
         return {f"beat_{beat.beat_num}": beat.extract_features(return_arr=False) for beat in self.beats}
 
     def get_beats_waveforms(
-        self, return_arr=True
+        self, return_arr=True, raw=True
     ) -> Union[NDArray[Shape["B, N"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         if return_arr:
-            return np.array([beat.get_whole_signal_waveform() for beat in self.beats])
-        return {f"beat_{beat.beat_num}": beat.get_whole_signal_waveform() for beat in self.beats}
+            return np.array([beat.get_whole_signal_waveform(raw=raw) for beat in self.beats])
+        return {f"beat_{beat.beat_num}": beat.get_whole_signal_waveform(raw=raw) for beat in self.beats}
 
     def get_agg_beat_features(self, return_arr=True) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         return self.agg_beat.extract_features(return_arr=return_arr)
@@ -524,9 +570,65 @@ class PeriodicSignal(ABC, Signal):
     def get_agg_beat_waveform(self) -> NDArray[Shape["N"], Float]:
         return self.agg_beat.data
 
-    def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, axes=None):
+    def plot_signal_and_agg_beat(self, use_raw=False, axes=None):
+        return_fig = False
         if axes is None:
-            fig, axes = plt.subplots(1, 2, figsize=(24, 4), gridspec_kw={"width_ratios": [8, 2]})
+            fig, axes = plt.subplots(
+                1, 2, figsize=self.fig_params["fig_size"], sharey=True, gridspec_kw={"width_ratios": [8, 2]}
+            )
+            return_fig = True
+        self.plot(ax=axes[0], use_raw=use_raw, title=None, label=None)
+        self.agg_beat.plot(ax=axes[1], title=None, label=None)
+        plt.tight_layout()
+        if return_fig:
+            return fig
+
+    def plot_segmentation(self, mode="windows", use_raw=False, show_lines=True, use_samples=False):
+        w, h = self.fig_params["fig_size"]
+        fig = plt.figure(figsize=(w, h * 2), layout="constrained")
+        signals = self.windows if mode == "windows" else self.beats
+        spec = fig.add_gridspec(2, len(signals))
+        ax0 = fig.add_subplot(spec[0, :])
+        # fig, ax = plt.subplots(1, 1, figsize=self.fig_params["fig_size"])
+        self.plot(0, -1, ax=ax0, use_raw=use_raw, title=None, label=None, use_samples=use_samples)
+        axes = []
+        for j in range(len(signals)):
+            axes.append(fig.add_subplot(spec[1, j], sharey=axes[-1] if j != 0 else None))
+        axes = np.array(axes)
+        data = self.data if use_raw else self.cleaned
+        min_v, max_v = data.min(), data.max()
+        signals_bounds = []
+        color = "green"
+        for i, (ax, signal) in enumerate(zip(axes, signals)):
+            if use_samples:
+                bounds = [int(signal.start_sec * self.fs), int(signal.end_sec * self.fs)]
+            else:
+                bounds = [signal.start_sec, signal.end_sec]
+            title = "Window " if mode == "windows" else "Beat "
+            title += str(i + 1)
+            ax.set_title(title, fontsize=BEAT_FIG_PARAMS["title_size"])
+            ax0.fill_between(bounds, min_v, max_v, alpha=self.fig_params["fill_alpha"], color=color)
+            signals_bounds.extend(bounds)
+            color = "green" if color == "red" else "red"
+            signal.plot(0, -1, ax=ax, use_raw=use_raw, label=None, title=None, use_samples=use_samples)
+            if i != 0:
+                ax.set_ylabel("")
+                plt.setp(ax.get_yticklabels(), visible=False)
+        if show_lines:
+            ax0.vlines(signals_bounds, min_v, max_v, lw=1.5, alpha=0.6, ec="black", ls="--")
+        if not use_samples:
+            ax0.set_xlim([self.time[0], self.time[-1]])
+        else:
+            ax0.set_xlim([0, len(self.time)])
+        return fig
+
+    def plot_beats_segmentation(
+        self, valid=True, invalid=True, use_raw=False, color_validity=True, show_beat_lines=True, axes=None
+    ):
+        return_fig = False
+        if axes is None:
+            fig, axes = plt.subplots(1, 2, figsize=self.fig_params["fig_size"], gridspec_kw={"width_ratios": [8, 2]})
+            return_fig = True
         if use_raw:
             self.plot(ax=axes[0], title="beats segmentation")
             data = self.data
@@ -534,20 +636,36 @@ class PeriodicSignal(ABC, Signal):
             axes[0].plot(self.time, self.cleaned, lw=3, label=self.name)
             data = self.cleaned
         beats_bounds = []
+        color = "green"
         for beat in self.beats:
             bounds = [beat.start_sec, beat.end_sec]
-            color = "green" if beat.is_valid else "red"
-            axes[0].fill_between(bounds, data.min(), data.max(), alpha=0.15, color=color)
+            if color_validity is not None and color_validity:
+                color = "green" if beat.is_valid else "red"
+                label = "valid" if beat.is_valid else "invalid"
+            else:
+                color = "green"  # if color == "red" else "red"
+                label = None
+            if color_validity is not None:
+                axes[0].fill_between(
+                    bounds, data.min(), data.max(), alpha=self.fig_params["fill_alpha"], color=color, label=label
+                )
+            handles, labels = axes[0].get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            axes[0].legend(by_label.values(), by_label.keys(), fontsize=self.fig_params["legend_size"])
+
             beats_bounds.extend(bounds)
-        axes[0].vlines(beats_bounds, data.min(), data.max(), lw=1.5, ec="black", ls="--")
+        if show_beat_lines:
+            axes[0].vlines(beats_bounds, data.min(), data.max(), lw=1.5, alpha=0.6, ec="black", ls="--")
         self.plot_beats(valid=valid, invalid=invalid, ax=axes[1])
         axes[0].set_xlim([self.time.min(), self.time.max()])
-        # axes[0].set_ylim([self.data.min(), self.data.max()])
+        axes[0].grid(False)
         for ax in axes:
-            ax.grid(False)
-            ax.set_xlabel("")
-            ax.set_ylabel("")
+            ax.set_xlabel("Time [s]", fontsize=self.fig_params["label_size"])
+            ax.set_ylabel(self.units, fontsize=self.fig_params["label_size"])
+            ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])
         plt.tight_layout()
+        if return_fig:
+            return fig
 
     def plot_beats(self, same_ax=True, ax=None, valid=True, invalid=True):
         beats_to_plot = [beat for beat in self.beats if (beat.is_valid and valid) or (not beat.is_valid and invalid)]
@@ -560,14 +678,20 @@ class PeriodicSignal(ABC, Signal):
 
         if same_ax:
             if ax is None:
-                fig, ax = plt.subplots(figsize=(10, 5))
+                fig, ax = plt.subplots(figsize=self.agg_beat.fig_params["fig_size"])
             for i, beat in enumerate(beats_to_plot):
                 palette = valid_palette if beat.is_valid else invalid_palette
                 ax.plot(beat.time, beat.data, color=palette[i])
-            ax.plot(self.agg_beat.time, self.agg_beat.data, lw=8, alpha=0.5, c="black", label="Aggregated beat")
-            ax.set_title(f"{n_beats} beats ({n_valid} valid, {n_invalid} invalid)", fontsize=22)
-            ax.set_ylabel("Values", fontsize=18)
-            ax.set_xlabel("Time [s]", fontsize=18)
+            agg_beat = self.agg_beat
+            ax.plot(agg_beat.time, agg_beat.data, lw=8, alpha=0.5, c="black", label="Aggregated beat")
+            if valid is False or invalid is False:
+                ax.set_title(
+                    f"{n_beats} beats ({n_valid} valid, {n_invalid} invalid)",
+                    fontsize=int(agg_beat.fig_params["title_size"] / 1.5),
+                )
+            ax.set_ylabel(agg_beat.units, fontsize=agg_beat.fig_params["label_size"])
+            ax.set_xlabel("Time [s]", fontsize=agg_beat.fig_params["label_size"])
+            ax.tick_params(axis="both", which="major", labelsize=self.fig_params["tick_size"])
         else:
             ncols = 5
             nrows = int(np.ceil(n_beats / ncols))
@@ -575,15 +699,13 @@ class PeriodicSignal(ABC, Signal):
             for beat, ax in zip(beats_to_plot, axes.flatten()):
                 palette = valid_palette if beat.is_valid else invalid_palette
                 ax.plot(beat.time, beat.data, lw=3, c=palette[int(n_beats / 1.5)])
-                ax.set_title(beat.name, fontsize=18)
-            plt.tight_layout()
+                ax.set_title(beat.name, fontsize=beat.fig_params["title_size"])
 
-    def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20):
-        super().explore(start_time, width, window_size, min_hz, max_hz)
-        self.plot_beats_segmentation()
-        fig, axes = plt.subplots(1, 2, figsize=(24, 5))
-        self.plot_beats(ax=axes[0])
-        self.agg_beat.plot(with_crit_points=True, ax=axes[1])
+    def explore(self, start_time=0, width=None):
+        figs = super().explore(start_time, width)
+        beats_segmentation_fig = self.plot_beats_segmentation(show_beat_lines=False)
+        figs["beats_segmentation"] = beats_segmentation_fig
+        return figs
 
 
 class BeatSignal(ABC, BaseSignal):
@@ -658,16 +780,18 @@ class BeatSignal(ABC, BaseSignal):
         for name, loc in self.crit_points.items():
             features[f"{name}_loc"] = loc
             features[f"{name}_time"] = self.time[loc]
-            features[f"{name}_val"] = self.data[loc]
+            features[f"{name}_val"] = self.cleaned[loc]
         if plot:
-            self.plot_crit_points(plot_sig=True, ax=ax)
+            fig = self.plot_crit_points(plot_sig=True, ax=ax)
         if return_arr:
             return parse_feats_to_array(features)
+        if plot:
+            return features, fig
         return features
 
     def extract_energy_features(self, return_arr=True, **kwargs) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = {
-            point["name"]: calculate_energy(self.data, point["start"], point["end"])
+            point["name"]: calculate_energy(self.cleaned, point["start"], point["end"])
             for point in self.energy_features_crit_points
         }
         if return_arr:
@@ -678,20 +802,22 @@ class BeatSignal(ABC, BaseSignal):
         self, return_arr=True, method="trapz", plot=False, **kwargs
     ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = {
-            point["name"]: calculate_area(self.data, self.fs, point["start"], point["end"], method=method)
+            point["name"]: calculate_area(self.cleaned, self.fs, point["start"], point["end"], method=method)
             for point in self.area_features_crit_points
         }
         if plot:
-            self.plot_area_features()
+            fig = self.plot_area_features()
         if return_arr:
             return parse_feats_to_array(features)
+        if plot:
+            return features, fig
         return features
 
     def extract_slope_features(
         self, return_arr=True, plot=False, ax=None
     ) -> Union[NDArray[Shape["F"], Float], Dict[str, float]]:
         features = {
-            point["name"]: calculate_slope(self.time, self.data, point["start"], point["end"])
+            point["name"]: calculate_slope(self.time, self.cleaned, point["start"], point["end"])
             for point in self.slope_features_crit_points
         }
         if return_arr:
@@ -707,7 +833,7 @@ class BeatSignal(ABC, BaseSignal):
         }
 
         val_diff_features = {
-            f"{point['name']}_val_diff": self.data[point["end"]] - self.data[point["start"]]
+            f"{point['name']}_val_diff": self.cleaned[point["end"]] - self.cleaned[point["start"]]
             for point in self.intervals_features_crit_points
         }
         features = {**time_features, **val_diff_features}
@@ -715,40 +841,53 @@ class BeatSignal(ABC, BaseSignal):
             return parse_feats_to_array(features)
         return features
 
-    def plot_crit_points(self, plot_sig=False, ax=None, **kwargs):
+    def plot_crit_points(self, plot_sig=False, ax=None, crit_points="all", **kwargs):
         t = self.time
         t_range = t[-1] - t[0]
-        y_range = self.data.max() - self.data.min()
         offset = 0
+        return_fig = False
         if ax is None:
+            return_fig = True
             fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
         if plot_sig:
-            self.plot(ax=ax, title="crit points")
+            self.plot(ax=ax, title="crit points", **kwargs)
+        if crit_points == "all":
+            crit_points = list(self.crit_points.keys())
         for name, loc in self.crit_points.items():
-            t_loc = t[loc]
-            val = self.data[loc] + offset
+            if name not in crit_points:
+                continue
+            if "use_samples" in kwargs and kwargs["use_samples"]:
+                t_loc = loc
+            else:
+                t_loc = t[loc]
+            val = self.cleaned[loc] + offset
             ax.scatter(t_loc, val, label=name, s=self.fig_params["marker_size"])
             ax.annotate(
                 name.upper(),
-                (t_loc + 0.012 * t_range, val + 0.012 * y_range),
+                (t_loc + 0.012 * t_range, val + 0.012 * self.range),
                 fontweight="bold",
                 fontsize=self.fig_params["annot_size"],
             )
+        if return_fig:
+            return fig
 
-    def plot_area_features(self, ax=None):
+    def plot_area_features(self, ax=None, crit_points="all"):
+        return_fig = False
         if ax is None:
             fig, ax = plt.subplots(figsize=self.fig_params["fig_size"])
+            return_fig = True
         palette = sns.color_palette("pastel", len(self.area_features_crit_points))
-        self.plot_crit_points(ax=ax)
-        ax = plt.gca()
-        self.plot(ax=ax, title="area features")
+        if crit_points == "all":
+            crit_points = list(self.crit_points.keys())
+        self.plot_crit_points(ax=ax, crit_points=crit_points)
+        self.plot(ax=ax, title="area features", label=None)
         areas = []
         for i, point in enumerate(self.area_features_crit_points):
-            offset = min([self.data[point["start"]], self.data[point["end"]]])
+            offset = min([self.cleaned[point["start"]], self.cleaned[point["end"]]])
             mask = (np.arange(self.n_samples) >= point["start"]) & (np.arange(self.n_samples) <= point["end"])
             a = ax.fill_between(
                 self.time[mask],
-                self.data[mask],
+                self.cleaned[mask],
                 offset,
                 alpha=0.4,
                 color=palette[i],
@@ -757,11 +896,18 @@ class BeatSignal(ABC, BaseSignal):
                 label=point["name"],
             )
             areas.append(a)
-        leg = ax.legend(handles=areas, fontsize=self.fig_params["legend_size"])
+        leg = ax.legend(handles=areas, fontsize=self.fig_params["legend_size"], loc=1)
         ax.add_artist(leg)
+        if return_fig:
+            return fig
 
-    def explore(self, start_time=0, width=None, window_size=4, min_hz=0, max_hz=20, ax=None):
-        pass
+    def explore(self, start_time=0, width=None):
+        figs = super().explore(start_time, width)
+        _, area_features_fig = self.extract_area_features(return_arr=False, plot=True)
+        _, crit_points_fig = self.extract_crit_points_features(return_arr=False, plot=True)
+        figs["area_features"] = area_features_fig
+        figs["crit_points"] = crit_points_fig
+        return figs
 
 
 class MultiChannelSignal:
@@ -799,7 +945,7 @@ class MultiChannelSignal:
         self.windows = {name: sig.set_windows(win_len_s, step_s) for name, sig in self.signals.items()}
 
     def get_whole_signal_waveforms(
-        self, return_arr=True, **kwargs
+        self, return_arr=True, raw=False, **kwargs
     ) -> Union[NDArray[Shape["N, C"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         """Return whole signal waveforms representation, i.e. timeseries signals data.
 
@@ -810,8 +956,8 @@ class MultiChannelSignal:
         If return_arr if False, then signal for each channel is returned in dict form (`Dict[str, NDArray[Shape["N"], Float]]`)
         """
         if return_arr:
-            return np.array([sig.get_whole_signal_waveform() for name, sig in self.signals.items()]).T
-        return {name: sig.get_whole_signal_waveform() for name, sig in self.signals.items()}
+            return np.array([sig.get_whole_signal_waveform(raw=raw) for name, sig in self.signals.items()]).T
+        return {name: sig.get_whole_signal_waveform(raw=raw) for name, sig in self.signals.items()}
 
     def get_whole_signal_features(
         self, return_arr=True, **kwargs
@@ -821,15 +967,18 @@ class MultiChannelSignal:
         F - number of features from single signal
         C - number of channels
 
-        If return_arr is True, then `NDArray[Shape["FC"], Float]` is returned
+        If return_arr is True, then `NDArray[Shape["F, C"], Float]` is returned
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
+            # return np.array(
+            #     [func(return_arr=True, plot=False) for name, func in self.feature_extraction_funcs.items()]
+            # ).T
             return self.extract_features(return_arr=True)
         return {name: func(return_arr=False) for name, func in self.feature_extraction_funcs.items()}
 
     def get_windows_waveforms(
-        self, return_arr=True, **kwargs
+        self, return_arr=True, raw=True, **kwargs
     ) -> Union[NDArray[Shape["W, N, C"], Float], Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]:
         """Return windows waveforms representation, i.e. timeseries data for each window.
 
@@ -841,21 +990,21 @@ class MultiChannelSignal:
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]`)
         """
         if return_arr:
-            return np.array([sig.get_windows_waveforms(return_arr=True) for _, sig in self.signals.items()]).transpose(
-                1, 2, 0
-            )
-        return {name: sig.get_windows_waveforms(return_arr=False) for name, sig in self.signals.items()}
+            return np.array(
+                [sig.get_windows_waveforms(return_arr=True, raw=raw) for _, sig in self.signals.items()]
+            ).transpose(1, 2, 0)
+        return {name: sig.get_windows_waveforms(return_arr=False, raw=raw) for name, sig in self.signals.items()}
 
     def get_windows_features(
         self, return_arr=True, **kwargs
-    ) -> Union[NDArray[Shape["B, FC"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
+    ) -> Union[NDArray[Shape["B, F, C"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
         """Return windows features representation, i.e. features extracted for each window.
 
         B - number of windows
         F - number of features in a window
         C - number of channels
 
-        If return_arr is True, then `NDArray[Shape["B, FC"], Float]` is returned
+        If return_arr is True, then `NDArray[Shape["B, F, C"], Float]` is returned
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
@@ -896,13 +1045,26 @@ class MultiChannelSignal:
         title="",
     ):
         kwargs = dict_of(start_time, width, scatter, line, first_der, label, use_samples, title)
+        return_fig = False
+        w, h = SIGNAL_FIG_PARAMS["fig_size"]
         if axes is None:
-            fig, axes = plt.subplots(self.n_signals, 1, figsize=(24, 1 * self.n_signals), sharex=True)
+            return_fig = True
+            fig, axes = plt.subplots(
+                self.n_signals, 1, figsize=(w, 1.6 * self.n_signals + 1 / self.n_signals), sharex=True
+            )
         for ax, (sig_name, sig) in zip(axes, self.signals.items()):
             sig.plot(ax=ax, **kwargs)
-            ax.set(xlabel="", ylabel="", title="")
-            ax.grid(False)
-            ax.get_legend().remove()
+            ax.set_xlabel("")
+            ax.set_ylabel("")
+            ax.set_title(sig_name, fontsize=sig.fig_params["title_size"])
+            ax.tick_params(axis="both", which="major", labelsize=sig.fig_params["tick_size"])
+            # ax.grid(False)
+            # ax.get_legend().remove()
+        axes[-1].set_xlabel("Time [s]", fontsize=sig.fig_params["label_size"])
+
+        plt.tight_layout()
+        if return_fig:
+            return fig
 
 
 class MultiChannelPeriodicSignal(MultiChannelSignal):
@@ -987,23 +1149,23 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
 
     def get_beats_features(
         self, return_arr=True, **kwargs
-    ) -> Union[NDArray[Shape["B, FC"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
+    ) -> Union[NDArray[Shape["B, F, C"], Float], Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]:
         """Return beats features representation, i.e. features extracted for each beat.
 
         B - number of beats
         F - number of features in a beat
         C - number of channels
 
-        If return_arr is True, then `NDArray[Shape["B, FC"], Float]` is returned
+        If return_arr is True, then `NDArray[Shape["B, F, C"], Float]` is returned
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
 
         if return_arr:
-            return np.concatenate([sig.get_beats_features(return_arr=True) for _, sig in self.signals.items()], axis=1)
+            return np.concatenate([sig.get_agg_beat_features(return_arr=True) for _, sig in self.signals.items()])
         return {name: sig.get_beats_features(return_arr=False) for name, sig in self.signals.items()}
 
     def get_beats_waveforms(
-        self, return_arr=True, **kwargs
+        self, return_arr=True, raw=True, **kwargs
     ) -> Union[NDArray[Shape["W, N, C"], Float], Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]:
         """Return beats waveforms representation, i.e. timeseries data for each beat.
 
@@ -1015,13 +1177,13 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["N"], Float]]]]`)
         """
         if return_arr:
-            return np.array([sig.get_beats_waveforms(return_arr=True) for _, sig in self.signals.items()]).transpose(
-                1, 2, 0
-            )
-        return {name: sig.get_beats_waveforms(return_arr=False) for name, sig in self.signals.items()}
+            return np.array(
+                [sig.get_beats_waveforms(return_arr=True, raw=raw) for _, sig in self.signals.items()]
+            ).transpose(1, 2, 0)
+        return {name: sig.get_beats_waveforms(return_arr=False, raw=raw) for name, sig in self.signals.items()}
 
     def get_agg_beat_waveforms(
-        self, return_arr=True, **kwargs
+        self, return_arr=True, raw=True, **kwargs
     ) -> Union[NDArray[Shape["N, C"], Float], Dict[str, NDArray[Shape["N"], Float]]]:
         """Return aggregated beat waveforms representation, i.e. timeseries data for each aggregated beat.
 
@@ -1032,8 +1194,8 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         If return_arr if False, then signal for each channel is returned in dict form (`Dict[str, NDArray[Shape["N"], Float]]`)
         """
         if return_arr:
-            return np.array([sig.get_agg_beat_waveform() for _, sig in self.signals.items()]).T
-        return {name: sig.get_agg_beat_waveform() for name, sig in self.signals.items()}
+            return np.array([sig.get_agg_beat_waveform(raw=raw) for _, sig in self.signals.items()]).T
+        return {name: sig.get_agg_beat_waveform(raw=raw) for name, sig in self.signals.items()}
 
     def get_agg_beat_features(
         self, return_arr=True, **kwargs
@@ -1043,7 +1205,7 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
         F - number of features from single aggregated beat.
         C - number of channels
 
-        If return_arr is True, then `NDArray[Shape["FC"], Float]` is returned
+        If return_arr is True, then `NDArray[Shape["F, C"], Float]` is returned
         If return_arr if False, then features for each channel are returned in dict form (`Dict[str, Dict[str, NDArray[Shape["F"], Float]]]]`)
         """
         if return_arr:
@@ -1074,12 +1236,30 @@ class MultiChannelPeriodicSignal(MultiChannelSignal):
             all_feature_names.extend(feature_names)
         return np.array(all_feature_names)
 
-    def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, **kwargs):
-        fig, axes = plt.subplots(
-            self.n_signals, 2, figsize=(24, 1.3 * self.n_signals), sharex="col", gridspec_kw={"width_ratios": [9, 2]}
+    def plot_beats_segmentation(self, valid=True, invalid=True, use_raw=False, color_validity=True, **kwargs):
+        w, h = SIGNAL_FIG_PARAMS["fig_size"]
+        fig, all_axes = plt.subplots(
+            self.n_signals,
+            2,
+            figsize=(w, 1.6 * self.n_signals + 1 / self.n_signals),
+            sharex="col",
+            gridspec_kw={"width_ratios": [8, 2]},
         )
-        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
-            sig.plot_beats_segmentation(valid=valid, invalid=invalid, use_raw=use_raw, axes=ax)
-            sig.agg_beat.plot_crit_points(ax=ax[1])
-            ax[1].set_title("")
+        for axes, (sig_name, sig) in zip(all_axes, self.signals.items()):
+            sig.plot_beats_segmentation(
+                valid=valid, invalid=invalid, use_raw=use_raw, color_validity=color_validity, axes=axes
+            )
+            for ax in axes:
+                ax.set_xlabel("")
+                ax.set_ylabel("")
+                ax.tick_params(axis="both", which="major", labelsize=sig.fig_params["tick_size"])
+            axes[0].set_title(sig_name, fontsize=sig.fig_params["title_size"])
+            axes[0].get_legend().remove()
+            # ax.grid(False)
+            # ax.get_legend().remove()
+        for ax in all_axes[-1]:
+            ax.set_xlabel("Time [s]", fontsize=sig.fig_params["label_size"])
+
         plt.tight_layout()
+
+        return fig

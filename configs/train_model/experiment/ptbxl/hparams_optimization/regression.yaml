@@ -1,0 +1,21 @@
+# @package _global_
+
+defaults:
+  - override /callbacks: default.yaml
+  - override /logger: ml_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+  - override /trainer: ml_classifier_trainer.yaml
+  - override /datamodule: ptbxl.yaml
+  - override /model: logistic_regression.yaml
+  - override /transforms: [flatten.yaml]
+
+logger_project: ptbxl_optimization #${datamodule._target_}
+logger_run_name: ${dataset}__${representation_type}__${model._target_}
+
+model:
+  max_iter: 2000     # 100, 500, 2000, 5000
+  C: 1           # 0.01, 0.1, 1, 10
+  solver: lbfgs      # lbfgs, newton-cg, sag, saga
+
+datamodule:
+  standardize: False

@@ -1,122 +1,77 @@
 from typing import List, Tuple, Union
 
-import torch.nn.functional as F
 from sorcery import dict_of
 from torch import nn
 
-from msr.models.architectures.blocks.cnn import CNN
+from msr.models.architectures.blocks.cnn import CNN, ResidualCNN
 from msr.models.architectures.blocks.feature_extractor import FeatureExtractor
+from msr.models.architectures.blocks.other import BasicBlock1d, ResNet1d
 from msr.models.architectures.helpers import _adaptive_pool
 from msr.models.architectures.networks.base import (
     ClassificationNeuralNetwork,
     RegressionNeuralNetwork,
 )
+from msr.models.architectures.networks.mlp import MLPExtractor
 
 
 class CNNExtractor(FeatureExtractor):
     def __init__(
         self,
-        dim: int,
         in_channels: int,
-        out_channels: List[int],
-        maxpool_kernel_size: Union[int, List[int], Tuple[int], List[Tuple[int]]],
-        kernel_size: Union[int, List[int], Tuple[int], List[Tuple[int]]],
-        stride: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 1,
-        padding: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 0,
-        dilation: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 1,
-        transpose: Union[bool, List[bool]] = False,
-        use_batchnorm: Union[bool, List[bool]] = True,
-        activation: Union[str, List[str]] = "ReLU",
+        conv0_kernel_size: int,
+        conv0_channels: int,
+        layers: List[int] = [1, 1, 1],
     ):
+        cnn_net = ResNet1d(
+            block=BasicBlock1d,
+            kernel_size_stem=conv0_kernel_size,
+            inplanes=conv0_channels,
+            layers=layers,
+            input_channels=in_channels,
+        )
         net = nn.Sequential(
-            CNN(
-                **dict_of(
-                    dim,
-                    in_channels,
-                    out_channels,
-                    maxpool_kernel_size,
-                    kernel_size,
-                    stride,
-                    padding,
-                    dilation,
-                    transpose,
-                    use_batchnorm,
-                    activation,
-                )
-            ),
-            _adaptive_pool(dim, mode="Avg")(1),
+            cnn_net,
+            _adaptive_pool(dim=1, mode="Avg")(1),
             nn.Flatten(),
         )
-        output_size = out_channels[-1]
+        output_size = conv0_channels
         super().__init__(net=net, output_size=output_size)
 
     def forward(self, x):
-        out = self.net(x.permute(0, 2, 1))  # TODO
+        out = self.net(x)
         return out
 
 
 class CNNRegressor(RegressionNeuralNetwork):
     def __init__(
         self,
-        dim: int,
         in_channels: int,
-        out_channels: List[int],
-        maxpool_kernel_size: Union[int, List[int], Tuple[int], List[Tuple[int]]],
-        kernel_size: Union[int, List[int], Tuple[int], List[Tuple[int]]],
-        stride: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 1,
-        padding: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 0,
-        dilation: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 1,
-        transpose: Union[bool, List[bool]] = False,
-        use_batchnorm: Union[bool, List[bool]] = True,
-        activation: Union[str, List[str]] = "ReLU",
+        conv0_kernel_size: int,
+        conv0_channels: int,
+        layers: List[int] = [1, 1, 1],
+        ff_hidden_dims: List[int] = [128, 128],
+        ff_dropout: float = 0.2,
     ):
-        feature_extractor = CNNExtractor(
-            **dict_of(
-                dim,
-                in_channels,
-                out_channels,
-                maxpool_kernel_size,
-                kernel_size,
-                stride,
-                padding,
-                dilation,
-                transpose,
-                use_batchnorm,
-                activation,
-            )
+        feature_extractor = CNNExtractor(**dict_of(in_channels, conv0_kernel_size, conv0_channels, layers))
+        feed_forward = MLPExtractor(
+            input_size=feature_extractor.output_size, hidden_dims=ff_hidden_dims, dropout=ff_dropout
         )
-        super().__init__(feature_extractor=feature_extractor)
+        super().__init__(feature_extractor=feature_extractor, feed_forward=feed_forward)
 
 
 class CNNClassifier(ClassificationNeuralNetwork):
     def __init__(
         self,
         num_classes: int,
-        dim: int,
         in_channels: int,
-        out_channels: List[int],
-        maxpool_kernel_size: Union[int, List[int], Tuple[int], List[Tuple[int]]],
-        kernel_size: Union[int, List[int], Tuple[int], List[Tuple[int]]],
-        stride: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 1,
-        padding: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 0,
-        dilation: Union[int, List[int], Tuple[int], List[Tuple[int]]] = 1,
-        transpose: Union[bool, List[bool]] = False,
-        use_batchnorm: Union[bool, List[bool]] = True,
-        activation: Union[str, List[str]] = "ReLU",
+        conv0_kernel_size: int,
+        conv0_channels: int,
+        layers: List[int] = [1, 1, 1],
+        ff_hidden_dims: List[int] = [128, 128],
+        ff_dropout: float = 0.2,
     ):
-        feature_extractor = CNNExtractor(
-            **dict_of(
-                dim,
-                in_channels,
-                out_channels,
-                maxpool_kernel_size,
-                kernel_size,
-                stride,
-                padding,
-                dilation,
-                transpose,
-                use_batchnorm,
-                activation,
-            )
+        feature_extractor = CNNExtractor(**dict_of(in_channels, conv0_kernel_size, conv0_channels, layers))
+        feed_forward = MLPExtractor(
+            input_size=feature_extractor.output_size, hidden_dims=ff_hidden_dims, dropout=ff_dropout
         )
-        super().__init__(feature_extractor=feature_extractor, num_classes=num_classes)
+        super().__init__(feature_extractor=feature_extractor, feed_forward=feed_forward, num_classes=num_classes)

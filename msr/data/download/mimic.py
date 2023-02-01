@@ -18,7 +18,8 @@ from tqdm.auto import tqdm
 
 from msr.data.download.utils import cut_segments_into_samples, validate_signal
 from msr.data.utils import create_train_val_test_split_info
-from msr.signals.ecg import ECGSignal, check_ecg_polarity, find_intervals_using_hr
+from msr.signals.base import find_intervals_using_most_dominant_freq
+from msr.signals.ecg import ECGSignal, check_ecg_polarity
 from msr.signals.utils import resample
 from msr.utils import DATA_PATH, append_txt_to_file, find_true_intervals, load_tensor
 
@@ -197,10 +198,15 @@ def validate_recording(
     Returns:
         np.ndarray: True indicates samples which are good for all validation steps for all signals.
     """
+    # 4.1.1 Filter out measurements with not enough samples (MIN_SIGNAL_LEN_SEC * FS)
+    # 4.1.2 Check each signal of the signals (ABP, PPG, ECG) and filter out measurements which dont meet any of the conditions:
+    # 4.1.2.1 ABP values between 40 and 260 and maximum number of repeated samples is less than MAX_N_SAME
+    # 4.1.2.2 ECG maximum number of repeated samples is less than MAX_N_SAME
+    # 4.1.2.3 PPG maximum number of repeated samples is less than MAX_N_SAME
     valid_sig_len = len(abp) >= sample_len_samples
 
     if valid_sig_len or plot:
-        abp_is_good = validate_signal(abp, low=0, high=300, max_n_same=max_n_same)
+        abp_is_good = validate_signal(abp, low=50, high=220, max_n_same=max_n_same)
         ppg_is_good = validate_signal(ppg, low=None, high=None, max_n_same=max_n_same)
         ecg_is_good = validate_signal(ecg, low=None, high=None, max_n_same=max_n_same)
         is_good = abp_is_good & ppg_is_good & ecg_is_good
@@ -240,7 +246,9 @@ def find_valid_segments(
     """
     data = load_raw_measurement_to_array(measurement_path, sig_names=sig_names)
     abp, ppg, ecg = data.T
+    # 4.1. Validate measurement (finds which signal data points are "good")
     is_good = validate_recording(abp, ppg, ecg, sample_len_samples, max_n_same, plot=plot)
+    # 4.2. Filter out segment which have less then SAMPLE_LEN_SAMPLES consecutive "good" data points
     segments = find_true_intervals(is_good)
     valid_segments = [segment for segment in segments if (segment[1] - segment[0]) >= sample_len_samples]
     if plot:
@@ -329,7 +337,7 @@ def segment_and_save_for_subject(
     subject: str, sample_len_samples: int, max_n_same: int, max_samples_per_subject: int, sig_names: List[str]
 ) -> Dict[str, List[Tuple[int, int]]]:
     """Segment subjects measurements and save valid segments to numpy files.
-
+    Filtering pipeline
     Args:
         subject (str): Subject code.
         sample_len_samples (int): Minimum accepted signal length (in samples).
@@ -340,12 +348,14 @@ def segment_and_save_for_subject(
     Returns:
         Dict[str, List[Tuple[int, int]]]: Dictionary with measurements paths as keys and corresponding segments as values.
     """
+    # 1. Download measurements paths
     measurements_paths = get_measurements_paths(subject)
     if not measurements_paths:
         log.warning(f"{subject}: No measurements")
         return {subject: None}
-    signals_availability = pd.DataFrame([check_signals_availability(path, sig_names) for path in measurements_paths])
 
+    # 2. Filter out measurements which dont have any of ABP, PPG or ECG (II) signals
+    signals_availability = pd.DataFrame([check_signals_availability(path, sig_names) for path in measurements_paths])
     valid_measurements = signals_availability.query(
         f"ABP == True and PLETH == True and II == True and n_samples >= {sample_len_samples}"
     )
@@ -359,8 +369,10 @@ def segment_and_save_for_subject(
 
     segmented_measurements = {}
     for path in measurements_paths:
+        # 3. Download measurements
         download_measurement(path)
         params = dict(sample_len_samples=sample_len_samples, max_n_same=max_n_same, sig_names=sig_names)
+        # 4. Find valid segments
         segmented_measurements[path] = find_valid_segments(path, **params)
 
     valid_segmented_measurements = {
@@ -370,6 +382,9 @@ def segment_and_save_for_subject(
         params = dict(
             sample_len_samples=sample_len_samples, max_samples_per_subject=max_samples_per_subject, sig_names=sig_names
         )
+        # 5. Cut valid segments into dataset samples of len SAMPLE_LEN_SAMPLES
+        # 5.1. Maximum number of dataset samples per single subject is MAX_SAMPLES_PER_SUBJECT
+        # 5.2. Dataset samples are chosen randomly
         cut_segments_into_samples_and_save(valid_segmented_measurements, **params)
     else:
         log.warning(f"{subject}: No samples for that subject")
@@ -520,7 +535,7 @@ def find_sbp_and_dbp_idxs_with_rpeaks(
     rpeaks = nk.ecg_peaks(cleaned, sampling_rate=ecg_fs, correct_artifacts=True)[1]["ECG_R_Peaks"]
     if len(rpeaks) == 0:
         ecg_sig = ECGSignal("ecg", ecg, ecg_fs)
-        intervals = np.array(find_intervals_using_hr(ecg_sig))
+        intervals = np.array(find_intervals_using_most_dominant_freq(ecg_sig))
     else:
         beats_n_samples = np.diff(rpeaks)
         min_n_samples = min(beats_n_samples)

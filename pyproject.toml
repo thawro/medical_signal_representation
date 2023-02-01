@@ -37,6 +37,12 @@ wandb = "^0.13.5"
 pyrootutils = "^1.0.4"
 lightgbm = "^3.3.3"
 pywavelets = "^1.4.1"
+torchinfo = "^1.7.1"
+torchvision = "^0.14.1"
+fastai = "1.0.61"
+thop = "^0.1.1.post2209072238"
+mat73 = "^0.59"
+hurry-filesize = "^0.9"
 
 [tool.black]
 experimental-string-processing = true

@@ -10,13 +10,12 @@ import torch
 from joblib import Parallel, delayed
 from tqdm.auto import tqdm
 
-from msr.data.download import mimic, ptbxl, sleep_edf
+from msr.data.download import mimic, mimic_clean, ptbxl, sleep_edf
 from msr.data.measurements import (
     MimicMeasurement,
     PtbXLMeasurement,
     SleepEDFMeasurement,
 )
-from msr.data.namespace import get_setters_mask
 from msr.signals.representation_extractor import create_representation_extractor
 
 log = logging.getLogger(__name__)
@@ -47,8 +46,9 @@ class DatasetProvider:
 
     def get_representations(self, data, return_feature_names: bool = False, **kwargs):
         measurement = self.MeasurementFactory(*data, fs=self.fs)
-        set_beats, set_windows, set_agg_beat = get_setters_mask(self.representation_types)
-        rep_extractor = create_representation_extractor(measurement, **self.representation_extractor_params)
+        rep_extractor = create_representation_extractor(
+            measurement, representation_types=self.representation_types, **self.representation_extractor_params
+        )
         representations = rep_extractor.get_representations(representation_types=self.representation_types, **kwargs)
         if return_feature_names:
             feature_representation_types = [
@@ -215,6 +215,35 @@ class MimicDatasetProvider(PeriodicDatasetProvider):
 
     def get_representations(self, data, return_feature_names: bool = False):
         return super(MimicDatasetProvider, self).get_representations(data.T.numpy(), return_feature_names)
+
+
+class MimicCleanDatasetProvider(PeriodicDatasetProvider):
+    def __init__(
+        self,
+        representation_types: List[str],
+        windows_params: Dict[str, Union[str, float, int]],
+        beats_params: Dict[str, Union[str, float, int]],
+        agg_beat_params: Dict[str, Union[str, float, int]],
+        n_beats: int,
+    ):
+        super().__init__(
+            representation_types=representation_types,
+            windows_params=windows_params,
+            beats_params=beats_params,
+            agg_beat_params=agg_beat_params,
+            n_beats=n_beats,
+            fs=mimic_clean.FS,
+            raw_tensors_data_path=mimic_clean.RAW_TENSORS_DATA_PATH,
+            representations_path=mimic_clean.DATASET_PATH / "representations",
+            targets_path=mimic_clean.RAW_TENSORS_TARGETS_PATH,
+        )
+
+    @property
+    def MeasurementFactory(self):
+        return MimicMeasurement
+
+    def get_representations(self, data, return_feature_names: bool = False):
+        return super(MimicCleanDatasetProvider, self).get_representations(data.numpy(), return_feature_names)
 
 
 class PtbXLDatasetProvider(PeriodicDatasetProvider):

@@ -1,8 +1,9 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import welch
 
 from msr.signals.base import MultiChannelSignal, Signal
-from msr.signals.utils import parse_feats_to_array
+from msr.signals.utils import BEAT_FIG_PARAMS, parse_feats_to_array
 
 FREQ_BANDS = {"delta": [0.5, 4.5], "theta": [4.5, 8.5], "alpha": [8.5, 11.5], "sigma": [11.5, 15.5], "beta": [15.5, 30]}
 
@@ -10,6 +11,7 @@ FREQ_BANDS = {"delta": [0.5, 4.5], "theta": [4.5, 8.5], "alpha": [8.5, 11.5], "s
 class EEGSignal(Signal):
     def __init__(self, name, data, fs, start_sec=0):
         super().__init__(name, data, fs, start_sec)
+        self.units = "Voltage [V]"
         self.feature_extraction_funcs.update(
             {
                 "frequency": self.extract_frequency_features,
@@ -17,16 +19,19 @@ class EEGSignal(Signal):
             }
         )
 
-    def extract_frequency_features(self, return_arr=False, fmin=0.5, fmax=30, **kwargs):
-        freqs, pxx = welch(self.data, fs=self.fs)
-        freq_mask = (freqs >= fmin) & (freqs <= fmax)
-        freqs, pxx = freqs[freq_mask], pxx[freq_mask]
-        pxx /= sum(pxx)
+    def extract_frequency_features(self, return_arr=True, fmin=0.5, fmax=30, plot=False, ax=None, **kwargs):
+        return_fig = False
+        if plot and ax is None:
+            fig, ax = plt.subplots(figsize=BEAT_FIG_PARAMS["fig_size"])
+            return_fig = True
+        freqs, pxx = self.psd(fmin, fmax, normalize=True, plot=plot, ax=ax)
         features = {
             f"{band}_power": np.mean(pxx[(freqs >= fmin) & (freqs < fmax)]) for band, (fmin, fmax) in FREQ_BANDS.items()
         }
         if return_arr:
             return parse_feats_to_array(features)
+        if return_fig:
+            return features, fig
         return features
 
     # TODO

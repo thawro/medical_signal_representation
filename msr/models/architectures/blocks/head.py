@@ -14,8 +14,8 @@ class Head(nn.Module):
 
 
 class RegressionHead(Head):
-    def __init__(self, in_features):
-        super().__init__(in_features=in_features, out_features=1)
+    def __init__(self, in_features, out_features=1):
+        super().__init__(in_features=in_features, out_features=out_features)
 
 
 class ClassificationHead(Head):

@@ -9,17 +9,20 @@ from msr.evaluation.metrics import get_classification_metrics, get_regression_me
 
 
 class BaseModule(pl.LightningModule):
-    def __init__(self, net: nn.Module):
+    def __init__(self, net: nn.Module, learning_rate: float = 0.01, weight_decay: float = 0.01):
         super().__init__()
         self.net = net
-        self.save_hyperparameters(logger=False, ignore=["net"])
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.save_hyperparameters(logger=False)
 
     @abstractmethod
-    def get_metrics(self, preds, target):
+    def get_metrics(self, preds, target, metrics):
         pass
 
     def forward(self, x):
-        return self.net(x)
+        out = self.net(x)
+        return out.squeeze()
 
     def _common_step(self, batch, batch_idx: int, stage: str):
         data, target = batch
@@ -41,7 +44,7 @@ class BaseModule(pl.LightningModule):
         preds = torch.cat([output["preds"] for output in outputs], dim=0)
         target = torch.cat([output["target"] for output in outputs], dim=0)
         metrics = self.get_metrics(preds, target)
-        metrics["loss"] = loss
+        metrics["loss"] = loss.item()
         metrics = {f"{stage}/{name}": value for name, value in metrics.items()}
         results = {"metrics": metrics, "y_values": {"preds": preds, "target": target}}
         if self.trainer.sanity_checking or self.trainer.testing:
@@ -67,15 +70,15 @@ class BaseModule(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             params=self.parameters(),
-            lr=0.001,
+            lr=self.learning_rate,
             betas=(0.9, 0.999),
-            weight_decay=0.01,
+            weight_decay=self.weight_decay,
         )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
-            factor=0.1,
-            patience=10,
+            factor=0.7,
+            patience=7,
             threshold=0.0001,
         )
         return {
@@ -90,18 +93,20 @@ class BaseModule(pl.LightningModule):
 
 
 class ClassifierModule(BaseModule):
-    def __init__(self, net: nn.Module):
-        super().__init__(net)
+    def __init__(self, net: nn.Module, learning_rate: float = 0.01, weight_decay: float = 0.01):
+        super().__init__(net, learning_rate, weight_decay)
         self.criterion = nn.NLLLoss()
 
     def get_metrics(self, preds, target):
-        return get_classification_metrics(num_classes=self.net.num_classes, preds=preds, target=target)
+        metrics = ["accuracy", "fscore", "auroc"]
+        return get_classification_metrics(num_classes=self.net.num_classes, preds=preds, target=target, metrics=metrics)
 
 
 class RegressorModule(BaseModule):
-    def __init__(self, net: nn.Module):
-        super().__init__(net)
+    def __init__(self, net: nn.Module, learning_rate: float = 0.01, weight_decay: float = 0.01):
+        super().__init__(net, learning_rate, weight_decay)
         self.criterion = nn.MSELoss()
 
     def get_metrics(self, preds, target):
-        return get_regression_metrics(preds=preds, target=target)
+        metrics = ["mae", "mape", "corr", "r2", "mse"]
+        return get_regression_metrics(preds=preds, target=target, metrics=metrics)

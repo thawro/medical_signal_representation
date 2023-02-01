@@ -1,0 +1,10 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+n_samples: 1000
+max_samples_per_subject: 20     # maximum number of samples per subject in created dataset
+train_size: 0.7
+val_size: 0.15
+test_size: 0.15
+seed: 42

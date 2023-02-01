@@ -9,7 +9,7 @@ from msr.signals.base import (
     BeatSignal,
     MultiChannelPeriodicSignal,
     PeriodicSignal,
-    find_intervals_using_hr,
+    find_intervals_using_most_dominant_freq,
 )
 from msr.signals.features import get_basic_signal_features
 from msr.signals.utils import parse_feats_to_array
@@ -38,6 +38,7 @@ class ECGSignal(PeriodicSignal):
     def __init__(self, name, data, fs, start_sec=0):
         polarity = check_ecg_polarity(nk.ecg_clean(data, sampling_rate=fs))
         super().__init__(name, polarity * data, fs, start_sec)
+        self.units = "Voltage [V]"
         # self.nk_signals_df, self.nk_info = nk.ecg_process(self.data, sampling_rate=self.fs)
         self.feature_extraction_funcs.update(
             {
@@ -70,13 +71,9 @@ class ECGSignal(PeriodicSignal):
                 if not is_peaks_valid(peaks):
                     raise Exception
             except Exception:  # TODO # both methods raise exceptions
-                intervals = find_intervals_using_hr(self)
+                intervals = find_intervals_using_most_dominant_freq(self)
                 peaks = np.array([self.data[start:end].argmax()] + start for start, end in intervals)
         return peaks
-
-    def find_troughs(self):
-        peaks = zip(self.peaks[:-1], self.peaks[1:])
-        return np.array([self.data[prev_peak : next_peak + 1].argmin() + prev_peak for prev_peak, next_peak in peaks])
 
     def _get_beats_intervals(self, align_to_peak=True):
         try:
@@ -110,7 +107,7 @@ class ECGSignal(PeriodicSignal):
             intervals = np.array(intervals)
         except ZeroDivisionError:
             print("Setting intervals using hr")
-            intervals = find_intervals_using_hr(self)
+            intervals = find_intervals_using_most_dominant_freq(self)
         return intervals
 
     def extract_hrv_features(self, return_arr=True, **kwargs):
@@ -158,13 +155,11 @@ class ECGSignal(PeriodicSignal):
             return parse_feats_to_array(features)
         return features
 
-    def extract_agg_beat_features(self, return_arr=True, plot=False):
-        return self.agg_beat.extract_features(plot=plot, return_arr=return_arr)
-
 
 class ECGBeat(BeatSignal):
     def __init__(self, name, data, fs, start_sec, beat_num=0):
         super().__init__(name, data, fs, start_sec, beat_num)
+        self.units = "Voltage [V]"
 
     @lazy_property
     def r_onset_loc(self):
@@ -326,15 +321,3 @@ class ECGBeat(BeatSignal):
             {"name": "QRS_interval", "start": self.q_loc, "end": self.s_loc},
             {"name": "QT_interval", "start": self.q_loc, "end": self.t_offset_loc},
         ]
-
-
-class MultiChannelECGSignal(MultiChannelPeriodicSignal):
-    def plot_beats_segmentation(self, use_raw=False, **kwargs):
-        fig, axes = plt.subplots(
-            self.n_signals, 2, figsize=(24, 1.3 * self.n_signals), sharex="col", gridspec_kw={"width_ratios": [9, 2]}
-        )
-        for ax, (sig_name, sig) in zip(axes, self.signals.items()):
-            sig.plot_beats_segmentation(use_raw=use_raw, axes=ax)
-            sig.agg_beat.plot_crit_points(points=["p", "q", "r", "s", "t"], ax=ax[1])
-            ax[1].set_title("")
-        plt.tight_layout()

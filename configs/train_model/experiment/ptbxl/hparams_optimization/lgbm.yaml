@@ -1,0 +1,21 @@
+# @package _global_
+
+defaults:
+  - override /callbacks: default.yaml
+  - override /logger: ml_wandb_logger.yaml
+  - override /plotter: plotly.yaml
+  - override /trainer: ml_classifier_trainer.yaml
+  - override /datamodule: ptbxl.yaml
+  - override /model: lgbm_classifier.yaml
+  - override /transforms: [flatten.yaml]
+
+logger_project: ptbxl_optimization #${datamodule._target_}
+logger_run_name: ${dataset}__${representation_type}__${model._target_}
+
+
+model:
+  colsample_bytree: 0.1   # 0.1, 0.3, 0.5, 0.7, 0.9, 1.0      | 1.0
+  max_depth: 4            # 4, 16, 32, 64, -1                      | -1
+  num_leaves: 31          # 15, 31, 63, 127                   | 31
+  n_estimators: 600       # 100, 250, 600, 1000               | 600
+  learning_rate: 0.1      # 0.001, 0.005, 0.01, 0.1           | 0.1
